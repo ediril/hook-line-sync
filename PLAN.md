@@ -24,9 +24,10 @@
     - hls u|pload   <local-file> [<remote-file-name>]
                     <local-folder>/ [<remote-folder-name>]
                     <local-folder>/*.js
-                    *changed
-                    *15m
+                    *diff [<filter>]
     - hls d|ownload <remote-file> [<local-file-name>]
                     <remote-folder>/ [<local-folder-name>]
+                    *diff [<filter>]
     - hls list l|ocal
                r|emote
+               d|iff        # based on size & timestamp
