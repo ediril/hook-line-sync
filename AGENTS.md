@@ -42,6 +42,9 @@
 - Prefer characterization before new architecture.
 - Do not tune thresholds just to make a test pass.
 - When tests fail in a revealing way, report what the failure says.
+- Keep the test suite conservative. Every test must protect a distinct,
+  load-bearing behavior or failure boundary; avoid exhaustive permutations and
+  tests that merely restate implementation details.
 - Keep old comparison modes available when promoting a new default, unless there
   is a clear reason to remove them.
 - Preserve deterministic behavior.

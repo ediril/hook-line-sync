@@ -1,6 +1,6 @@
 # Work Queue
 
-- [ ] Establish the executable foundation and configuration slice:
+- [x] Establish the executable foundation and configuration slice:
   - Add `pyproject.toml`, the `hls` package, console entry point, supported
     Python metadata, lint/test configuration, and a minimal README.
   - Define and validate the server-configuration model, including host, port,

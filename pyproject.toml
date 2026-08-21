@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hls"
+dynamic = ["version"]
+description = "Synchronize local files with remote servers over explicit FTPS"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Hook Line Sync contributors" }]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Environment :: Console",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: System :: Archiving :: Backup",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "build>=1,<2",
+  "pyftpdlib[ssl]>=2.0,<3",
+  "pytest>=8,<10",
+  "ruff>=0.12,<1",
+  "setuptools>=77",
+]
+
+[project.scripts]
+hls = "hls.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "hls.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

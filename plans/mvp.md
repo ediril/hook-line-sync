@@ -9,6 +9,9 @@ remote servers over explicit FTP over TLS (FTPS).
 - The application supports Python 3.10 and newer.
 - The project is packaged with `pyproject.toml` and will be distributed through
   PyPI.
+- Versions use `0.<month>.<day>.<increment>` without leading zeroes. The final
+  component starts at `1` each day and increases for subsequent releases made
+  that day.
 
 ## Server configurations
 
