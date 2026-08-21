@@ -39,14 +39,15 @@ PROD_FTPS_PASSWORD
 Custom names can be supplied with `--username-env` and `--password-env`.
 Credential values are never written to `~/.hls/configs.json`.
 
-Set the default profile and verify its FTPS connection:
+Verify a profile's FTPS connection explicitly:
 
 ```console
-hls set prod
 hls connect prod
 ```
 
 The connection uses certificate verification and refuses plaintext fallback.
+There is no global default profile. File operations will resolve their server
+through persisted mappings so ambient CLI state cannot redirect a transfer.
 
 ## Versioning
 

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-CONFIG_VERSION = 1
+CONFIG_VERSION = 2
 CONFIG_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 ENVIRONMENT_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -110,20 +110,14 @@ class ServerConfiguration:
 @dataclass
 class ApplicationConfiguration:
     servers: dict[str, ServerConfiguration] = field(default_factory=dict)
-    default: str | None = None
 
     def __post_init__(self) -> None:
         for name in self.servers:
             validate_config_name(name)
-        if self.default is not None and self.default not in self.servers:
-            raise ConfigurationError(
-                f"default configuration '{self.default}' does not exist"
-            )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "version": CONFIG_VERSION,
-            "default": self.default,
             "servers": {
                 name: server.to_dict()
                 for name, server in sorted(self.servers.items())
@@ -134,15 +128,15 @@ class ApplicationConfiguration:
     def from_dict(cls, value: Any) -> ApplicationConfiguration:
         if not isinstance(value, dict):
             raise ConfigurationError("configuration document must be an object")
-        expected = {"version", "default", "servers"}
+        if value.get("version") != CONFIG_VERSION:
+            raise ConfigurationError(
+                f"unsupported configuration version: {value.get('version')!r}"
+            )
+        expected = {"version", "servers"}
         unknown = set(value) - expected
         if unknown:
             raise ConfigurationError(
                 f"unknown configuration fields: {', '.join(sorted(unknown))}"
-            )
-        if value.get("version") != CONFIG_VERSION:
-            raise ConfigurationError(
-                f"unsupported configuration version: {value.get('version')!r}"
             )
         servers_value = value.get("servers")
         if not isinstance(servers_value, dict):
@@ -151,10 +145,7 @@ class ApplicationConfiguration:
             validate_config_name(name): ServerConfiguration.from_dict(server)
             for name, server in servers_value.items()
         }
-        default = value.get("default")
-        if default is not None and not isinstance(default, str):
-            raise ConfigurationError("default must be a string or null")
-        return cls(servers=servers, default=default)
+        return cls(servers=servers)
 
 
 class ConfigurationStore:

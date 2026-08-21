@@ -7,7 +7,7 @@
     TLS settings, and credential environment-variable names.
   - Implement atomic persistence in `~/.hls/configs.json` without storing
     credential values.
-  - Implement `hls add`, `hls set`, `hls help`, and `hls version`.
+  - Implement `hls add`, `hls help`, and `hls version`.
   - Implement an explicit-FTPS transport that verifies certificates, enables
     `PROT P`, and has no plaintext fallback.
   - Cover configuration behavior with unit tests and FTPS connectivity with an
