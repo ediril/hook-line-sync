@@ -10,7 +10,7 @@ from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import TLS_FTPHandler
 from pyftpdlib.servers import FTPServer
 
-from hls.config import ServerConfiguration
+from hls.config import ProjectConfiguration
 from hls.transport import ExplicitFTPSTransport, TransportError
 
 
@@ -18,8 +18,9 @@ def test_missing_credentials_are_reported(monkeypatch) -> None:
     monkeypatch.delenv("PROD_FTPS_USERNAME", raising=False)
     monkeypatch.delenv("PROD_FTPS_PASSWORD", raising=False)
     transport = ExplicitFTPSTransport(
-        ServerConfiguration(
+        ProjectConfiguration(
             host="localhost",
+            remote_root="/",
             username_env="PROD_FTPS_USERNAME",
             password_env="PROD_FTPS_PASSWORD",
         )
@@ -93,8 +94,9 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
     monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
     context = ssl.create_default_context(cafile=os.fspath(certificate))
     transport = ExplicitFTPSTransport(
-        ServerConfiguration(
+        ProjectConfiguration(
             host="localhost",
+            remote_root="/",
             port=port,
             username_env="PROD_FTPS_USERNAME",
             password_env="PROD_FTPS_PASSWORD",
@@ -116,8 +118,9 @@ def test_rejects_an_untrusted_server_certificate(tls_ftp_server, monkeypatch) ->
     monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
     monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
     transport = ExplicitFTPSTransport(
-        ServerConfiguration(
+        ProjectConfiguration(
             host="localhost",
+            remote_root="/",
             port=port,
             username_env="PROD_FTPS_USERNAME",
             password_env="PROD_FTPS_PASSWORD",
@@ -125,4 +128,24 @@ def test_rejects_an_untrusted_server_certificate(tls_ftp_server, monkeypatch) ->
     )
 
     with pytest.raises(TransportError, match="certificate verify failed"):
+        transport.connect()
+
+
+def test_rejects_an_inaccessible_project_root(tls_ftp_server, monkeypatch) -> None:
+    port, certificate = tls_ftp_server
+    monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
+    monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
+    context = ssl.create_default_context(cafile=os.fspath(certificate))
+    transport = ExplicitFTPSTransport(
+        ProjectConfiguration(
+            host="localhost",
+            remote_root="/missing",
+            port=port,
+            username_env="PROD_FTPS_USERNAME",
+            password_env="PROD_FTPS_PASSWORD",
+        ),
+        ssl_context=context,
+    )
+
+    with pytest.raises(TransportError, match="No such file or directory"):
         transport.connect()

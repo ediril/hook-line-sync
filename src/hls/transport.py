@@ -6,7 +6,7 @@ import ssl
 from dataclasses import dataclass
 from typing import Protocol
 
-from hls.config import ServerConfiguration
+from hls.config import ProjectConfiguration
 
 
 class TransportError(RuntimeError):
@@ -21,7 +21,7 @@ class RemoteTransport(Protocol):
 
 @dataclass
 class ExplicitFTPSTransport:
-    configuration: ServerConfiguration
+    configuration: ProjectConfiguration
     timeout: float = 30.0
     ssl_context: ssl.SSLContext | None = None
 
@@ -53,13 +53,15 @@ class ExplicitFTPSTransport:
             client.auth()
             client.login(username, password)
             client.prot_p()
+            client.cwd(self.configuration.remote_root)
         except (OSError, ftplib.Error, ssl.SSLError) as error:
             try:
                 client.close()
             finally:
                 raise TransportError(
-                    f"could not establish explicit FTPS connection to "
-                    f"{self.configuration.host}:{self.configuration.port}: {error}"
+                    f"could not open explicit FTPS project at "
+                    f"{self.configuration.host}:{self.configuration.port}"
+                    f"{self.configuration.remote_root}: {error}"
                 ) from error
         self._client = client
 

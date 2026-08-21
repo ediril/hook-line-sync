@@ -20,16 +20,17 @@ python -m pip install -e '.[dev]'
 pytest
 ```
 
-## Configuration
+## Projects
 
-Add a server profile:
+Add a project with its FTPS endpoint and absolute remote root:
 
 ```console
-hls add prod ftps --host ftp.example.com
+hls add prod ftps --host ftp.example.com --remote-root /public_html/site
 ```
 
-By default, credential variable names are derived from the profile name. The
-command above reads credentials from:
+Each project owns its connection details, remote root, and mappings. Multiple
+projects may use the same server. By default, credential variable names are
+derived from the project name. The command above reads credentials from:
 
 ```text
 PROD_FTPS_USERNAME
@@ -39,28 +40,37 @@ PROD_FTPS_PASSWORD
 Custom names can be supplied with `--username-env` and `--password-env`.
 Credential values are never written to `~/.hls/configs.json`.
 
-Verify a profile's FTPS connection explicitly:
+Verify a project's FTPS connection explicitly:
 
 ```console
 hls connect prod
 ```
 
 The connection uses certificate verification and refuses plaintext fallback.
-There is no global default profile. File operations will resolve their server
+There is no global default project. File operations will resolve their project
 through persisted mappings so ambient CLI state cannot redirect a transfer.
+
+Remove a project and all of its locally stored mappings:
+
+```console
+hls remove prod
+```
+
+Removal does not connect to the server or delete remote files.
 
 ## Mappings
 
-Bind an existing local folder to an absolute folder in a server profile's FTP
-namespace:
+Bind an existing local folder to an absolute folder within a project's remote
+root:
 
 ```console
-hls map prod /public_html ./site
+hls map prod /public_html/site ./site
 ```
 
 If the local folder is omitted, the current directory is used. Local paths are
-resolved before storage, including symlinks. Within one profile, neither side
-of a mapping may duplicate, contain, or be contained by another mapping.
+resolved before storage, including symlinks. Within one project, neither side
+of a mapping may duplicate, contain, or be contained by another mapping. A
+remote mapping may not escape the project's configured remote root.
 
 ## Versioning
 

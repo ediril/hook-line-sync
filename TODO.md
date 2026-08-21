@@ -3,11 +3,11 @@
 - [x] Establish the executable foundation and configuration slice:
   - Add `pyproject.toml`, the `hls` package, console entry point, supported
     Python metadata, lint/test configuration, and a minimal README.
-  - Define and validate the server-configuration model, including host, port,
-    TLS settings, and credential environment-variable names.
+  - Define and validate the project-configuration model, including host, port,
+    remote root, TLS settings, and credential environment-variable names.
   - Implement atomic persistence in `~/.hls/configs.json` without storing
     credential values.
-  - Implement `hls add`, `hls help`, and `hls version`.
+  - Implement `hls add`, `hls remove`, `hls help`, and `hls version`.
   - Implement an explicit-FTPS transport that verifies certificates, enables
     `PROT P`, and has no plaintext fallback.
   - Cover configuration behavior with unit tests and FTPS connectivity with an

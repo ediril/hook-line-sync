@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-CONFIG_VERSION = 3
-CONFIG_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+CONFIG_VERSION = 4
+PROJECT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 ENVIRONMENT_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -17,18 +17,18 @@ class ConfigurationError(ValueError):
     """Raised when configuration is invalid or cannot be decoded."""
 
 
-def validate_config_name(name: str) -> str:
-    if not CONFIG_NAME_PATTERN.fullmatch(name):
+def validate_project_name(name: str) -> str:
+    if not PROJECT_NAME_PATTERN.fullmatch(name):
         raise ConfigurationError(
-            "configuration name must start with a letter or digit and contain "
+            "project name must start with a letter or digit and contain "
             "only letters, digits, '.', '_', or '-'"
         )
     return name
 
 
-def credential_environment_names(config_name: str) -> tuple[str, str]:
-    validate_config_name(config_name)
-    prefix = re.sub(r"[^A-Za-z0-9]", "_", config_name).upper()
+def credential_environment_names(project_name: str) -> tuple[str, str]:
+    validate_project_name(project_name)
+    prefix = re.sub(r"[^A-Za-z0-9]", "_", project_name).upper()
     return f"{prefix}_FTPS_USERNAME", f"{prefix}_FTPS_PASSWORD"
 
 
@@ -51,13 +51,13 @@ def _paths_overlap(first: Path | PurePosixPath, second: Path | PurePosixPath) ->
     return first == second or first in second.parents or second in first.parents
 
 
-def _normalize_remote_path(value: Any) -> str:
-    remote_value = _required_string(value, "mapping remote path")
+def _normalize_remote_path(value: Any, field_name: str = "mapping remote path") -> str:
+    remote_value = _required_string(value, field_name)
     remote_path = PurePosixPath(remote_value)
     if not remote_path.is_absolute():
-        raise ConfigurationError("mapping remote path must be absolute")
+        raise ConfigurationError(f"{field_name} must be absolute")
     if ".." in remote_path.parts:
-        raise ConfigurationError("mapping remote path cannot contain '..'")
+        raise ConfigurationError(f"{field_name} cannot contain '..'")
     components = [part for part in remote_path.parts if part not in {"/", "//"}]
     return "/" + "/".join(components)
 
@@ -118,8 +118,9 @@ class DirectoryMapping:
 
 
 @dataclass(frozen=True)
-class ServerConfiguration:
+class ProjectConfiguration:
     host: str
+    remote_root: str
     port: int = 21
     username_env: str = "FTPS_USERNAME"
     password_env: str = "FTPS_PASSWORD"
@@ -128,6 +129,11 @@ class ServerConfiguration:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "host", _required_string(self.host, "host"))
+        object.__setattr__(
+            self,
+            "remote_root",
+            _normalize_remote_path(self.remote_root, "project remote root"),
+        )
         if self.type != "ftps":
             raise ConfigurationError("server type must be 'ftps'")
         if isinstance(self.port, bool) or not isinstance(self.port, int):
@@ -145,8 +151,18 @@ class ServerConfiguration:
             _environment_name(self.password_env, "password_env"),
         )
         for index, mapping in enumerate(self.mappings):
+            self._validate_within_remote_root(mapping)
             for existing in self.mappings[:index]:
                 self._validate_no_overlap(mapping, existing)
+
+    def _validate_within_remote_root(self, mapping: DirectoryMapping) -> None:
+        remote = PurePosixPath(mapping.remote)
+        root = PurePosixPath(self.remote_root)
+        if remote != root and root not in remote.parents:
+            raise ConfigurationError(
+                f"remote path '{mapping.remote}' is outside project root "
+                f"'{self.remote_root}'"
+            )
 
     @staticmethod
     def _validate_no_overlap(
@@ -165,11 +181,13 @@ class ServerConfiguration:
                 f"'{existing.remote}'"
             )
 
-    def with_mapping(self, mapping: DirectoryMapping) -> ServerConfiguration:
+    def with_mapping(self, mapping: DirectoryMapping) -> ProjectConfiguration:
+        self._validate_within_remote_root(mapping)
         for existing in self.mappings:
             self._validate_no_overlap(mapping, existing)
-        return ServerConfiguration(
+        return ProjectConfiguration(
             host=self.host,
+            remote_root=self.remote_root,
             port=self.port,
             username_env=self.username_env,
             password_env=self.password_env,
@@ -181,6 +199,7 @@ class ServerConfiguration:
         return {
             "type": self.type,
             "host": self.host,
+            "remote_root": self.remote_root,
             "port": self.port,
             "username_env": self.username_env,
             "password_env": self.password_env,
@@ -193,12 +212,13 @@ class ServerConfiguration:
         }
 
     @classmethod
-    def from_dict(cls, value: Any) -> ServerConfiguration:
+    def from_dict(cls, value: Any) -> ProjectConfiguration:
         if not isinstance(value, dict):
-            raise ConfigurationError("server configuration must be an object")
+            raise ConfigurationError("project configuration must be an object")
         expected = {
             "type",
             "host",
+            "remote_root",
             "port",
             "username_env",
             "password_env",
@@ -207,15 +227,16 @@ class ServerConfiguration:
         unknown = set(value) - expected
         if unknown:
             raise ConfigurationError(
-                f"unknown server configuration fields: {', '.join(sorted(unknown))}"
+                f"unknown project configuration fields: {', '.join(sorted(unknown))}"
             )
         try:
             mappings_value = value["mappings"]
             if not isinstance(mappings_value, list):
-                raise ConfigurationError("server mappings must be an array")
+                raise ConfigurationError("project mappings must be an array")
             return cls(
                 type=value["type"],
                 host=value["host"],
+                remote_root=value["remote_root"],
                 port=value["port"],
                 username_env=value["username_env"],
                 password_env=value["password_env"],
@@ -226,24 +247,24 @@ class ServerConfiguration:
             )
         except KeyError as error:
             raise ConfigurationError(
-                f"server configuration is missing field: {error.args[0]}"
+                f"project configuration is missing field: {error.args[0]}"
             ) from error
 
 
 @dataclass
 class ApplicationConfiguration:
-    servers: dict[str, ServerConfiguration] = field(default_factory=dict)
+    projects: dict[str, ProjectConfiguration] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        for name in self.servers:
-            validate_config_name(name)
+        for name in self.projects:
+            validate_project_name(name)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "version": CONFIG_VERSION,
-            "servers": {
-                name: server.to_dict()
-                for name, server in sorted(self.servers.items())
+            "projects": {
+                name: project.to_dict()
+                for name, project in sorted(self.projects.items())
             },
         }
 
@@ -255,20 +276,20 @@ class ApplicationConfiguration:
             raise ConfigurationError(
                 f"unsupported configuration version: {value.get('version')!r}"
             )
-        expected = {"version", "servers"}
+        expected = {"version", "projects"}
         unknown = set(value) - expected
         if unknown:
             raise ConfigurationError(
                 f"unknown configuration fields: {', '.join(sorted(unknown))}"
             )
-        servers_value = value.get("servers")
-        if not isinstance(servers_value, dict):
-            raise ConfigurationError("servers must be an object")
-        servers = {
-            validate_config_name(name): ServerConfiguration.from_dict(server)
-            for name, server in servers_value.items()
+        projects_value = value.get("projects")
+        if not isinstance(projects_value, dict):
+            raise ConfigurationError("projects must be an object")
+        projects = {
+            validate_project_name(name): ProjectConfiguration.from_dict(project)
+            for name, project in projects_value.items()
         }
-        return cls(servers=servers)
+        return cls(projects=projects)
 
 
 class ConfigurationStore:

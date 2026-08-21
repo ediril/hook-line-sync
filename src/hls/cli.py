@@ -12,9 +12,9 @@ from hls.config import (
     ConfigurationError,
     ConfigurationStore,
     DirectoryMapping,
-    ServerConfiguration,
+    ProjectConfiguration,
     credential_environment_names,
-    validate_config_name,
+    validate_project_name,
 )
 from hls.transport import ExplicitFTPSTransport, TransportError
 
@@ -27,23 +27,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=__version__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    add_parser = subparsers.add_parser("add", help="add an FTPS server profile")
-    add_parser.add_argument("config_name")
+    add_parser = subparsers.add_parser("add", help="add an FTPS project")
+    add_parser.add_argument("project_name")
     add_parser.add_argument("type", choices=("ftps",))
     add_parser.add_argument("--host", required=True)
+    add_parser.add_argument("--remote-root", required=True)
     add_parser.add_argument("--port", type=int, default=21)
     add_parser.add_argument("--username-env")
     add_parser.add_argument("--password-env")
 
     connect_parser = subparsers.add_parser(
-        "connect", help="verify an FTPS connection"
+        "connect", help="verify a project's FTPS connection"
     )
-    connect_parser.add_argument("config_name")
+    connect_parser.add_argument("project_name")
 
     map_parser = subparsers.add_parser("map", help="add a folder mapping")
-    map_parser.add_argument("config_name")
+    map_parser.add_argument("project_name")
     map_parser.add_argument("remote_folder")
     map_parser.add_argument("local_folder", nargs="?", default=".")
+
+    remove_parser = subparsers.add_parser("remove", help="remove a project")
+    remove_parser.add_argument("project_name")
 
     help_parser = subparsers.add_parser("help", help="show command help")
     help_parser.add_argument("topic", nargs="?")
@@ -52,52 +56,60 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _save_server(
+def _save_project(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
 ) -> str:
-    name = validate_config_name(arguments.config_name)
+    name = validate_project_name(arguments.project_name)
     configuration = store.load()
-    if name in configuration.servers:
-        raise ConfigurationError(f"configuration '{name}' already exists")
+    if name in configuration.projects:
+        raise ConfigurationError(f"project '{name}' already exists")
     default_username_env, default_password_env = credential_environment_names(name)
-    server = ServerConfiguration(
+    project = ProjectConfiguration(
         type=arguments.type,
         host=arguments.host,
+        remote_root=arguments.remote_root,
         port=arguments.port,
         username_env=arguments.username_env or default_username_env,
         password_env=arguments.password_env or default_password_env,
     )
-    configuration.servers[name] = server
+    configuration.projects[name] = project
     store.save(configuration)
-    return f"Added FTPS configuration '{name}'."
+    return f"Added FTPS project '{name}'."
 
 
-def _resolve_server(
+def _resolve_project(
     arguments: argparse.Namespace, store: ConfigurationStore
-) -> tuple[ApplicationConfiguration, str, ServerConfiguration]:
-    name = validate_config_name(arguments.config_name)
+) -> tuple[ApplicationConfiguration, str, ProjectConfiguration]:
+    name = validate_project_name(arguments.project_name)
     configuration = store.load()
-    if name not in configuration.servers:
-        raise ConfigurationError(f"configuration '{name}' does not exist")
-    return configuration, name, configuration.servers[name]
+    if name not in configuration.projects:
+        raise ConfigurationError(f"project '{name}' does not exist")
+    return configuration, name, configuration.projects[name]
 
 
 def _connect(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
-    _, name, server = _resolve_server(arguments, store)
-    with ExplicitFTPSTransport(server):
+    _, name, project = _resolve_project(arguments, store)
+    with ExplicitFTPSTransport(project):
         pass
-    return f"Connected securely using configuration '{name}'."
+    return f"Connected securely to project '{name}'."
 
 
 def _map(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
-    configuration, name, server = _resolve_server(arguments, store)
+    configuration, name, project = _resolve_project(arguments, store)
     mapping = DirectoryMapping.create(
         local=Path(arguments.local_folder), remote=arguments.remote_folder
     )
-    configuration.servers[name] = server.with_mapping(mapping)
+    configuration.projects[name] = project.with_mapping(mapping)
     store.save(configuration)
     return f"Mapped '{mapping.local}' to '{name}:{mapping.remote}'."
+
+
+def _remove(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+    configuration, name, _ = _resolve_project(arguments, store)
+    del configuration.projects[name]
+    store.save(configuration)
+    return f"Removed project '{name}'."
 
 
 def _show_help(parser: argparse.ArgumentParser, topic: str | None) -> str:
@@ -125,11 +137,13 @@ def run(
     configuration_store = store or ConfigurationStore()
     try:
         if arguments.command == "add":
-            message = _save_server(arguments, configuration_store)
+            message = _save_project(arguments, configuration_store)
         elif arguments.command == "connect":
             message = _connect(arguments, configuration_store)
         elif arguments.command == "map":
             message = _map(arguments, configuration_store)
+        elif arguments.command == "remove":
+            message = _remove(arguments, configuration_store)
         elif arguments.command == "help":
             message = _show_help(parser, arguments.topic)
         elif arguments.command == "version":
