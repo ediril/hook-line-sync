@@ -5,10 +5,10 @@ import os
 import re
 import tempfile
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
-CONFIG_VERSION = 2
+CONFIG_VERSION = 3
 CONFIG_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 ENVIRONMENT_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -47,6 +47,76 @@ def _environment_name(value: Any, field_name: str) -> str:
     return name
 
 
+def _paths_overlap(first: Path | PurePosixPath, second: Path | PurePosixPath) -> bool:
+    return first == second or first in second.parents or second in first.parents
+
+
+def _normalize_remote_path(value: Any) -> str:
+    remote_value = _required_string(value, "mapping remote path")
+    remote_path = PurePosixPath(remote_value)
+    if not remote_path.is_absolute():
+        raise ConfigurationError("mapping remote path must be absolute")
+    if ".." in remote_path.parts:
+        raise ConfigurationError("mapping remote path cannot contain '..'")
+    components = [part for part in remote_path.parts if part not in {"/", "//"}]
+    return "/" + "/".join(components)
+
+
+@dataclass(frozen=True)
+class DirectoryMapping:
+    local: str
+    remote: str
+
+    def __post_init__(self) -> None:
+        local_value = _required_string(self.local, "mapping local path")
+        local_path = Path(local_value)
+        if not local_path.is_absolute():
+            raise ConfigurationError("mapping local path must be absolute")
+        if local_path.parent == local_path:
+            raise ConfigurationError("mapping local path cannot be the filesystem root")
+        if os.path.normpath(local_value) != local_value:
+            raise ConfigurationError("mapping local path must be normalized")
+
+        if _normalize_remote_path(self.remote) != self.remote:
+            raise ConfigurationError("mapping remote path must be normalized")
+
+    @classmethod
+    def create(cls, local: str | Path, remote: str) -> DirectoryMapping:
+        candidate = Path(local).expanduser()
+        try:
+            local_path = candidate.resolve(strict=True)
+        except OSError as error:
+            raise ConfigurationError(
+                f"local mapping folder does not exist: {candidate}"
+            ) from error
+        if not local_path.is_dir():
+            raise ConfigurationError(f"local mapping path is not a folder: {candidate}")
+
+        return cls(
+            local=os.fspath(local_path), remote=_normalize_remote_path(remote)
+        )
+
+    def to_dict(self) -> dict[str, str]:
+        return {"local": self.local, "remote": self.remote}
+
+    @classmethod
+    def from_dict(cls, value: Any) -> DirectoryMapping:
+        if not isinstance(value, dict):
+            raise ConfigurationError("mapping must be an object")
+        expected = {"local", "remote"}
+        unknown = set(value) - expected
+        if unknown:
+            raise ConfigurationError(
+                f"unknown mapping fields: {', '.join(sorted(unknown))}"
+            )
+        try:
+            return cls(local=value["local"], remote=value["remote"])
+        except KeyError as error:
+            raise ConfigurationError(
+                f"mapping is missing field: {error.args[0]}"
+            ) from error
+
+
 @dataclass(frozen=True)
 class ServerConfiguration:
     host: str
@@ -54,6 +124,7 @@ class ServerConfiguration:
     username_env: str = "FTPS_USERNAME"
     password_env: str = "FTPS_PASSWORD"
     type: str = "ftps"
+    mappings: tuple[DirectoryMapping, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "host", _required_string(self.host, "host"))
@@ -73,33 +144,85 @@ class ServerConfiguration:
             "password_env",
             _environment_name(self.password_env, "password_env"),
         )
+        for index, mapping in enumerate(self.mappings):
+            for existing in self.mappings[:index]:
+                self._validate_no_overlap(mapping, existing)
 
-    def to_dict(self) -> dict[str, str | int]:
+    @staticmethod
+    def _validate_no_overlap(
+        mapping: DirectoryMapping, existing: DirectoryMapping
+    ) -> None:
+        if _paths_overlap(Path(mapping.local), Path(existing.local)):
+            raise ConfigurationError(
+                f"local path '{mapping.local}' overlaps existing mapping "
+                f"'{existing.local}'"
+            )
+        if _paths_overlap(
+            PurePosixPath(mapping.remote), PurePosixPath(existing.remote)
+        ):
+            raise ConfigurationError(
+                f"remote path '{mapping.remote}' overlaps existing mapping "
+                f"'{existing.remote}'"
+            )
+
+    def with_mapping(self, mapping: DirectoryMapping) -> ServerConfiguration:
+        for existing in self.mappings:
+            self._validate_no_overlap(mapping, existing)
+        return ServerConfiguration(
+            host=self.host,
+            port=self.port,
+            username_env=self.username_env,
+            password_env=self.password_env,
+            type=self.type,
+            mappings=(*self.mappings, mapping),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": self.type,
             "host": self.host,
             "port": self.port,
             "username_env": self.username_env,
             "password_env": self.password_env,
+            "mappings": [
+                mapping.to_dict()
+                for mapping in sorted(
+                    self.mappings, key=lambda item: (item.local, item.remote)
+                )
+            ],
         }
 
     @classmethod
     def from_dict(cls, value: Any) -> ServerConfiguration:
         if not isinstance(value, dict):
             raise ConfigurationError("server configuration must be an object")
-        expected = {"type", "host", "port", "username_env", "password_env"}
+        expected = {
+            "type",
+            "host",
+            "port",
+            "username_env",
+            "password_env",
+            "mappings",
+        }
         unknown = set(value) - expected
         if unknown:
             raise ConfigurationError(
                 f"unknown server configuration fields: {', '.join(sorted(unknown))}"
             )
         try:
+            mappings_value = value["mappings"]
+            if not isinstance(mappings_value, list):
+                raise ConfigurationError("server mappings must be an array")
             return cls(
                 type=value["type"],
                 host=value["host"],
                 port=value["port"],
                 username_env=value["username_env"],
                 password_env=value["password_env"],
+                mappings=tuple(
+                    DirectoryMapping.from_dict(mapping)
+                    for mapping in mappings_value
+                ),
             )
         except KeyError as error:
             raise ConfigurationError(

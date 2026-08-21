@@ -3,12 +3,15 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import TextIO
 
 from hls import __version__
 from hls.config import (
+    ApplicationConfiguration,
     ConfigurationError,
     ConfigurationStore,
+    DirectoryMapping,
     ServerConfiguration,
     credential_environment_names,
     validate_config_name,
@@ -36,6 +39,11 @@ def build_parser() -> argparse.ArgumentParser:
         "connect", help="verify an FTPS connection"
     )
     connect_parser.add_argument("config_name")
+
+    map_parser = subparsers.add_parser("map", help="add a folder mapping")
+    map_parser.add_argument("config_name")
+    map_parser.add_argument("remote_folder")
+    map_parser.add_argument("local_folder", nargs="?", default=".")
 
     help_parser = subparsers.add_parser("help", help="show command help")
     help_parser.add_argument("topic", nargs="?")
@@ -67,19 +75,29 @@ def _save_server(
 
 def _resolve_server(
     arguments: argparse.Namespace, store: ConfigurationStore
-) -> tuple[str, ServerConfiguration]:
+) -> tuple[ApplicationConfiguration, str, ServerConfiguration]:
     name = validate_config_name(arguments.config_name)
     configuration = store.load()
     if name not in configuration.servers:
         raise ConfigurationError(f"configuration '{name}' does not exist")
-    return name, configuration.servers[name]
+    return configuration, name, configuration.servers[name]
 
 
 def _connect(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
-    name, server = _resolve_server(arguments, store)
+    _, name, server = _resolve_server(arguments, store)
     with ExplicitFTPSTransport(server):
         pass
     return f"Connected securely using configuration '{name}'."
+
+
+def _map(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+    configuration, name, server = _resolve_server(arguments, store)
+    mapping = DirectoryMapping.create(
+        local=Path(arguments.local_folder), remote=arguments.remote_folder
+    )
+    configuration.servers[name] = server.with_mapping(mapping)
+    store.save(configuration)
+    return f"Mapped '{mapping.local}' to '{name}:{mapping.remote}'."
 
 
 def _show_help(parser: argparse.ArgumentParser, topic: str | None) -> str:
@@ -110,6 +128,8 @@ def run(
             message = _save_server(arguments, configuration_store)
         elif arguments.command == "connect":
             message = _connect(arguments, configuration_store)
+        elif arguments.command == "map":
+            message = _map(arguments, configuration_store)
         elif arguments.command == "help":
             message = _show_help(parser, arguments.topic)
         elif arguments.command == "version":

@@ -49,6 +49,19 @@ The connection uses certificate verification and refuses plaintext fallback.
 There is no global default profile. File operations will resolve their server
 through persisted mappings so ambient CLI state cannot redirect a transfer.
 
+## Mappings
+
+Bind an existing local folder to an absolute folder in a server profile's FTP
+namespace:
+
+```console
+hls map prod /public_html ./site
+```
+
+If the local folder is omitted, the current directory is used. Local paths are
+resolved before storage, including symlinks. Within one profile, neither side
+of a mapping may duplicate, contain, or be contained by another mapping.
+
 ## Versioning
 
 Releases use `0.<month>.<day>.<increment>` without leading zeroes. The final
