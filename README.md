@@ -178,6 +178,10 @@ File identity uses size and modification timestamps normalized to the coarser
 precision reported by the local filesystem and remote MLSD facts. Identical
 paths are omitted from the output.
 
+Compare prints immediately flushed progress milestones to stderr while it
+connects and scans. The final projection is written to stdout, so it can be
+redirected without mixing status messages into the result.
+
 ## Push and pull
 
 Apply the complete push or pull projection from anywhere inside a mapped

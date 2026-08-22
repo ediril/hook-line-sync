@@ -51,7 +51,19 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.21.15"
+    assert __version__ == "0.8.22.2"
+
+    help_output = invoke(["help"], store)[1]
+    assert "compare (cmp)       preview file changes without modifying anything" in (
+        help_output
+    )
+    assert "push                upload local changes to the remote project" in (
+        help_output
+    )
+    pull_help = (
+        "pull                replace changed local files from the remote project"
+    )
+    assert pull_help in help_output
 
     list_status, list_stdout, list_stderr = invoke(["list"], store)
     assert (list_status, list_stderr) == (0, "")
@@ -271,26 +283,37 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert invoke(["list", "remote"], store) == remote_listing
     assert invoke(["lsr"], store) == remote_listing
     push_comparison = invoke(["compare"], store)
-    assert push_comparison[0] == 0 and push_comparison[2] == ""
+    push_progress = (
+        "Comparing project 'prod'...\n"
+        "Connecting securely over FTPS...\n"
+        "Scanning local files...\n"
+        "Reading remote files over FTPS...\n"
+        "Building push plan...\n"
+    )
+    assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert "Push projection for project 'prod':\n" in push_comparison[1]
     assert "upload         local-only" in push_comparison[1]
     assert "skip           remote-only" in push_comparison[1]
     assert invoke(["cmp"], store) == push_comparison
 
     selected_comparison = invoke(["compare", "main.py"], store)
-    assert selected_comparison[0] == 0 and selected_comparison[2] == ""
+    assert selected_comparison[0] == 0
+    assert selected_comparison[2] == push_progress
     assert "src/main.py" in selected_comparison[1]
     assert "README.md" not in selected_comparison[1]
     assert "deployed.html" not in selected_comparison[1]
 
     pull_comparison = invoke(["compare", "--pull", "-p"], store)
-    assert pull_comparison[0] == 0 and pull_comparison[2] == ""
+    assert pull_comparison[0] == 0
+    assert pull_comparison[2].endswith("Building pull plan...\n")
     assert "Pull projection for project 'prod':\n" in pull_comparison[1]
     assert "delete-remote  remote-only" in pull_comparison[1]
     assert "skip           local-only" in pull_comparison[1]
 
     push_result = invoke(["push", "main.py"], store)
-    assert push_result[0] == 0 and push_result[2] == ""
+    assert push_result[0] == 0
+    assert push_result[2].startswith("Preparing push for project 'prod'...\n")
+    assert push_result[2].endswith("Executing push plan...\n")
     assert "Push completed for project 'prod': 1 change(s)." in push_result[1]
     assert operations == [
         ("mkdir", "src"),
@@ -298,7 +321,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     ]
     monkeypatch.chdir(workspace)
     pull_result = invoke(["pull", "deployed.html"], store)
-    assert pull_result[0] == 0 and pull_result[2] == ""
+    assert pull_result[0] == 0
+    assert pull_result[2].startswith("Preparing pull for project 'prod'...\n")
+    assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
     assert len(transports) == 9

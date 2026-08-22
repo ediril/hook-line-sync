@@ -83,10 +83,22 @@ def build_parser() -> argparse.ArgumentParser:
     compare_parser = subparsers.add_parser(
         "compare",
         aliases=("cmp",),
-        help="show the projected push or pull actions",
+        help="preview file changes without modifying anything",
+        description=(
+            "Preview file changes without modifying local or remote files. "
+            "Shows push actions by default; use --pull to preview pull actions."
+        ),
     )
-    compare_parser.add_argument("selector", nargs="?")
-    compare_parser.add_argument("--project", dest="project_name")
+    compare_parser.add_argument(
+        "selector",
+        nargs="?",
+        help="relative file path or quoted wildcard; defaults to the whole project",
+    )
+    compare_parser.add_argument(
+        "--project",
+        dest="project_name",
+        help="project name; inferred from the current directory when omitted",
+    )
     compare_parser.add_argument(
         "--pull",
         action="store_true",
@@ -99,13 +111,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="project deletion of remote-only paths",
     )
 
+    transfer_help = {
+        "push": "upload local changes to the remote project",
+        "pull": "replace changed local files from the remote project",
+    }
+    transfer_description = {
+        "push": (
+            "Upload new and changed local files. Remote-only files are reported "
+            "and left untouched unless --prune-remote is supplied."
+        ),
+        "pull": (
+            "Replace changed existing local files from the remote project. "
+            "Missing local files are not restored."
+        ),
+    }
     for command in ("push", "pull"):
         transfer_parser = subparsers.add_parser(
             command,
-            help=f"synchronize selected files in the {command} direction",
+            help=transfer_help[command],
+            description=transfer_description[command],
         )
-        transfer_parser.add_argument("selector", nargs="?")
-        transfer_parser.add_argument("--project", dest="project_name")
+        transfer_parser.add_argument(
+            "selector",
+            nargs="?",
+            help=(
+                "relative file path or quoted wildcard; defaults to the whole project"
+            ),
+        )
+        transfer_parser.add_argument(
+            "--project",
+            dest="project_name",
+            help="project name; inferred from the current directory when omitted",
+        )
         transfer_parser.add_argument(
             "-p",
             "--prune-remote",
@@ -288,11 +325,15 @@ def _build_plan(
     transport: ExplicitFTPSTransport,
     *,
     direction: str,
+    progress: TextIO,
 ) -> tuple[TreeSnapshot, TreeSnapshot, ComparisonPlan]:
     exclusions = ExclusionSpec(project.exclusions)
     selector = _file_selector(arguments, root)
+    print("Scanning local files...", file=progress, flush=True)
     local = snapshot_local(root, exclusions)
+    print("Reading remote files over FTPS...", file=progress, flush=True)
     remote = transport.snapshot(exclusions)
+    print(f"Building {direction} plan...", file=progress, flush=True)
     plan = build_comparison(
         local,
         remote,
@@ -303,9 +344,15 @@ def _build_plan(
     return local, remote, plan
 
 
-def _compare(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+def _compare(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    progress: TextIO,
+) -> str:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
+    print(f"Comparing project '{name}'...", file=progress, flush=True)
+    print("Connecting securely over FTPS...", file=progress, flush=True)
     with ExplicitFTPSTransport(project) as transport:
         _, _, plan = _build_plan(
             arguments,
@@ -313,6 +360,7 @@ def _compare(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
             root,
             transport,
             direction="pull" if arguments.pull else "push",
+            progress=progress,
         )
     return _format_comparison(name, plan)
 
@@ -331,9 +379,19 @@ def _format_transfer(name: str, result: TransferResult) -> str:
     return "\n".join(lines)
 
 
-def _transfer(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+def _transfer(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    progress: TextIO,
+) -> str:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
+    print(
+        f"Preparing {arguments.command} for project '{name}'...",
+        file=progress,
+        flush=True,
+    )
+    print("Connecting securely over FTPS...", file=progress, flush=True)
     with ExplicitFTPSTransport(project) as transport:
         local, remote, plan = _build_plan(
             arguments,
@@ -341,7 +399,9 @@ def _transfer(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
             root,
             transport,
             direction=arguments.command,
+            progress=progress,
         )
+        print(f"Executing {arguments.command} plan...", file=progress, flush=True)
         result = execute_transfer(
             plan,
             local_root=root,
@@ -400,9 +460,9 @@ def run(
         elif arguments.command == "lsr":
             message = _list_remote(arguments, configuration_store)
         elif arguments.command in {"compare", "cmp"}:
-            message = _compare(arguments, configuration_store)
+            message = _compare(arguments, configuration_store, stderr)
         elif arguments.command in {"push", "pull"}:
-            message = _transfer(arguments, configuration_store)
+            message = _transfer(arguments, configuration_store, stderr)
         elif arguments.command == "help":
             message = _show_help(parser, arguments.topic)
         elif arguments.command == "version":
