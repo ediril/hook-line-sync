@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.22.2"
+    assert __version__ == "0.8.22.3"
 
     help_output = invoke(["help"], store)[1]
     assert "compare (cmp)       preview file changes without modifying anything" in (
@@ -220,9 +220,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         def __exit__(self, *_):
             return None
 
-        def snapshot(self, exclusions):
+        def snapshot(self, exclusions, selector=None):
             assert exclusions.patterns == ("*.log", "node_modules/")
-            return TreeSnapshot(
+            snapshot = TreeSnapshot(
                 (
                     TreeEntry(
                         "deployed.html",
@@ -233,6 +233,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
                     ),
                 )
             )
+            if selector is None or selector.matches("deployed.html"):
+                return snapshot
+            return TreeSnapshot()
 
         def make_directory(self, path):
             operations.append(("mkdir", path))

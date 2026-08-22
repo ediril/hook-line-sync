@@ -109,3 +109,12 @@ def test_comparison_projects_push_pull_prune_and_timestamp_precision() -> None:
             remote,
             selector=FileSelector("missing/**/*.js"),
         )
+
+    top_level = FileSelector("*")
+    assert top_level.matches("index.html")
+    assert not top_level.matches("src/index.html")
+    assert not top_level.may_match_descendant("src")
+    recursive = FileSelector("src/**/*.js")
+    assert recursive.may_match_descendant("src")
+    assert recursive.may_match_descendant("src/components")
+    assert not recursive.may_match_descendant("assets")

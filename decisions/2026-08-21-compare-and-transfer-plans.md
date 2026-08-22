@@ -39,6 +39,12 @@ than a successful no-op. Selection never expands the configured exclusion
 scope. `--prune-remote` deletes remote-only paths only inside the selected
 scope.
 
+Selectors are applied during snapshot traversal, before comparison. Local and
+remote walkers enter only directories whose project-relative prefixes can
+still satisfy the pattern. A single-segment `*` therefore scans only the
+corresponding directory; recursive traversal occurs only where `**` or later
+pattern segments can match descendants.
+
 The positional argument is reserved for the selector. An explicit project
 override therefore uses `--project <name>`; otherwise the current directory
 selects the project from its mapped root. When the current directory is inside

@@ -203,12 +203,29 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
 
     with transport:
         exclusions = ExclusionSpec()
-        local = snapshot_local(local_root, exclusions)
-        remote = transport.snapshot(exclusions)
+        unrelated = remote_root / "unrelated" / "deep"
+        unrelated.mkdir(parents=True)
+        (unrelated / "ignored.txt").write_text("ignored", encoding="utf-8")
+        (remote_root / "top.txt").write_text("top", encoding="utf-8")
+        assert transport._client is not None
+        original_mlsd = transport._client.mlsd
+        listed_directories = []
+
+        def tracked_mlsd(path="", facts=()):
+            listed_directories.append(path)
+            return original_mlsd(path, facts)
+
+        transport._client.mlsd = tracked_mlsd
+        transport.snapshot(exclusions, FileSelector("*"))
+        assert listed_directories == [""]
+
+        selector = FileSelector("nested/*.txt")
+        local = snapshot_local(local_root, exclusions, selector)
+        remote = transport.snapshot(exclusions, selector)
         push = build_comparison(
             local,
             remote,
-            selector=FileSelector("nested/*.txt"),
+            selector=selector,
         )
         execute_transfer(
             push,
@@ -221,11 +238,11 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             "local version"
         )
         assert not (remote_root / "unselected.txt").exists()
-        remote = transport.snapshot(exclusions)
+        remote = transport.snapshot(exclusions, selector)
         after_push = build_comparison(
-            snapshot_local(local_root, exclusions),
+            snapshot_local(local_root, exclusions, selector),
             remote,
-            selector=FileSelector("nested/*.txt"),
+            selector=selector,
         )
         assert after_push.entries[0].action == "unchanged"
 
@@ -236,13 +253,13 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             remote_selected,
             ns=(remote_timestamp_ns, remote_timestamp_ns),
         )
-        local = snapshot_local(local_root, exclusions)
-        remote = transport.snapshot(exclusions)
+        local = snapshot_local(local_root, exclusions, selector)
+        remote = transport.snapshot(exclusions, selector)
         pull = build_comparison(
             local,
             remote,
             direction="pull",
-            selector=FileSelector("nested/*.txt"),
+            selector=selector,
         )
         execute_transfer(
             pull,
@@ -256,13 +273,14 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
 
         orphan = remote_root / "orphan.txt"
         orphan.write_text("delete me", encoding="utf-8")
-        local = snapshot_local(local_root, exclusions)
-        remote = transport.snapshot(exclusions)
+        orphan_selector = FileSelector("orphan.txt")
+        local = snapshot_local(local_root, exclusions, orphan_selector)
+        remote = transport.snapshot(exclusions, orphan_selector)
         prune = build_comparison(
             local,
             remote,
             prune_remote=True,
-            selector=FileSelector("orphan.txt"),
+            selector=orphan_selector,
         )
         execute_transfer(
             prune,

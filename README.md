@@ -161,6 +161,10 @@ excluded, absolute, or parent-traversing selector is rejected. Use
 `--project <name>` to select a project explicitly; outside that project's local
 root, its selectors are project-root-relative.
 
+Selectors are applied before local and remote snapshots are built. HLS descends
+only into directories that can contain a match: `*` scans the corresponding
+directory without recursion, while `**` permits recursive traversal.
+
 The projection reports uploads, directional replacements, conflicts, skipped
 paths, and remote deletions. Local path existence is authoritative, so a
 remote-only path is skipped rather than restored or deleted by default. Include

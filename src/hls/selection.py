@@ -24,6 +24,25 @@ def _matches_parts(pattern: tuple[str, ...], path: tuple[str, ...]) -> bool:
     )
 
 
+@cache
+def _can_match_descendant(
+    pattern: tuple[str, ...],
+    directory: tuple[str, ...],
+) -> bool:
+    if not directory:
+        return bool(pattern)
+    if not pattern:
+        return False
+    head, *tail = pattern
+    if head == "**":
+        return _can_match_descendant(tuple(tail), directory) or (
+            _can_match_descendant(pattern, directory[1:])
+        )
+    return fnmatchcase(directory[0], head) and _can_match_descendant(
+        tuple(tail), directory[1:]
+    )
+
+
 @dataclass(frozen=True)
 class FileSelector:
     pattern: str
@@ -68,3 +87,12 @@ class FileSelector:
         if path.is_absolute() or ".." in path.parts:
             raise SelectionError("selected paths must remain inside the project")
         return _matches_parts(PurePosixPath(self.pattern).parts, path.parts)
+
+    def may_match_descendant(self, project_relative_directory: str) -> bool:
+        directory = PurePosixPath(project_relative_directory)
+        if directory.is_absolute() or ".." in directory.parts:
+            raise SelectionError("selected paths must remain inside the project")
+        return _can_match_descendant(
+            PurePosixPath(self.pattern).parts,
+            directory.parts,
+        )

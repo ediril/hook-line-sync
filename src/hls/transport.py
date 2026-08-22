@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from hls.config import ProjectConfiguration
 from hls.exclusions import ExclusionSpec
+from hls.selection import FileSelector
 from hls.snapshot import EntryKind, SnapshotError, TreeEntry, TreeSnapshot
 
 
@@ -49,7 +50,11 @@ def _relative_remote_path(value: str) -> str:
 class RemoteTransport(Protocol):
     def connect(self) -> None: ...
 
-    def snapshot(self, exclusions: ExclusionSpec) -> TreeSnapshot: ...
+    def snapshot(
+        self,
+        exclusions: ExclusionSpec,
+        selector: FileSelector | None = None,
+    ) -> TreeSnapshot: ...
 
     def make_directory(self, relative_path: str) -> None: ...
 
@@ -125,7 +130,11 @@ class ExplicitFTPSTransport:
         except (OSError, ftplib.Error):
             client.close()
 
-    def snapshot(self, exclusions: ExclusionSpec) -> TreeSnapshot:
+    def snapshot(
+        self,
+        exclusions: ExclusionSpec,
+        selector: FileSelector | None = None,
+    ) -> TreeSnapshot:
         if self._client is None:
             raise TransportError("FTPS transport is not connected")
         entries: list[TreeEntry] = []
@@ -172,7 +181,8 @@ class ExplicitFTPSTransport:
                     is_directory=kind == "directory",
                 ):
                     continue
-                if kind == "file":
+                selected = selector is None or selector.matches(relative_path)
+                if selected and kind == "file":
                     size_value = facts.get("size")
                     modified_value = facts.get("modify")
                     if size_value is None or modified_value is None:
@@ -205,9 +215,12 @@ class ExplicitFTPSTransport:
                             f"'{relative_path}': {error}"
                         ) from error
                     entries.append(entry)
-                else:
+                elif selected:
                     entries.append(TreeEntry(relative_path, kind))
-                if kind == "directory":
+                if kind == "directory" and (
+                    selector is None
+                    or selector.may_match_descendant(relative_path)
+                ):
                     walk(relative)
 
         walk(PurePosixPath())

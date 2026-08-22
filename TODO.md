@@ -26,7 +26,8 @@
   `--prune-remote` / `-p` planning with full local-to-FTPS integration coverage.
 - [x] Implement the shared optional file-selector model and apply it to compare:
   current-directory-relative literal paths, quoted `*` / `**` patterns,
-  exclusion enforcement, unmatched-selector errors, and prune containment.
+  exclusion enforcement, unmatched-selector errors, prune containment, and
+  pre-comparison traversal pruning on both local and remote snapshots.
 - [x] Specify overwrite, selection, symlink, partial-transfer, and delete
   behavior; implement `hls push` with a fresh transfer plan and the shared
   optional file selector. Remote-only paths are reported and skipped unless

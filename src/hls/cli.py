@@ -330,9 +330,9 @@ def _build_plan(
     exclusions = ExclusionSpec(project.exclusions)
     selector = _file_selector(arguments, root)
     print("Scanning local files...", file=progress, flush=True)
-    local = snapshot_local(root, exclusions)
+    local = snapshot_local(root, exclusions, selector)
     print("Reading remote files over FTPS...", file=progress, flush=True)
-    remote = transport.snapshot(exclusions)
+    remote = transport.snapshot(exclusions, selector)
     print(f"Building {direction} plan...", file=progress, flush=True)
     plan = build_comparison(
         local,
