@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hls"
+name = "hook-line-sync"
 dynamic = ["version"]
 description = "Synchronize local files with remote servers over explicit FTPS"
 readme = "README.md"
@@ -11,9 +11,11 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "Hook Line Sync contributors" }]
+keywords = ["deployment", "ftp", "ftps", "synchronization"]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Environment :: Console",
+  "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -24,6 +26,12 @@ classifiers = [
 ]
 dependencies = ["pathspec>=0.12,<1"]
 
+[project.urls]
+Homepage = "https://github.com/ediril/hook-line-sync"
+Changelog = "https://github.com/ediril/hook-line-sync/blob/main/CHANGELOG.md"
+Issues = "https://github.com/ediril/hook-line-sync/issues"
+Repository = "https://github.com/ediril/hook-line-sync.git"
+
 [project.optional-dependencies]
 dev = [
   "build>=1,<2",
@@ -31,6 +39,7 @@ dev = [
   "pytest>=8,<10",
   "ruff>=0.12,<1",
   "setuptools>=77",
+  "twine>=6,<7",
 ]
 
 [project.scripts]

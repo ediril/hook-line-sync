@@ -4,18 +4,28 @@ Hook Line Sync (`hls`) is a Python CLI for transferring files between mapped
 local folders and remote servers over explicit FTP over TLS (FTPS).
 
 The project is in pre-alpha development. Configuration, connection, mapping,
-tree inventory, comparison, and file transfer are available. Release packaging
-remains on the work queue in [`TODO.md`](TODO.md). Completed work is recorded in
-[`CHANGELOG.md`](CHANGELOG.md).
+tree inventory, comparison, file transfer, and release packaging are available.
+Future work is ordered in
+[`TODO.md`](https://github.com/ediril/hook-line-sync/blob/main/TODO.md), and
+completed work is recorded in the
+[`CHANGELOG.md`](https://github.com/ediril/hook-line-sync/blob/main/CHANGELOG.md).
 
 ## License and sustainability
 
-HLS is released under the [MIT License](LICENSE). Personal and commercial use
-are both permitted without payment.
+HLS is released under the
+[MIT License](https://github.com/ediril/hook-line-sync/blob/main/LICENSE).
+Personal and commercial use are both permitted without payment.
 
 A voluntary Business subscription is planned for professional users who want
 to fund continued development and receive additional services or support. It
 will not be required for commercial use of the MIT-licensed software.
+
+The initial Business Support offering will be cancellable monthly and scoped
+per organization. It will include private installation and configuration help,
+review of one HLS deployment setup, compatibility troubleshooting, and priority
+triage of reproducible defects. Response and resolution times will not be
+guaranteed until a formal service-level plan is offered. Pricing and the
+subscription channel will be announced separately.
 
 ## Requirements
 
@@ -30,6 +40,17 @@ will not be required for commercial use of the MIT-licensed software.
 python -m pip install -e '.[dev]'
 pytest
 ```
+
+The release distribution is named `hook-line-sync`; the installed command and
+Python package are both named `hls`. Once the first release is published to
+PyPI, installation will be:
+
+```console
+python -m pip install hook-line-sync
+```
+
+Maintainer release instructions are in
+[`RELEASING.md`](https://github.com/ediril/hook-line-sync/blob/main/RELEASING.md).
 
 ## Projects
 

@@ -18,5 +18,9 @@ additional services or support.
 - HLS remains open-source software rather than source-available software with a
   noncommercial restriction.
 
-The exact subscription benefits, pricing, and delivery mechanism remain part of
-release and business planning.
+The initial offering is a cancellable monthly Business Support subscription per
+organization. It includes private installation and configuration help, review
+of one HLS deployment setup, compatibility troubleshooting, and priority triage
+of reproducible defects. It has no guaranteed response or resolution time.
+Pricing and the subscription channel remain business decisions and do not
+affect the MIT license.

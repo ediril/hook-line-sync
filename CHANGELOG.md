@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.22.15 — 2026-08-22
+
+### Added
+
+- Added release identity validation and a documented manual PyPI procedure that
+  tests, builds, validates, and installs each release artifact before the
+  maintainer publishes it with Twine.
+
+### Changed
+
+- Defined the initial voluntary Business Support benefits without restricting
+  the MIT license or promising a service-level response time.
+- Prepared the `hook-line-sync` PyPI distribution name while retaining `hls` as
+  both the installed command and import package.
+
 ## 0.8.22.14 — 2026-08-22
 
 ### Added
@@ -37,6 +52,7 @@
   neutral gray `·` marker while keeping excluded paths out of transfers and
   pruning.
 - Added unique command-prefix resolution with ambiguity errors.
+- Added MIT licensing and documented the voluntary Business Support offering.
 
 ### Changed
 

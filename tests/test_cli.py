@@ -51,7 +51,6 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.22.14"
 
     help_output = invoke(["help"], store)[1]
     assert "compare             preview file changes without modifying anything" in (

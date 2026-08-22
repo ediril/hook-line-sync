@@ -1,9 +1,10 @@
 # Work Queue
 
-- [ ] Complete packaging documentation, release checks, and PyPI publication
+- [x] Complete packaging documentation, release checks, and PyPI publication
   preparation:
-  - Define the concrete support and service benefits of the voluntary Business
-    subscription without implying that the MIT license requires payment.
+  - [x] Define the concrete support and service benefits of the voluntary
+    Business subscription without implying that the MIT license requires
+    payment.
 - [ ] Make persistent rule maintenance scale without requiring user discipline:
   - Automatically perform only provably semantics-preserving cleanup whenever
     `hls include` or `hls exclude` mutates the ordered rule list; do not expose
