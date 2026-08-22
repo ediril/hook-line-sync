@@ -10,8 +10,10 @@ from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import TLS_FTPHandler
 from pyftpdlib.servers import FTPServer
 
+from hls.comparison import build_comparison
 from hls.config import ProjectConfiguration
 from hls.exclusions import ExclusionSpec
+from hls.snapshot import snapshot_local
 from hls.transport import ExplicitFTPSTransport, TransportError
 
 
@@ -98,6 +100,9 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
     (assets / "logo.svg").write_text("logo", encoding="utf-8")
     (cache / "index.bin").write_bytes(b"ignored")
     (root / "debug.log").write_text("ignored", encoding="utf-8")
+    local_root = root.parent / "local-root"
+    local_root.mkdir()
+    (local_root / "local.txt").write_text("local", encoding="utf-8")
     monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
     monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
     context = ssl.create_default_context(cafile=os.fspath(certificate))
@@ -120,6 +125,13 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
             ("assets", "directory"),
             ("assets/logo.svg", "file"),
         ]
+        local = snapshot_local(local_root, ExclusionSpec())
+        comparison = {
+            entry.path: entry
+            for entry in build_comparison(local, snapshot).entries
+        }
+        assert comparison["local.txt"].action == "upload"
+        assert comparison["assets/logo.svg"].action == "skip"
 
     assert transport._client is None
 

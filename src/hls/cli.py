@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TextIO
 
 from hls import __version__
+from hls.comparison import ComparisonEntry, ComparisonPlan, build_comparison
 from hls.config import (
     DEFAULT_PASSWORD_ENV,
     DEFAULT_USERNAME_ENV,
@@ -67,6 +68,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     list_parser.add_argument("project_name", nargs="?")
 
+    local_list_parser = subparsers.add_parser(
+        "lsl", help="list the local tree for a mapped project"
+    )
+    local_list_parser.add_argument("project_name", nargs="?")
+
+    remote_list_parser = subparsers.add_parser(
+        "lsr", help="list the remote tree for a mapped project"
+    )
+    remote_list_parser.add_argument("project_name", nargs="?")
+
+    compare_parser = subparsers.add_parser(
+        "compare",
+        aliases=("cmp",),
+        help="show the projected push or pull actions",
+    )
+    compare_parser.add_argument("project_name", nargs="?")
+    compare_parser.add_argument(
+        "--pull",
+        action="store_true",
+        help="project pull actions instead of push actions",
+    )
+    compare_parser.add_argument(
+        "-p",
+        "--prune-remote",
+        action="store_true",
+        help="project deletion of remote-only paths",
+    )
+
     help_parser = subparsers.add_parser("help", help="show command help")
     help_parser.add_argument("topic", nargs="?")
 
@@ -126,7 +155,7 @@ def _connect(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     _, name, project = _resolve_project(arguments, store)
     with ExplicitFTPSTransport(project):
         pass
-    return f"Connected securely to project '{name}'."
+    return f"Verified secure connectivity to project '{name}'."
 
 
 def _map(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
@@ -200,6 +229,45 @@ def _list_remote(arguments: argparse.Namespace, store: ConfigurationStore) -> st
     return _format_snapshot("Remote", name, snapshot)
 
 
+def _comparison_kind(entry: ComparisonEntry) -> str:
+    if (
+        entry.local_kind is not None
+        and entry.remote_kind is not None
+        and entry.local_kind != entry.remote_kind
+    ):
+        return f"{entry.local_kind}->{entry.remote_kind}"
+    return entry.local_kind or entry.remote_kind or "unknown"
+
+
+def _format_comparison(name: str, plan: ComparisonPlan) -> str:
+    direction = plan.direction.capitalize()
+    if not plan.differences:
+        return f"{direction} projection for project '{name}': no differences."
+    lines = [f"{direction} projection for project '{name}':"]
+    for entry in plan.differences:
+        lines.append(
+            f"  {entry.action:<14} {entry.state:<16} "
+            f"{_comparison_kind(entry):<20} {entry.path}"
+        )
+    return "\n".join(lines)
+
+
+def _compare(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+    _, name, project = _resolve_project(arguments, store)
+    root = _require_local_root(name, project)
+    exclusions = ExclusionSpec(project.exclusions)
+    local = snapshot_local(root, exclusions)
+    with ExplicitFTPSTransport(project) as transport:
+        remote = transport.snapshot(exclusions)
+    plan = build_comparison(
+        local,
+        remote,
+        direction="pull" if arguments.pull else "push",
+        prune_remote=arguments.prune_remote,
+    )
+    return _format_comparison(name, plan)
+
+
 def _show_help(parser: argparse.ArgumentParser, topic: str | None) -> str:
     if topic is None:
         return parser.format_help().rstrip()
@@ -243,6 +311,12 @@ def run(
                 message = _list_local(arguments, configuration_store)
             else:
                 message = _list_remote(arguments, configuration_store)
+        elif arguments.command == "lsl":
+            message = _list_local(arguments, configuration_store)
+        elif arguments.command == "lsr":
+            message = _list_remote(arguments, configuration_store)
+        elif arguments.command in {"compare", "cmp"}:
+            message = _compare(arguments, configuration_store)
         elif arguments.command == "help":
             message = _show_help(parser, arguments.topic)
         elif arguments.command == "version":

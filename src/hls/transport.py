@@ -3,17 +3,39 @@ from __future__ import annotations
 import ftplib
 import os
 import ssl
+from calendar import timegm
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Protocol
 
 from hls.config import ProjectConfiguration
 from hls.exclusions import ExclusionSpec
-from hls.snapshot import EntryKind, TreeEntry, TreeSnapshot
+from hls.snapshot import EntryKind, SnapshotError, TreeEntry, TreeSnapshot
 
 
 class TransportError(RuntimeError):
     """Raised when a remote transport cannot be used safely."""
+
+
+def _parse_mlsd_modify(value: str, path: str) -> tuple[int, int]:
+    base, separator, fraction = value.partition(".")
+    if len(base) != 14 or not base.isdigit() or (
+        separator and (not fraction or not fraction.isdigit())
+    ):
+        raise TransportError(
+            f"invalid MLSD modify timestamp {value!r} for '{path}'"
+        )
+    try:
+        timestamp = datetime.strptime(base, "%Y%m%d%H%M%S")
+    except ValueError as error:
+        raise TransportError(
+            f"invalid MLSD modify timestamp {value!r} for '{path}'"
+        ) from error
+    fraction_digits = min(len(fraction), 9)
+    fractional_ns = int(fraction[:9].ljust(9, "0")) if fraction else 0
+    precision_ns = 10 ** (9 - fraction_digits) if fraction else 1_000_000_000
+    return timegm(timestamp.timetuple()) * 1_000_000_000 + fractional_ns, precision_ns
 
 
 class RemoteTransport(Protocol):
@@ -90,7 +112,10 @@ class ExplicitFTPSTransport:
                 remote_directory = ""
             try:
                 children = sorted(
-                    self._client.mlsd(remote_directory, facts=["type"]),
+                    self._client.mlsd(
+                        remote_directory,
+                        facts=["type", "size", "modify"],
+                    ),
                     key=lambda item: item[0],
                 )
             except (OSError, ftplib.Error, ssl.SSLError) as error:
@@ -123,7 +148,41 @@ class ExplicitFTPSTransport:
                     is_directory=kind == "directory",
                 ):
                     continue
-                entries.append(TreeEntry(relative_path, kind))
+                if kind == "file":
+                    size_value = facts.get("size")
+                    modified_value = facts.get("modify")
+                    if size_value is None or modified_value is None:
+                        raise TransportError(
+                            f"remote file metadata is incomplete for "
+                            f"'{relative_path}'"
+                        )
+                    try:
+                        size = int(size_value)
+                    except SnapshotError as error:
+                        raise TransportError(
+                            f"invalid MLSD size {size_value!r} for "
+                            f"'{relative_path}'"
+                        ) from error
+                    modified_ns, precision_ns = _parse_mlsd_modify(
+                        modified_value,
+                        relative_path,
+                    )
+                    try:
+                        entry = TreeEntry(
+                            relative_path,
+                            kind,
+                            size=size,
+                            modified_ns=modified_ns,
+                            timestamp_precision_ns=precision_ns,
+                        )
+                    except ValueError as error:
+                        raise TransportError(
+                            f"invalid remote file metadata for "
+                            f"'{relative_path}': {error}"
+                        ) from error
+                    entries.append(entry)
+                else:
+                    entries.append(TreeEntry(relative_path, kind))
                 if kind == "directory":
                     walk(relative)
 

@@ -56,8 +56,9 @@ From anywhere under a mapped local root, the project name can be omitted:
 hls connect
 ```
 
-An explicit name takes precedence. The connection uses certificate verification
-and refuses plaintext fallback.
+An explicit name takes precedence. The command verifies authentication, the
+configured remote root, and protected data-channel setup, then closes the
+connection. It does not create a persistent session.
 
 Remove a project and its locally stored mapping:
 
@@ -112,7 +113,11 @@ project tree:
 ```console
 hls list local
 hls list remote
+hls lsl
+hls lsr
 ```
+
+`hls lsl` and `hls lsr` are shorthands for the corresponding `list` commands.
 
 An explicit project may be supplied when running elsewhere:
 
@@ -126,6 +131,35 @@ mapping exclusions. Directories, files, and symlinks are labeled separately;
 symlinks are listed but never followed. Remote traversal uses MLSD over the
 protected FTPS data connection and fails if the server cannot provide a
 structured listing.
+
+## Compare
+
+Preview what a full-project push would do without changing either side:
+
+```console
+hls compare
+hls cmp
+```
+
+Use the pull projection when needed:
+
+```console
+hls compare --pull
+```
+
+The projection reports uploads, directional replacements, conflicts, skipped
+paths, and remote deletions. Local path existence is authoritative, so a
+remote-only path is skipped rather than restored or deleted by default. Include
+its remote deletion in the projection explicitly with:
+
+```console
+hls compare --prune-remote
+hls cmp --pull -p
+```
+
+File identity uses size and modification timestamps normalized to the coarser
+precision reported by the local filesystem and remote MLSD facts. Identical
+paths are omitted from the output.
 
 ## Versioning
 

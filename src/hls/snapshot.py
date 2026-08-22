@@ -14,16 +14,39 @@ class SnapshotError(RuntimeError):
     """Raised when a deterministic tree snapshot cannot be produced."""
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True)
 class TreeEntry:
     path: str
     kind: EntryKind
+    size: int | None = None
+    modified_ns: int | None = None
+    timestamp_precision_ns: int | None = None
 
     def __post_init__(self) -> None:
         path = PurePosixPath(self.path)
         if path.is_absolute() or not path.parts or ".." in path.parts:
             raise SnapshotError(f"snapshot path must be relative: {self.path!r}")
         object.__setattr__(self, "path", path.as_posix())
+        metadata = (self.size, self.modified_ns, self.timestamp_precision_ns)
+        if self.kind == "file":
+            if any(value is None for value in metadata):
+                raise SnapshotError(
+                    f"file snapshot metadata is incomplete: {self.path!r}"
+                )
+            if self.size is not None and self.size < 0:
+                raise SnapshotError(f"file size cannot be negative: {self.path!r}")
+            if (
+                self.timestamp_precision_ns is not None
+                and self.timestamp_precision_ns <= 0
+            ):
+                raise SnapshotError(
+                    f"timestamp precision must be positive: {self.path!r}"
+                )
+        elif any(value is not None for value in metadata):
+            raise SnapshotError(
+                f"{self.kind} snapshot entry cannot have file metadata: "
+                f"{self.path!r}"
+            )
 
 
 @dataclass(frozen=True)
@@ -75,7 +98,25 @@ def snapshot_local(root: Path, exclusions: ExclusionSpec) -> TreeSnapshot:
                 is_directory=kind == "directory",
             ):
                 continue
-            entries.append(TreeEntry(relative_path, kind))
+            if kind == "file":
+                try:
+                    stat = child.stat(follow_symlinks=False)
+                except OSError as error:
+                    raise SnapshotError(
+                        f"could not read local file metadata "
+                        f"'{directory / child.name}': {error}"
+                    ) from error
+                entries.append(
+                    TreeEntry(
+                        relative_path,
+                        kind,
+                        size=stat.st_size,
+                        modified_ns=stat.st_mtime_ns,
+                        timestamp_precision_ns=1,
+                    )
+                )
+            else:
+                entries.append(TreeEntry(relative_path, kind))
             if kind == "directory":
                 walk(directory / child.name, relative)
 

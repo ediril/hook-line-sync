@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.21.11"
+    assert __version__ == "0.8.21.13"
 
     list_status, list_stdout, list_stderr = invoke(["list"], store)
     assert (list_status, list_stderr) == (0, "")
@@ -209,17 +209,27 @@ def test_current_project_inference_drives_connect_and_tree_listings(
 
         def snapshot(self, exclusions):
             assert exclusions.patterns == ("*.log", "node_modules/")
-            return TreeSnapshot((TreeEntry("deployed.html", "file"),))
+            return TreeSnapshot(
+                (
+                    TreeEntry(
+                        "deployed.html",
+                        "file",
+                        size=8,
+                        modified_ns=1_700_000_000_000_000_000,
+                        timestamp_precision_ns=1_000_000_000,
+                    ),
+                )
+            )
 
     monkeypatch.setattr("hls.cli.ExplicitFTPSTransport", FakeTransport)
     monkeypatch.chdir(source)
 
     assert invoke(["connect"], store) == (
         0,
-        "Connected securely to project 'prod'.\n",
+        "Verified secure connectivity to project 'prod'.\n",
         "",
     )
-    assert invoke(["list", "local"], store) == (
+    local_listing = (
         0,
         "Local tree for project 'prod':\n"
         "  file      README.md\n"
@@ -228,13 +238,29 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "  file      src/main.py\n",
         "",
     )
-    assert invoke(["list", "remote"], store) == (
+    remote_listing = (
         0,
         "Remote tree for project 'prod':\n"
         "  file      deployed.html\n",
         "",
     )
-    assert len(transports) == 2
+    assert invoke(["list", "local"], store) == local_listing
+    assert invoke(["lsl"], store) == local_listing
+    assert invoke(["list", "remote"], store) == remote_listing
+    assert invoke(["lsr"], store) == remote_listing
+    push_comparison = invoke(["compare"], store)
+    assert push_comparison[0] == 0 and push_comparison[2] == ""
+    assert "Push projection for project 'prod':\n" in push_comparison[1]
+    assert "upload         local-only" in push_comparison[1]
+    assert "skip           remote-only" in push_comparison[1]
+    assert invoke(["cmp"], store) == push_comparison
+
+    pull_comparison = invoke(["compare", "--pull", "-p"], store)
+    assert pull_comparison[0] == 0 and pull_comparison[2] == ""
+    assert "Pull projection for project 'prod':\n" in pull_comparison[1]
+    assert "delete-remote  remote-only" in pull_comparison[1]
+    assert "skip           local-only" in pull_comparison[1]
+    assert len(transports) == 6
 
 
 def test_map_rejects_existing_and_overlapping_local_roots(

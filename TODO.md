@@ -21,15 +21,19 @@
   endpoints, local/remote roots, exclusions, and current-directory inference.
 - [x] Implement deterministic, exclusion-aware local and remote tree snapshots
   and `hls list local` / `hls list remote` with mapped-directory inference.
-- [ ] Specify timestamp normalization and comparison states, then implement
-  `hls list diff` with full local-to-FTPS integration coverage.
-- [ ] Specify overwrite, rename, glob, filter, symlink, and partial-transfer
-  behavior; implement explicit file and directory upload.
-- [ ] Implement diff-selected upload and verify the full local-to-FTPS upload
-  pipeline.
-- [ ] Implement explicit file and directory download, including safe local
-  writes and the agreed overwrite behavior.
-- [ ] Implement diff-selected download and verify the full FTPS-to-local
-  download pipeline.
+- [x] Specify timestamp normalization and comparison states, then implement
+  push-oriented `hls compare` / `hls cmp`, its `--pull` projection, and
+  `--prune-remote` / `-p` planning with full local-to-FTPS integration coverage.
+- [ ] Specify overwrite, rename, glob, filter, symlink, partial-transfer, and
+  delete behavior; implement explicit file and directory `hls push` with a
+  fresh transfer plan. Remote-only paths are reported and skipped unless
+  `--prune-remote` / `-p` explicitly authorizes deletion after successful
+  non-delete operations. Preserve and verify remote modification timestamps so
+  completed uploads compare identically.
+- [ ] Implement diff-selected push and verify the full local-to-FTPS pipeline.
+- [ ] Implement explicit file and directory `hls pull`, including safe local
+  writes, the agreed overwrite behavior, and the same opt-in `--prune-remote` /
+  `-p` behavior without restoring remote-only paths.
+- [ ] Implement diff-selected pull and verify the full FTPS-to-local pipeline.
 - [ ] Complete packaging documentation, release checks, and PyPI publication
   preparation.
