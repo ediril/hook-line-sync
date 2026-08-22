@@ -159,8 +159,11 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     docs = workspace / "docs"
     ignored.mkdir()
     docs.mkdir()
+    package = ignored / "package"
+    package.mkdir()
     (ignored / "drop.js").write_text("drop", encoding="utf-8")
     (ignored / "keep.js").write_text("keep", encoding="utf-8")
+    (package / "nested.js").write_text("nested", encoding="utf-8")
     (workspace / "composer.json").write_text("{}", encoding="utf-8")
     (workspace / "composer.lock").write_text("{}", encoding="utf-8")
     (docs / "note.txt").write_text("note", encoding="utf-8")
@@ -173,6 +176,7 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         ["exc", "composer.json", "composer.lock"], store
     )
     include_result = invoke(["inc", "node_modules/keep.js"], store)
+    directory_include_result = invoke(["inc", "node_modules/package"], store)
     monkeypatch.chdir(docs)
     assert invoke(["exc", "note.txt"], store)[0] == 0
     monkeypatch.chdir(workspace)
@@ -193,6 +197,11 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         "Included for project 'prod':\n  node_modules/keep.js\n",
         "",
     )
+    assert directory_include_result == (
+        0,
+        "Included for project 'prod':\n  node_modules/package\n",
+        "",
+    )
     assert expanded_exclude_result == (
         0,
         "Excluded for project 'prod':\n  composer.json\n  composer.lock\n",
@@ -208,12 +217,14 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         "/composer.json",
         "/composer.lock",
         "!/node_modules/keep.js",
+        "!/node_modules/package/**",
         "/docs/note.txt",
     )
     exclusions = ExclusionSpec(project.exclusions)
     assert exclusions.excludes(".git", is_directory=True)
-    assert exclusions.excludes("node_modules/package/index.js")
+    assert not exclusions.excludes("node_modules/package/index.js")
     assert not exclusions.excludes("node_modules/keep.js")
+    assert not exclusions.excludes("node_modules/package/nested.js")
     assert not exclusions.excludes("vendor/README.md")
     assert not exclusions.excludes("vendor/composer.json")
     legacy_rules = ExclusionSpec(("README.md", "composer.json"))
@@ -225,32 +236,44 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert [entry.path for entry in snapshot.entries] == [
         "docs",
         "node_modules/keep.js",
+        "node_modules/package",
+        "node_modules/package/nested.js",
     ]
-    assert invoke(["exc"], store) == (
-        0,
-        "Excluded local files for project 'prod':\n"
-        "  composer.json\n"
-        "  composer.lock\n"
-        "  docs/note.txt\n"
-        "  node_modules/drop.js\n",
-        "",
-    )
-    assert invoke(["inc", "--list"], store) == (
+    included_view = (
         0,
         "Included local files for project 'prod':\n"
-        "  node_modules/keep.js\n",
+        "  node_modules/keep.js\n"
+        "  node_modules/package/nested.js\n",
         "",
     )
-    list_with_patterns = invoke(["exc", "--list", "*.md"], store)
-    assert list_with_patterns[0] == 1
-    assert "--list cannot be combined with patterns" in list_with_patterns[2]
+    assert invoke(["files"], store) == included_view
+    assert invoke(["exc"], store) == (
+        0,
+        "Exclusion rules for project 'prod':\n"
+        "  /.git/\n"
+        "  /node_modules/\n"
+        "  *.log\n"
+        "  **/.cache/\n"
+        "  /composer.json\n"
+        "  /composer.lock\n"
+        "  /docs/note.txt\n",
+        "",
+    )
+    assert invoke(["inc"], store) == (
+        0,
+        "Inclusion rules for project 'prod':\n"
+        "  /node_modules/keep.js\n"
+        "  /node_modules/package/**\n",
+        "",
+    )
     list_stdout = invoke(["list"], store)[1]
     assert "* prod\n" in list_stdout
     assert f"  Local root: {workspace}\n" in list_stdout
     assert (
         "  Rules: exclude /.git/, exclude /node_modules/, exclude *.log, "
         "exclude **/.cache/, exclude /composer.json, exclude /composer.lock, "
-        "include /node_modules/keep.js, exclude /docs/note.txt\n"
+        "include /node_modules/keep.js, include /node_modules/package/**, "
+        "exclude /docs/note.txt\n"
     ) in list_stdout
     assert "project mapped to the current directory" not in list_stdout
 

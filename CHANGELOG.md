@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.22.16 — 2026-08-22
+
+### Changed
+
+- Literal directory inclusion operands now persist as recursive `/**` rules,
+  including directories produced by unquoted shell expansion such as
+  `vendor/*`.
+- No-argument `include` and `exclude` now list their respective persisted rules.
+  Added `hls files` as the unified effective listing of all local files included
+  in synchronization.
+
 ## 0.8.22.15 — 2026-08-22
 
 ### Added

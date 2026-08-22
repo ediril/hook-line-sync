@@ -57,7 +57,13 @@ def rules_from_patterns(
             raise ExclusionError("literal paths must be relative to the project")
         relative = PurePosixPath(*current_relative.parts) / supplied
         anchored = f"/{relative.as_posix()}"
-        if pattern.endswith("/") and not anchored.endswith("/"):
+        local_path = project_root.joinpath(*relative.parts)
+        is_directory = pattern.endswith("/") or (
+            local_path.is_dir() and not local_path.is_symlink()
+        )
+        if include and is_directory:
+            anchored = f"{anchored.rstrip('/')}/**"
+        elif pattern.endswith("/") and not anchored.endswith("/"):
             anchored += "/"
         normalized.append(anchored)
     if include:

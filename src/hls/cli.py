@@ -43,6 +43,7 @@ CANONICAL_COMMANDS = (
     "pull",
     "exclude",
     "include",
+    "files",
     "help",
     "version",
 )
@@ -96,9 +97,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     map_parser.add_argument("project_name")
 
-    for command, help_text in (
-        ("exclude", "permanently exclude paths from synchronization"),
-        ("include", "permanently re-include paths in synchronization"),
+    for command, help_text, rule_name in (
+        (
+            "exclude",
+            "permanently exclude paths from synchronization",
+            "exclusion",
+        ),
+        (
+            "include",
+            "permanently re-include paths in synchronization",
+            "inclusion",
+        ),
     ):
         rules_parser = subparsers.add_parser(command, help=help_text)
         add_pattern_operands(
@@ -106,21 +115,23 @@ def build_parser() -> argparse.ArgumentParser:
             required=False,
             help_text=(
                 "gitignore-style patterns or comma-separated pattern groups "
-                "relative to the local root; omit to list effective files"
+                f"relative to the local root; omit to list {rule_name} rules"
             ),
-        )
-        rules_parser.add_argument(
-            "-l",
-            "--list",
-            dest="list_files",
-            action="store_true",
-            help=f"list effectively {command}d local files",
         )
         rules_parser.add_argument(
             "--project",
             dest="project_name",
             help="project name; inferred from the current directory when omitted",
         )
+
+    files_parser = subparsers.add_parser(
+        "files", help="list local files included in synchronization"
+    )
+    files_parser.add_argument(
+        "--project",
+        dest="project_name",
+        help="project name; inferred from the current directory when omitted",
+    )
 
     remove_parser = subparsers.add_parser("remove", help="remove a project")
     remove_parser.add_argument("project_name")
@@ -301,25 +312,22 @@ def _change_exclusions(
 ) -> str:
     configuration, name, project = _resolve_project(arguments, store)
     patterns = normalize_pattern_operands(arguments)
-    if arguments.list_files and patterns:
-        raise ConfigurationError("--list cannot be combined with patterns")
-    if arguments.list_files or not patterns:
-        root = _require_local_root(name, project)
-        snapshot = snapshot_local(
-            root,
-            ExclusionSpec(project.exclusions),
-            include_excluded=True,
+    if not patterns:
+        rules = tuple(
+            rule[1:]
+            for rule in project.exclusions
+            if include and rule.startswith("!")
         )
-        paths = tuple(
-            entry.path
-            for entry in snapshot.entries
-            if entry.kind == "file" and entry.excluded == (not include)
+        if not include:
+            rules = tuple(
+                rule for rule in project.exclusions if not rule.startswith("!")
+            )
+        kind = "Inclusion" if include else "Exclusion"
+        if not rules:
+            return f"No {kind.lower()} rules for project '{name}'."
+        return "\n".join(
+            (f"{kind} rules for project '{name}':", *(f"  {rule}" for rule in rules))
         )
-        scope = "Included" if include else "Excluded"
-        if not paths:
-            return f"No {scope.lower()} local files for project '{name}'."
-        heading = f"{scope} local files for project '{name}':"
-        return "\n".join((heading, *(f"  {path}" for path in paths)))
     root = _require_local_root(name, project)
     rules = rules_from_patterns(
         patterns,
@@ -333,6 +341,32 @@ def _change_exclusions(
     displayed_rules = patterns
     return "\n".join(
         (f"{action} for project '{name}':", *(f"  {rule}" for rule in displayed_rules))
+    )
+
+
+def _list_included_files(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+) -> str:
+    _, name, project = _resolve_project(arguments, store)
+    root = _require_local_root(name, project)
+    snapshot = snapshot_local(
+        root,
+        ExclusionSpec(project.exclusions),
+        include_excluded=True,
+    )
+    paths = tuple(
+        entry.path
+        for entry in snapshot.entries
+        if entry.kind == "file" and not entry.excluded
+    )
+    if not paths:
+        return f"No included local files for project '{name}'."
+    return "\n".join(
+        (
+            f"Included local files for project '{name}':",
+            *(f"  {path}" for path in paths),
+        )
     )
 
 
@@ -621,6 +655,8 @@ def run(
             )
         elif arguments.command == "include":
             message = _change_exclusions(arguments, configuration_store, include=True)
+        elif arguments.command == "files":
+            message = _list_included_files(arguments, configuration_store)
         elif arguments.command == "remove":
             message = _remove(arguments, configuration_store)
         elif arguments.command == "list":

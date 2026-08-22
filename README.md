@@ -146,18 +146,27 @@ hls exc '*.bak'
 hls exc composer.*
 ```
 
-List the effective local files on either side of the ordered rules:
+Omit patterns to inspect the normalized rules recorded by each command:
 
 ```console
 hls exc
-hls exc --list
 hls inc
-hls inc --list
 ```
 
-Omitting patterns defaults to listing. These views print one regular-file path
-per line, inspect only the mapped local root, and do not connect to FTPS.
-`--list` cannot be combined with mutation patterns.
+`hls exc` lists exclusion rules and `hls inc` lists inclusion rules, one per
+line. The combined rule order remains visible under each project in `hls list`
+because reconciliation uses ordered, last-match-wins semantics.
+
+List the unified effective set of local files currently included in
+synchronization with:
+
+```console
+hls files
+```
+
+The command prints one regular-file path per line, inspects only the mapped
+local root, and does not connect to FTPS. Use `--project <name>` when outside its
+mapped root. Excluded files remain visible as gray diagnostics in `hls compare`.
 
 Re-include narrower paths later by appending an ordered override:
 
@@ -165,6 +174,17 @@ Re-include narrower paths later by appending an ordered override:
 hls include 'node_modules/required-package/dist/**'
 hls inc 'var/generated/index.html'
 ```
+
+Use a quoted recursive wildcard to include every file under a directory:
+
+```console
+hls inc 'vendor/**'
+```
+
+With an unquoted `hls inc vendor/*`, the shell expands the operand into
+vendor's immediate children. HLS detects child directories and records them as
+recursive `/**` rules, so their descendants are included too. Direct child
+files are recorded as exact paths.
 
 An unquoted wildcard expanded by the shell becomes multiple literal paths. HLS
 anchors each literal to its exact location relative to the project root, so
