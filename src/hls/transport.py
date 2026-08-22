@@ -4,9 +4,12 @@ import ftplib
 import os
 import ssl
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Protocol
 
 from hls.config import ProjectConfiguration
+from hls.exclusions import ExclusionSpec
+from hls.snapshot import EntryKind, TreeEntry, TreeSnapshot
 
 
 class TransportError(RuntimeError):
@@ -15,6 +18,8 @@ class TransportError(RuntimeError):
 
 class RemoteTransport(Protocol):
     def connect(self) -> None: ...
+
+    def snapshot(self, exclusions: ExclusionSpec) -> TreeSnapshot: ...
 
     def close(self) -> None: ...
 
@@ -73,6 +78,57 @@ class ExplicitFTPSTransport:
             client.quit()
         except (OSError, ftplib.Error):
             client.close()
+
+    def snapshot(self, exclusions: ExclusionSpec) -> TreeSnapshot:
+        if self._client is None:
+            raise TransportError("FTPS transport is not connected")
+        entries: list[TreeEntry] = []
+
+        def walk(relative_directory: PurePosixPath) -> None:
+            remote_directory = relative_directory.as_posix()
+            if remote_directory == ".":
+                remote_directory = ""
+            try:
+                children = sorted(
+                    self._client.mlsd(remote_directory, facts=["type"]),
+                    key=lambda item: item[0],
+                )
+            except (OSError, ftplib.Error, ssl.SSLError) as error:
+                display_path = remote_directory or "."
+                raise TransportError(
+                    f"could not list remote directory '{display_path}': {error}"
+                ) from error
+
+            for name, facts in children:
+                entry_type = facts.get("type", "").lower()
+                if entry_type in {"cdir", "pdir"}:
+                    continue
+                if not name or "/" in name or name in {".", ".."}:
+                    raise TransportError(f"invalid name in remote listing: {name!r}")
+                relative = relative_directory / name
+                relative_path = relative.as_posix()
+                if entry_type == "dir":
+                    kind: EntryKind = "directory"
+                elif entry_type == "file":
+                    kind = "file"
+                elif entry_type.startswith("os.unix=slink"):
+                    kind = "symlink"
+                else:
+                    raise TransportError(
+                        f"unsupported remote entry type {entry_type!r} "
+                        f"for '{relative_path}'"
+                    )
+                if exclusions.excludes(
+                    relative_path,
+                    is_directory=kind == "directory",
+                ):
+                    continue
+                entries.append(TreeEntry(relative_path, kind))
+                if kind == "directory":
+                    walk(relative)
+
+        walk(PurePosixPath())
+        return TreeSnapshot(tuple(entries))
 
     def __enter__(self) -> ExplicitFTPSTransport:
         self.connect()

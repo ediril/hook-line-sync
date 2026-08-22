@@ -3,15 +3,16 @@
 Hook Line Sync (`hls`) is a Python CLI for transferring files between mapped
 local folders and remote servers over explicit FTP over TLS (FTPS).
 
-The project is in pre-alpha development. The configuration, connection, and
-local-root mapping foundation is available; file-transfer commands remain on
-the work queue in [`TODO.md`](TODO.md).
+The project is in pre-alpha development. Configuration, connection, mapping,
+and tree inventory are available; comparison and file-transfer commands remain
+on the work queue in [`TODO.md`](TODO.md).
 
 ## Requirements
 
 - Python 3.10 or newer
 - An FTPS server supporting explicit TLS (`AUTH TLS`) and protected data
   connections (`PROT P`)
+- MLSD support for structured remote directory listings
 
 ## Development installation
 
@@ -49,7 +50,14 @@ Verify a project's FTPS connection:
 hls connect prod
 ```
 
-The connection uses certificate verification and refuses plaintext fallback.
+From anywhere under a mapped local root, the project name can be omitted:
+
+```console
+hls connect
+```
+
+An explicit name takes precedence. The connection uses certificate verification
+and refuses plaintext fallback.
 
 Remove a project and its locally stored mapping:
 
@@ -67,8 +75,7 @@ hls list
 hls ls
 ```
 
-`hls list projects` is the explicit form. The `list` command will later also
-host local, remote, and diff file inventories.
+`hls list projects` is the explicit form.
 
 ## Local roots
 
@@ -96,6 +103,29 @@ hls map prod --exclude '.git/,node_modules/,*.log,**/.cache/'
 Patterns are relative to the local root. Empty patterns, `..` traversal, and
 gitignore re-inclusion patterns beginning with `!` are rejected. Commas cannot
 be used inside a pattern.
+
+## Tree inventories
+
+From anywhere under a mapped local root, list the complete local or remote
+project tree:
+
+```console
+hls list local
+hls list remote
+```
+
+An explicit project may be supplied when running elsewhere:
+
+```console
+hls list local prod
+hls list remote prod
+```
+
+Both commands display deterministic project-relative paths and apply the same
+mapping exclusions. Directories, files, and symlinks are labeled separately;
+symlinks are listed but never followed. Remote traversal uses MLSD over the
+protected FTPS data connection and fails if the server cannot provide a
+structured listing.
 
 ## Versioning
 

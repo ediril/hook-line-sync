@@ -11,6 +11,7 @@ from pyftpdlib.handlers import TLS_FTPHandler
 from pyftpdlib.servers import FTPServer
 
 from hls.config import ProjectConfiguration
+from hls.exclusions import ExclusionSpec
 from hls.transport import ExplicitFTPSTransport, TransportError
 
 
@@ -79,7 +80,7 @@ def tls_ftp_server(tmp_path):
     )
     thread.start()
     try:
-        yield server.socket.getsockname()[1], certificate
+        yield server.socket.getsockname()[1], certificate, root
     finally:
         server.ioloop.call_later(0, server.close_all)
         thread.join(timeout=2)
@@ -89,7 +90,14 @@ def tls_ftp_server(tmp_path):
 def test_connects_with_verified_explicit_tls_and_protected_data_channel(
     tls_ftp_server, monkeypatch
 ) -> None:
-    port, certificate = tls_ftp_server
+    port, certificate, root = tls_ftp_server
+    assets = root / "assets"
+    cache = root / "cache"
+    assets.mkdir()
+    cache.mkdir()
+    (assets / "logo.svg").write_text("logo", encoding="utf-8")
+    (cache / "index.bin").write_bytes(b"ignored")
+    (root / "debug.log").write_text("ignored", encoding="utf-8")
     monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
     monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
     context = ssl.create_default_context(cafile=os.fspath(certificate))
@@ -105,16 +113,19 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
     )
 
     with transport:
-        assert transport._client is not None
-        # The fixture refuses unprotected data connections, so a successful
-        # listing proves that PROT P was negotiated rather than merely called.
-        assert transport._client.nlst() == []
+        # The fixture refuses unprotected data connections, so recursive MLSD
+        # success proves that PROT P was negotiated rather than merely called.
+        snapshot = transport.snapshot(ExclusionSpec(("cache/", "*.log")))
+        assert [(entry.path, entry.kind) for entry in snapshot.entries] == [
+            ("assets", "directory"),
+            ("assets/logo.svg", "file"),
+        ]
 
     assert transport._client is None
 
 
 def test_rejects_an_untrusted_server_certificate(tls_ftp_server, monkeypatch) -> None:
-    port, _ = tls_ftp_server
+    port, _, _ = tls_ftp_server
     monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
     monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
     transport = ExplicitFTPSTransport(
@@ -132,7 +143,7 @@ def test_rejects_an_untrusted_server_certificate(tls_ftp_server, monkeypatch) ->
 
 
 def test_rejects_an_inaccessible_project_root(tls_ftp_server, monkeypatch) -> None:
-    port, certificate = tls_ftp_server
+    port, certificate, _ = tls_ftp_server
     monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
     monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
     context = ssl.create_default_context(cafile=os.fspath(certificate))

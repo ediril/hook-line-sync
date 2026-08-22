@@ -4,11 +4,12 @@ Date: 2026-08-21
 
 ## Decision
 
-Hook Line Sync does not persist or use a default project. Commands that operate
-on a project directly, such as connection verification and mapping creation,
-require its name explicitly. File operations will select their project through
-an applicable persisted mapping; ambiguous selection must fail rather
-than consulting ambient global state.
+Hook Line Sync does not persist or use a default project. Mapping creation and
+project mutation require a name explicitly. Connection verification accepts an
+explicit project, or infers one from the unique mapped local root containing the
+current directory. File operations select their project through the same
+persisted mapping; ambiguous selection must fail rather than consulting ambient
+global state.
 
 ## Rationale
 

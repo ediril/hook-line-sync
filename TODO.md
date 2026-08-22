@@ -19,8 +19,8 @@
   selection is inferred from non-overlapping local roots.
 - [x] Implement deterministic `hls list` / `hls ls` project inventory, including
   endpoints, local/remote roots, exclusions, and current-directory inference.
-- [ ] Implement deterministic local and remote tree snapshots, then specify and
-  implement `hls list local` and `hls list remote`.
+- [x] Implement deterministic, exclusion-aware local and remote tree snapshots
+  and `hls list local` / `hls list remote` with mapped-directory inference.
 - [ ] Specify timestamp normalization and comparison states, then implement
   `hls list diff` with full local-to-FTPS integration coverage.
 - [ ] Specify overwrite, rename, glob, filter, symlink, and partial-transfer

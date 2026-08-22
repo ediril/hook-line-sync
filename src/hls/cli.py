@@ -18,6 +18,7 @@ from hls.config import (
     validate_project_name,
 )
 from hls.exclusions import ExclusionError, ExclusionSpec
+from hls.snapshot import SnapshotError, TreeSnapshot, snapshot_local
 from hls.transport import ExplicitFTPSTransport, TransportError
 
 
@@ -41,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     connect_parser = subparsers.add_parser(
         "connect", help="verify a project's FTPS connection"
     )
-    connect_parser.add_argument("project_name")
+    connect_parser.add_argument("project_name", nargs="?")
 
     map_parser = subparsers.add_parser(
         "map", help="map the current directory to a project"
@@ -59,8 +60,12 @@ def build_parser() -> argparse.ArgumentParser:
         "list", aliases=("ls",), help="list configured projects"
     )
     list_parser.add_argument(
-        "target", nargs="?", choices=("projects",), default="projects"
+        "target",
+        nargs="?",
+        choices=("projects", "local", "remote"),
+        default="projects",
     )
+    list_parser.add_argument("project_name", nargs="?")
 
     help_parser = subparsers.add_parser("help", help="show command help")
     help_parser.add_argument("topic", nargs="?")
@@ -101,8 +106,17 @@ def _save_project(
 def _resolve_project(
     arguments: argparse.Namespace, store: ConfigurationStore
 ) -> tuple[ApplicationConfiguration, str, ProjectConfiguration]:
-    name = validate_project_name(arguments.project_name)
     configuration = store.load()
+    supplied_name = getattr(arguments, "project_name", None)
+    if supplied_name is None:
+        active = configuration.project_for_path(Path.cwd().resolve(strict=True))
+        if active is None:
+            raise ConfigurationError(
+                "current directory is not inside a mapped project"
+            )
+        name, project = active
+        return configuration, name, project
+    name = validate_project_name(supplied_name)
     if name not in configuration.projects:
         raise ConfigurationError(f"project '{name}' does not exist")
     return configuration, name, configuration.projects[name]
@@ -152,9 +166,38 @@ def _list_projects(store: ConfigurationStore) -> str:
             lines.append(f"  Excludes: {', '.join(project.exclusions)}")
         else:
             lines.append("  Excludes: none")
-    if active is not None:
-        lines.extend(("", "* project mapped to the current directory"))
     return "\n".join(lines)
+
+
+def _require_local_root(name: str, project: ProjectConfiguration) -> Path:
+    if project.local_root is None:
+        raise ConfigurationError(f"project '{name}' has not been mapped")
+    return Path(project.local_root)
+
+
+def _format_snapshot(source: str, name: str, snapshot: TreeSnapshot) -> str:
+    if not snapshot.entries:
+        return f"{source} tree for project '{name}' is empty."
+    lines = [f"{source} tree for project '{name}':"]
+    for entry in snapshot.entries:
+        path = f"{entry.path}/" if entry.kind == "directory" else entry.path
+        lines.append(f"  {entry.kind:<9} {path}")
+    return "\n".join(lines)
+
+
+def _list_local(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+    _, name, project = _resolve_project(arguments, store)
+    root = _require_local_root(name, project)
+    snapshot = snapshot_local(root, ExclusionSpec(project.exclusions))
+    return _format_snapshot("Local", name, snapshot)
+
+
+def _list_remote(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+    _, name, project = _resolve_project(arguments, store)
+    _require_local_root(name, project)
+    with ExplicitFTPSTransport(project) as transport:
+        snapshot = transport.snapshot(ExclusionSpec(project.exclusions))
+    return _format_snapshot("Remote", name, snapshot)
 
 
 def _show_help(parser: argparse.ArgumentParser, topic: str | None) -> str:
@@ -190,7 +233,16 @@ def run(
         elif arguments.command == "remove":
             message = _remove(arguments, configuration_store)
         elif arguments.command in {"list", "ls"}:
-            message = _list_projects(configuration_store)
+            if arguments.target == "projects":
+                if arguments.project_name is not None:
+                    raise ConfigurationError(
+                        "list projects does not accept a project name"
+                    )
+                message = _list_projects(configuration_store)
+            elif arguments.target == "local":
+                message = _list_local(arguments, configuration_store)
+            else:
+                message = _list_remote(arguments, configuration_store)
         elif arguments.command == "help":
             message = _show_help(parser, arguments.topic)
         elif arguments.command == "version":
@@ -198,7 +250,12 @@ def run(
         else:
             parser.error(f"unknown command: {arguments.command}")
             return 2
-    except (ConfigurationError, ExclusionError, TransportError) as error:
+    except (
+        ConfigurationError,
+        ExclusionError,
+        SnapshotError,
+        TransportError,
+    ) as error:
         print(f"hls: error: {error}", file=stderr)
         return 1
     print(message, file=stdout)

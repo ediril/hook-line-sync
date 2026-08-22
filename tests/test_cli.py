@@ -6,6 +6,7 @@ from hls import __version__
 from hls.cli import run
 from hls.config import ConfigurationStore
 from hls.exclusions import ExclusionSpec
+from hls.snapshot import TreeEntry, TreeSnapshot
 
 
 def invoke(arguments, store):
@@ -50,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.21.10"
+    assert __version__ == "0.8.21.11"
 
     list_status, list_stdout, list_stderr = invoke(["list"], store)
     assert (list_status, list_stderr) == (0, "")
@@ -158,6 +159,82 @@ def test_map_uses_current_directory_and_compiles_comma_separated_exclusions(
     assert "* prod\n" in list_stdout
     assert f"  Local root: {workspace}\n" in list_stdout
     assert "  Excludes: **/.cache/, *.log, .git/, node_modules/\n" in list_stdout
+    assert "project mapped to the current directory" not in list_stdout
+
+
+def test_current_project_inference_drives_connect_and_tree_listings(
+    tmp_path, monkeypatch
+) -> None:
+    store = ConfigurationStore(tmp_path / "configs.json")
+    workspace = tmp_path / "workspace"
+    source = workspace / "src"
+    ignored = workspace / "node_modules"
+    outside = tmp_path / "outside"
+    source.mkdir(parents=True)
+    ignored.mkdir()
+    outside.mkdir()
+    (workspace / "README.md").write_text("read me", encoding="utf-8")
+    (source / "main.py").write_text("print('hello')", encoding="utf-8")
+    (source / "debug.log").write_text("ignored", encoding="utf-8")
+    (ignored / "package.js").write_text("ignored", encoding="utf-8")
+    (outside / "secret.txt").write_text("outside", encoding="utf-8")
+    (workspace / "linked").symlink_to(outside, target_is_directory=True)
+    invoke(
+        [
+            "add",
+            "prod",
+            "--host",
+            "ftp.example.com",
+            "--remote-root",
+            "/public_html",
+        ],
+        store,
+    )
+    monkeypatch.chdir(workspace)
+    assert invoke(
+        ["map", "prod", "--exclude", "node_modules/,*.log"], store
+    )[0] == 0
+
+    transports = []
+
+    class FakeTransport:
+        def __init__(self, project) -> None:
+            transports.append(project)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def snapshot(self, exclusions):
+            assert exclusions.patterns == ("*.log", "node_modules/")
+            return TreeSnapshot((TreeEntry("deployed.html", "file"),))
+
+    monkeypatch.setattr("hls.cli.ExplicitFTPSTransport", FakeTransport)
+    monkeypatch.chdir(source)
+
+    assert invoke(["connect"], store) == (
+        0,
+        "Connected securely to project 'prod'.\n",
+        "",
+    )
+    assert invoke(["list", "local"], store) == (
+        0,
+        "Local tree for project 'prod':\n"
+        "  file      README.md\n"
+        "  symlink   linked\n"
+        "  directory src/\n"
+        "  file      src/main.py\n",
+        "",
+    )
+    assert invoke(["list", "remote"], store) == (
+        0,
+        "Remote tree for project 'prod':\n"
+        "  file      deployed.html\n",
+        "",
+    )
+    assert len(transports) == 2
 
 
 def test_map_rejects_existing_and_overlapping_local_roots(
