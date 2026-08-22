@@ -300,8 +300,10 @@ def _change_exclusions(
     configuration.append_exclusion_rules(name, rules)
     store.save(configuration)
     action = "Included" if include else "Excluded"
-    display = ", ".join(rule[1:] if include else rule for rule in rules)
-    return f"{action} for project '{name}': {display}."
+    displayed_rules = (rule[1:] if include else rule for rule in rules)
+    return "\n".join(
+        (f"{action} for project '{name}':", *(f"  {rule}" for rule in displayed_rules))
+    )
 
 
 def _remove(arguments: argparse.Namespace, store: ConfigurationStore) -> str:

@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.22.10"
+    assert __version__ == "0.8.22.11"
 
     help_output = invoke(["help"], store)[1]
     assert "compare             preview file changes without modifying anything" in (
@@ -176,17 +176,21 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert stdout == f"Mapped '{workspace}' to 'prod:/public_html'.\n"
     assert exclude_result == (
         0,
-        "Excluded for project 'prod': .git/, node_modules/, *.log, **/.cache/.\n",
+        "Excluded for project 'prod':\n"
+        "  .git/\n"
+        "  node_modules/\n"
+        "  *.log\n"
+        "  **/.cache/\n",
         "",
     )
     assert include_result == (
         0,
-        "Included for project 'prod': node_modules/keep.js.\n",
+        "Included for project 'prod':\n  node_modules/keep.js\n",
         "",
     )
     assert expanded_exclude_result == (
         0,
-        "Excluded for project 'prod': composer.json, composer.lock.\n",
+        "Excluded for project 'prod':\n  composer.json\n  composer.lock\n",
         "",
     )
     project = store.load().projects["prod"]
