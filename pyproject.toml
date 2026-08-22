@@ -7,6 +7,8 @@ name = "hls"
 dynamic = ["version"]
 description = "Synchronize local files with remote servers over explicit FTPS"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "Hook Line Sync contributors" }]
 classifiers = [

@@ -8,6 +8,15 @@ tree inventory, comparison, and file transfer are available. Release packaging
 remains on the work queue in [`TODO.md`](TODO.md). Completed work is recorded in
 [`CHANGELOG.md`](CHANGELOG.md).
 
+## License and sustainability
+
+HLS is released under the [MIT License](LICENSE). Personal and commercial use
+are both permitted without payment.
+
+A voluntary Business subscription is planned for professional users who want
+to fund continued development and receive additional services or support. It
+will not be required for commercial use of the MIT-licensed software.
+
 ## Requirements
 
 - Python 3.10 or newer
