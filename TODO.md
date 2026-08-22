@@ -26,6 +26,10 @@
   by compare, push, pull, exclude, and include.
 - [x] Keep exact `ls` and `cmp` compatibility spellings functional while hiding
   them from the primary command menu.
+- [x] Make no-argument `exclude` and `include` list their complementary
+  effective local file scopes, with explicit `--list` equivalents.
+- [x] Anchor literal include/exclude operands to their exact project-relative
+  paths while retaining Gitignore semantics for wildcard rules.
 - [x] Remove the superseded directory-scoped `hls use` mechanism; project
   selection is inferred from non-overlapping local roots.
 - [x] Implement deterministic `hls list` / `hls ls` project inventory, including

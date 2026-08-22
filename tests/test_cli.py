@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.22.11"
+    assert __version__ == "0.8.22.14"
 
     help_output = invoke(["help"], store)[1]
     assert "compare             preview file changes without modifying anything" in (
@@ -157,11 +157,14 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     )
     monkeypatch.chdir(workspace)
     ignored = workspace / "node_modules"
+    docs = workspace / "docs"
     ignored.mkdir()
+    docs.mkdir()
     (ignored / "drop.js").write_text("drop", encoding="utf-8")
     (ignored / "keep.js").write_text("keep", encoding="utf-8")
     (workspace / "composer.json").write_text("{}", encoding="utf-8")
     (workspace / "composer.lock").write_text("{}", encoding="utf-8")
+    (docs / "note.txt").write_text("note", encoding="utf-8")
 
     status, stdout, stderr = invoke(["m", "prod"], store)
     exclude_result = invoke(
@@ -171,6 +174,9 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         ["exc", "composer.json", "composer.lock"], store
     )
     include_result = invoke(["inc", "node_modules/keep.js"], store)
+    monkeypatch.chdir(docs)
+    assert invoke(["exc", "note.txt"], store)[0] == 0
+    monkeypatch.chdir(workspace)
 
     assert status == 0 and stderr == ""
     assert stdout == f"Mapped '{workspace}' to 'prod:/public_html'.\n"
@@ -196,29 +202,56 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     project = store.load().projects["prod"]
     assert project.local_root == str(workspace)
     assert project.exclusions == (
-        ".git/",
-        "node_modules/",
+        "/.git/",
+        "/node_modules/",
         "*.log",
         "**/.cache/",
-        "composer.json",
-        "composer.lock",
-        "!node_modules/keep.js",
+        "/composer.json",
+        "/composer.lock",
+        "!/node_modules/keep.js",
+        "/docs/note.txt",
     )
     exclusions = ExclusionSpec(project.exclusions)
     assert exclusions.excludes(".git", is_directory=True)
     assert exclusions.excludes("node_modules/package/index.js")
     assert not exclusions.excludes("node_modules/keep.js")
+    assert not exclusions.excludes("vendor/README.md")
+    assert not exclusions.excludes("vendor/composer.json")
+    legacy_rules = ExclusionSpec(("README.md", "composer.json"))
+    assert legacy_rules.excludes("vendor/package/README.md")
+    assert legacy_rules.excludes("vendor/package/composer.json")
     assert exclusions.excludes("src/debug.log")
     assert not exclusions.excludes("src/main.py")
     snapshot = snapshot_local(workspace, exclusions)
-    assert [entry.path for entry in snapshot.entries] == ["node_modules/keep.js"]
+    assert [entry.path for entry in snapshot.entries] == [
+        "docs",
+        "node_modules/keep.js",
+    ]
+    assert invoke(["exc"], store) == (
+        0,
+        "Excluded local files for project 'prod':\n"
+        "  composer.json\n"
+        "  composer.lock\n"
+        "  docs/note.txt\n"
+        "  node_modules/drop.js\n",
+        "",
+    )
+    assert invoke(["inc", "--list"], store) == (
+        0,
+        "Included local files for project 'prod':\n"
+        "  node_modules/keep.js\n",
+        "",
+    )
+    list_with_patterns = invoke(["exc", "--list", "*.md"], store)
+    assert list_with_patterns[0] == 1
+    assert "--list cannot be combined with patterns" in list_with_patterns[2]
     list_stdout = invoke(["list"], store)[1]
     assert "* prod\n" in list_stdout
     assert f"  Local root: {workspace}\n" in list_stdout
     assert (
-        "  Rules: exclude .git/, exclude node_modules/, exclude *.log, "
-        "exclude **/.cache/, exclude composer.json, exclude composer.lock, "
-        "include node_modules/keep.js\n"
+        "  Rules: exclude /.git/, exclude /node_modules/, exclude *.log, "
+        "exclude **/.cache/, exclude /composer.json, exclude /composer.lock, "
+        "include /node_modules/keep.js, exclude /docs/note.txt\n"
     ) in list_stdout
     assert "project mapped to the current directory" not in list_stdout
 
@@ -269,7 +302,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
             return None
 
         def snapshot(self, exclusions, selector=None, *, include_excluded=False):
-            assert exclusions.patterns == ("node_modules/", "*.log")
+            assert exclusions.patterns == ("/node_modules/", "*.log")
             snapshot = TreeSnapshot(
                 (
                     TreeEntry(

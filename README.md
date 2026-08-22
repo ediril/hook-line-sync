@@ -115,6 +115,19 @@ hls exc '*.bak'
 hls exc composer.*
 ```
 
+List the effective local files on either side of the ordered rules:
+
+```console
+hls exc
+hls exc --list
+hls inc
+hls inc --list
+```
+
+Omitting patterns defaults to listing. These views print one regular-file path
+per line, inspect only the mapped local root, and do not connect to FTPS.
+`--list` cannot be combined with mutation patterns.
+
 Re-include narrower paths later by appending an ordered override:
 
 ```console
@@ -122,16 +135,27 @@ hls include 'node_modules/required-package/dist/**'
 hls inc 'var/generated/index.html'
 ```
 
-An unquoted wildcard expanded by the shell becomes multiple rules; quoted
-wildcards remain one rule interpreted by HLS. Multiple arguments and
-comma-separated groups can be combined in one command. The project is inferred
-from the current directory; use `--project <name>` elsewhere. Patterns are
-relative to the local root and evaluated in command order, so a later rule
+An unquoted wildcard expanded by the shell becomes multiple literal paths. HLS
+anchors each literal to its exact location relative to the project root, so
+running `hls exc *.md` at the root excludes only the Markdown files expanded by
+the shell at that root. Quoted wildcard patterns remain Gitignore rules;
+`hls exc '*.md'` excludes matching files at every depth. Multiple arguments and
+comma-separated groups can be combined in one command.
+
+The project is inferred from the current directory; use `--project <name>`
+elsewhere. Literal paths are relative to the current directory inside the
+project, while wildcard rules are evaluated against the project root using
+Gitignore semantics. Rules are evaluated in command order, so a later rule
 overrides an earlier matching rule. Excluded paths stay
 outside tree listings, push, pull, and remote pruning, but compare displays
 excluded files as neutral gray diagnostic entries. Empty patterns, `..`
 traversal, and direct `!` input are rejected; `include` records the negation
 internally. Commas cannot be used inside a pattern.
+
+Stored rules are always interpreted verbatim as Gitignore entries. In
+particular, a manually stored bare rule such as `README.md` matches that
+basename at every depth; HLS does not apply version-dependent compatibility
+interpretations.
 
 ## Tree inventories
 

@@ -48,12 +48,27 @@ and flattens comma-separated groups before command-specific validation. The
 shared declaration controls whether operands are optional or required; commands
 do not independently implement argument cardinality or normalization.
 
+Exclude and include make their operands optional for a complementary query
+mode. With no operands, or with explicit `--list`, they enumerate effectively
+excluded or included regular files beneath the mapped local root. Query mode
+uses a local diagnostic snapshot and never opens an FTPS connection. Supplying
+patterns with `--list` is rejected rather than guessing between query and
+mutation.
+
+Persistent rule operands distinguish literal paths from wildcard rules. A
+literal is resolved from the current directory and stored as an anchored
+project-relative Gitignore rule. A pattern containing `*`, `?`, or `[` remains
+a Gitignore wildcard evaluated against the project root. Consequently, shell
+expansion selects the exact paths the shell supplied, while quoting preserves a
+wildcard for HLS to apply recursively according to Gitignore semantics.
+
 ## Consequences
 
 - Stored `exclusions` remains an array in schema version 6, but order is now
   semantically significant and `!` entries represent inclusion rules.
-- Existing configurations remain valid; their previously persisted order is
-  retained.
+- Stored rules are always compiled verbatim as Gitignore entries. Existing bare
+  patterns therefore retain standard basename-at-any-depth behavior; HLS does
+  not reinterpret them based on the version that wrote them.
 - Direct command patterns cannot be empty, contain `..`, or begin with `!`.
 - Commas delimit operand groups consistently and therefore cannot address a
   literal filename containing a comma.

@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from pathspec import GitIgnoreSpec
 
 
 class ExclusionError(ValueError):
     """Raised when exclusion patterns are unsafe or malformed."""
+
+
+_WILDCARD_CHARACTERS = "*?["
+
+
+def _has_wildcard(pattern: str) -> bool:
+    return any(character in pattern for character in _WILDCARD_CHARACTERS)
 
 
 def _validate_pattern(pattern: object) -> str:
@@ -27,14 +34,35 @@ def _validate_pattern(pattern: object) -> str:
 
 
 def rules_from_patterns(
-    values: tuple[str, ...], *, include: bool
+    values: tuple[str, ...],
+    *,
+    include: bool,
+    project_root: Path,
+    current_directory: Path,
 ) -> tuple[str, ...]:
     patterns = tuple(_validate_pattern(item) for item in values)
     if any(pattern.startswith("!") for pattern in patterns):
         raise ExclusionError("command patterns must not begin with '!'")
+    try:
+        current_relative = current_directory.relative_to(project_root)
+    except ValueError:
+        current_relative = Path()
+    normalized: list[str] = []
+    for pattern in patterns:
+        if _has_wildcard(pattern):
+            normalized.append(pattern)
+            continue
+        supplied = PurePosixPath(pattern)
+        if supplied.is_absolute():
+            raise ExclusionError("literal paths must be relative to the project")
+        relative = PurePosixPath(*current_relative.parts) / supplied
+        anchored = f"/{relative.as_posix()}"
+        if pattern.endswith("/") and not anchored.endswith("/"):
+            anchored += "/"
+        normalized.append(anchored)
     if include:
-        return tuple(f"!{pattern}" for pattern in patterns)
-    return patterns
+        return tuple(f"!{pattern}" for pattern in normalized)
+    return tuple(normalized)
 
 
 def _literal_prefix(pattern: str) -> tuple[str, bool]:

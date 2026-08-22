@@ -103,11 +103,18 @@ def build_parser() -> argparse.ArgumentParser:
         rules_parser = subparsers.add_parser(command, help=help_text)
         add_pattern_operands(
             rules_parser,
-            required=True,
+            required=False,
             help_text=(
                 "gitignore-style patterns or comma-separated pattern groups "
-                "relative to the local root"
+                "relative to the local root; omit to list effective files"
             ),
+        )
+        rules_parser.add_argument(
+            "-l",
+            "--list",
+            dest="list_files",
+            action="store_true",
+            help=f"list effectively {command}d local files",
         )
         rules_parser.add_argument(
             "--project",
@@ -292,15 +299,38 @@ def _change_exclusions(
     *,
     include: bool,
 ) -> str:
-    configuration, name, _ = _resolve_project(arguments, store)
+    configuration, name, project = _resolve_project(arguments, store)
+    patterns = normalize_pattern_operands(arguments)
+    if arguments.list_files and patterns:
+        raise ConfigurationError("--list cannot be combined with patterns")
+    if arguments.list_files or not patterns:
+        root = _require_local_root(name, project)
+        snapshot = snapshot_local(
+            root,
+            ExclusionSpec(project.exclusions),
+            include_excluded=True,
+        )
+        paths = tuple(
+            entry.path
+            for entry in snapshot.entries
+            if entry.kind == "file" and entry.excluded == (not include)
+        )
+        scope = "Included" if include else "Excluded"
+        if not paths:
+            return f"No {scope.lower()} local files for project '{name}'."
+        heading = f"{scope} local files for project '{name}':"
+        return "\n".join((heading, *(f"  {path}" for path in paths)))
+    root = _require_local_root(name, project)
     rules = rules_from_patterns(
-        normalize_pattern_operands(arguments),
+        patterns,
         include=include,
+        project_root=root,
+        current_directory=Path.cwd().resolve(strict=True),
     )
     configuration.append_exclusion_rules(name, rules)
     store.save(configuration)
     action = "Included" if include else "Excluded"
-    displayed_rules = (rule[1:] if include else rule for rule in rules)
+    displayed_rules = patterns
     return "\n".join(
         (f"{action} for project '{name}':", *(f"  {rule}" for rule in displayed_rules))
     )
