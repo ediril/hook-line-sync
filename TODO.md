@@ -20,6 +20,8 @@
   resolution while retaining established exact aliases.
 - [x] Expose excluded files as gray neutral entries in compare-only diagnostic
   snapshots while keeping them absent from all transfer and prune plans.
+- [x] Accept shell-expanded multi-argument patterns consistently in exclude and
+  include while retaining comma-separated pattern groups.
 - [x] Remove the superseded directory-scoped `hls use` mechanism; project
   selection is inferred from non-overlapping local roots.
 - [x] Implement deterministic `hls list` / `hls ls` project inventory, including

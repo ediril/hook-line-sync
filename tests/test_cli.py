@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.22.7"
+    assert __version__ == "0.8.22.8"
 
     help_output = invoke(["help"], store)[1]
     assert "compare (cmp)       preview file changes without modifying anything" in (
@@ -158,10 +158,15 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     ignored.mkdir()
     (ignored / "drop.js").write_text("drop", encoding="utf-8")
     (ignored / "keep.js").write_text("keep", encoding="utf-8")
+    (workspace / "composer.json").write_text("{}", encoding="utf-8")
+    (workspace / "composer.lock").write_text("{}", encoding="utf-8")
 
     status, stdout, stderr = invoke(["m", "prod"], store)
     exclude_result = invoke(
         ["exc", ".git/, node_modules/,*.log,**/.cache/"], store
+    )
+    expanded_exclude_result = invoke(
+        ["exc", "composer.json", "composer.lock"], store
     )
     include_result = invoke(["inc", "node_modules/keep.js"], store)
 
@@ -177,6 +182,11 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         "Included for project 'prod': node_modules/keep.js.\n",
         "",
     )
+    assert expanded_exclude_result == (
+        0,
+        "Excluded for project 'prod': composer.json, composer.lock.\n",
+        "",
+    )
     project = store.load().projects["prod"]
     assert project.local_root == str(workspace)
     assert project.exclusions == (
@@ -184,6 +194,8 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         "node_modules/",
         "*.log",
         "**/.cache/",
+        "composer.json",
+        "composer.lock",
         "!node_modules/keep.js",
     )
     exclusions = ExclusionSpec(project.exclusions)
@@ -199,7 +211,8 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert f"  Local root: {workspace}\n" in list_stdout
     assert (
         "  Rules: exclude .git/, exclude node_modules/, exclude *.log, "
-        "exclude **/.cache/, include node_modules/keep.js\n"
+        "exclude **/.cache/, exclude composer.json, exclude composer.lock, "
+        "include node_modules/keep.js\n"
     ) in list_stdout
     assert "project mapped to the current directory" not in list_stdout
 

@@ -96,7 +96,11 @@ def build_parser() -> argparse.ArgumentParser:
         rules_parser = subparsers.add_parser(command, help=help_text)
         rules_parser.add_argument(
             "patterns",
-            help="comma-separated gitignore-style patterns relative to the local root",
+            nargs="+",
+            help=(
+                "gitignore-style patterns or comma-separated pattern groups "
+                "relative to the local root"
+            ),
         )
         rules_parser.add_argument(
             "--project",
@@ -285,7 +289,11 @@ def _change_exclusions(
     include: bool,
 ) -> str:
     configuration, name, _ = _resolve_project(arguments, store)
-    rules = rules_from_csv(arguments.patterns, include=include)
+    rules = tuple(
+        rule
+        for value in arguments.patterns
+        for rule in rules_from_csv(value, include=include)
+    )
     configuration.append_exclusion_rules(name, rules)
     store.save(configuration)
     action = "Included" if include else "Excluded"

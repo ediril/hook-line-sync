@@ -10,8 +10,10 @@ Ambiguous prefixes fail and name every candidate rather than choosing based on
 registration order.
 
 `hls map` only maps the current directory. `hls exclude` and `hls include`,
-which naturally permit `hls exc` and `hls inc`, append comma-separated rules to
-the inferred project's persistent synchronization scope. `--project <name>` is
+which naturally permit `hls exc` and `hls inc`, append one or more pattern
+arguments to the inferred project's persistent synchronization scope. Each
+argument may also contain comma-separated patterns, so quoted HLS wildcards and
+unquoted shell-expanded argument lists are both accepted. `--project <name>` is
 the explicit override. Rules use gitignore matching and retain insertion order;
 a later include or exclude therefore overrides an earlier matching rule.
 

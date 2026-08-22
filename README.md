@@ -105,6 +105,7 @@ gitignore-style wildcard patterns:
 ```console
 hls exclude '.git/,node_modules/,*.log,**/.cache/'
 hls exc '*.bak'
+hls exc composer.*
 ```
 
 Re-include narrower paths later by appending an ordered override:
@@ -114,9 +115,12 @@ hls include 'node_modules/required-package/dist/**'
 hls inc 'var/generated/index.html'
 ```
 
-The project is inferred from the current directory; use `--project <name>`
-elsewhere. Patterns are relative to the local root and evaluated in command
-order, so a later rule overrides an earlier matching rule. Excluded paths stay
+An unquoted wildcard expanded by the shell becomes multiple rules; quoted
+wildcards remain one rule interpreted by HLS. Multiple arguments and
+comma-separated groups can be combined in one command. The project is inferred
+from the current directory; use `--project <name>` elsewhere. Patterns are
+relative to the local root and evaluated in command order, so a later rule
+overrides an earlier matching rule. Excluded paths stay
 outside tree listings, push, pull, and remote pruning, but compare displays
 excluded files as neutral gray diagnostic entries. Empty patterns, `..`
 traversal, and direct `!` input are rejected; `include` records the negation
