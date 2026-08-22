@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Literal
 
-from hls.exclusions import ExclusionSpec
+from hls.rules import RuleSet
 from hls.selection import FileSelection
 
 EntryKind = Literal["directory", "file", "symlink"]
@@ -66,7 +66,7 @@ class TreeSnapshot:
 
 def snapshot_local(
     root: Path,
-    exclusions: ExclusionSpec,
+    rules: RuleSet,
     selector: FileSelection | None = None,
     *,
     include_excluded: bool = False,
@@ -103,7 +103,7 @@ def snapshot_local(
                     f"could not inspect local path '{directory / child.name}': {error}"
                 ) from error
 
-            excluded = exclusions.excludes(
+            excluded = rules.excludes(
                 relative_path,
                 is_directory=kind == "directory",
             )
@@ -137,7 +137,7 @@ def snapshot_local(
             exclusion_may_descend = (
                 include_excluded
                 or not excluded
-                or exclusions.may_include_descendant(relative_path)
+                or rules.may_include_descendant(relative_path)
             )
             if kind == "directory" and selection_may_descend and exclusion_may_descend:
                 walk(directory / child.name, relative)

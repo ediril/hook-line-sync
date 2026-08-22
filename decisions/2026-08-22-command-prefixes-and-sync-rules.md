@@ -2,6 +2,9 @@
 
 Date: 2026-08-22
 
+Status: Rule representation and matching semantics superseded by
+`2026-08-22-structured-hls-rules.md`; command-prefix decisions remain current.
+
 ## Decision
 
 All command names accept the shortest unambiguous prefix. Exact command names

@@ -7,10 +7,10 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from hls.exclusions import ExclusionError, ExclusionSpec
+from hls.rules import RuleAction, RuleError, RuleSet, SyncRule
 from hls.storage import write_json_atomic
 
-CONFIG_VERSION = 6
+CONFIG_VERSION = 7
 PROJECT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 ENVIRONMENT_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 DEFAULT_USERNAME_ENV = "PROD_FTPS_USERNAME"
@@ -96,7 +96,8 @@ class ProjectConfiguration:
     password_env: str = DEFAULT_PASSWORD_ENV
     type: str = "ftps"
     local_root: str | None = None
-    exclusions: tuple[str, ...] = ()
+    rules: tuple[SyncRule, ...] = ()
+    next_rule_id: int = 1
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "host", _required_string(self.host, "host"))
@@ -127,12 +128,20 @@ class ProjectConfiguration:
             _validate_stored_local_root(self.local_root),
         )
         try:
-            exclusion_spec = ExclusionSpec(self.exclusions)
-        except ExclusionError as error:
+            rule_set = RuleSet(self.rules)
+        except RuleError as error:
             raise ConfigurationError(str(error)) from error
-        object.__setattr__(self, "exclusions", exclusion_spec.patterns)
-        if self.local_root is None and self.exclusions:
-            raise ConfigurationError("an unmapped project cannot have exclusions")
+        object.__setattr__(self, "rules", rule_set.rules)
+        if (
+            isinstance(self.next_rule_id, bool)
+            or not isinstance(self.next_rule_id, int)
+            or self.next_rule_id < 1
+        ):
+            raise ConfigurationError("next_rule_id must be a positive integer")
+        if self.rules and self.next_rule_id <= self.rules[-1].id:
+            raise ConfigurationError("next_rule_id must be greater than every rule id")
+        if self.local_root is None and self.rules:
+            raise ConfigurationError("an unmapped project cannot have rules")
 
     def with_local_root(self, local_root: str) -> ProjectConfiguration:
         if self.local_root is not None:
@@ -147,10 +156,16 @@ class ProjectConfiguration:
             password_env=self.password_env,
             type=self.type,
             local_root=local_root,
-            exclusions=(),
+            rules=(),
+            next_rule_id=1,
         )
 
-    def with_exclusions(self, exclusions: tuple[str, ...]) -> ProjectConfiguration:
+    def with_rules(
+        self,
+        rules: tuple[SyncRule, ...],
+        *,
+        next_rule_id: int | None = None,
+    ) -> ProjectConfiguration:
         if self.local_root is None:
             raise ConfigurationError("cannot change rules for an unmapped project")
         return ProjectConfiguration(
@@ -161,7 +176,8 @@ class ProjectConfiguration:
             password_env=self.password_env,
             type=self.type,
             local_root=self.local_root,
-            exclusions=exclusions,
+            rules=rules,
+            next_rule_id=self.next_rule_id if next_rule_id is None else next_rule_id,
         )
 
     def remote_path_for(self, local_path: Path) -> str:
@@ -186,7 +202,8 @@ class ProjectConfiguration:
             "username_env": self.username_env,
             "password_env": self.password_env,
             "local_root": self.local_root,
-            "exclusions": list(self.exclusions),
+            "rules": [rule.to_dict() for rule in self.rules],
+            "next_rule_id": self.next_rule_id,
         }
 
     @classmethod
@@ -201,7 +218,8 @@ class ProjectConfiguration:
             "username_env",
             "password_env",
             "local_root",
-            "exclusions",
+            "rules",
+            "next_rule_id",
         }
         unknown = set(value) - expected
         if unknown:
@@ -209,9 +227,13 @@ class ProjectConfiguration:
                 f"unknown project configuration fields: {', '.join(sorted(unknown))}"
             )
         try:
-            exclusions = value["exclusions"]
-            if not isinstance(exclusions, list):
-                raise ConfigurationError("project exclusions must be an array")
+            rules = value["rules"]
+            if not isinstance(rules, list):
+                raise ConfigurationError("project rules must be an array")
+            try:
+                decoded_rules = tuple(SyncRule.from_dict(rule) for rule in rules)
+            except RuleError as error:
+                raise ConfigurationError(str(error)) from error
             return cls(
                 type=value["type"],
                 host=value["host"],
@@ -220,7 +242,8 @@ class ProjectConfiguration:
                 username_env=value["username_env"],
                 password_env=value["password_env"],
                 local_root=value["local_root"],
-                exclusions=tuple(exclusions),
+                rules=decoded_rules,
+                next_rule_id=value["next_rule_id"],
             )
         except KeyError as error:
             raise ConfigurationError(
@@ -267,15 +290,42 @@ class ApplicationConfiguration:
                 )
         self.projects[project_name] = project.with_local_root(local_root)
 
-    def append_exclusion_rules(
-        self, project_name: str, rules: tuple[str, ...]
-    ) -> None:
+    def append_rules(
+        self,
+        project_name: str,
+        action: RuleAction,
+        patterns: tuple[str, ...],
+    ) -> tuple[SyncRule, ...]:
         project = self.projects[project_name]
-        ordered = list(project.exclusions)
-        for rule in rules:
-            ordered = [existing for existing in ordered if existing != rule]
+        ordered = list(project.rules)
+        added: list[SyncRule] = []
+        next_rule_id = project.next_rule_id
+        unique_patterns: list[str] = []
+        for pattern in patterns:
+            unique_patterns = [item for item in unique_patterns if item != pattern]
+            unique_patterns.append(pattern)
+        for pattern in unique_patterns:
+            ordered = [rule for rule in ordered if rule.pattern != pattern]
+            rule = SyncRule(next_rule_id, action, pattern)
             ordered.append(rule)
-        self.projects[project_name] = project.with_exclusions(tuple(ordered))
+            added.append(rule)
+            next_rule_id += 1
+        self.projects[project_name] = project.with_rules(
+            tuple(ordered),
+            next_rule_id=next_rule_id,
+        )
+        return tuple(added)
+
+    def remove_rule(self, project_name: str, rule_id: int) -> SyncRule:
+        project = self.projects[project_name]
+        removed = next((rule for rule in project.rules if rule.id == rule_id), None)
+        if removed is None:
+            raise ConfigurationError(
+                f"project '{project_name}' has no rule with id {rule_id}"
+            )
+        remaining = tuple(rule for rule in project.rules if rule.id != rule_id)
+        self.projects[project_name] = project.with_rules(remaining)
+        return removed
 
     def project_for_path(
         self, local_path: Path

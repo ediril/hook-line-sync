@@ -5,7 +5,7 @@ import pytest
 from hls import __version__
 from hls.cli import run
 from hls.config import ConfigurationStore
-from hls.exclusions import ExclusionSpec
+from hls.rules import RuleSet, SyncRule
 from hls.snapshot import TreeEntry, TreeSnapshot, snapshot_local
 
 
@@ -164,6 +164,7 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     (ignored / "drop.js").write_text("drop", encoding="utf-8")
     (ignored / "keep.js").write_text("keep", encoding="utf-8")
     (package / "nested.js").write_text("nested", encoding="utf-8")
+    (workspace / "debug.log").write_text("debug", encoding="utf-8")
     (workspace / "composer.json").write_text("{}", encoding="utf-8")
     (workspace / "composer.lock").write_text("{}", encoding="utf-8")
     (docs / "note.txt").write_text("note", encoding="utf-8")
@@ -185,54 +186,55 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert stdout == f"Mapped '{workspace}' to 'prod:/public_html'.\n"
     assert exclude_result == (
         0,
-        "Excluded for project 'prod':\n"
-        "  .git/\n"
-        "  node_modules/\n"
-        "  *.log\n"
-        "  **/.cache/\n",
+        "Recorded exclusion rules for project 'prod':\n"
+        "  1  exclude .git/**\n"
+        "  2  exclude node_modules/**\n"
+        "  3  exclude *.log\n"
+        "  4  exclude **/.cache/**\n",
         "",
     )
     assert include_result == (
         0,
-        "Included for project 'prod':\n  node_modules/keep.js\n",
+        "Recorded inclusion rules for project 'prod':\n"
+        "  7  include node_modules/keep.js\n",
         "",
     )
     assert directory_include_result == (
         0,
-        "Included for project 'prod':\n  node_modules/package\n",
+        "Recorded inclusion rules for project 'prod':\n"
+        "  8  include node_modules/package/**\n",
         "",
     )
     assert expanded_exclude_result == (
         0,
-        "Excluded for project 'prod':\n  composer.json\n  composer.lock\n",
+        "Recorded exclusion rules for project 'prod':\n"
+        "  5  exclude composer.json\n"
+        "  6  exclude composer.lock\n",
         "",
     )
     project = store.load().projects["prod"]
     assert project.local_root == str(workspace)
-    assert project.exclusions == (
-        "/.git/",
-        "/node_modules/",
-        "*.log",
-        "**/.cache/",
-        "/composer.json",
-        "/composer.lock",
-        "!/node_modules/keep.js",
-        "!/node_modules/package/**",
-        "/docs/note.txt",
+    assert project.rules == (
+        SyncRule(1, "exclude", ".git/**"),
+        SyncRule(2, "exclude", "node_modules/**"),
+        SyncRule(3, "exclude", "*.log"),
+        SyncRule(4, "exclude", "**/.cache/**"),
+        SyncRule(5, "exclude", "composer.json"),
+        SyncRule(6, "exclude", "composer.lock"),
+        SyncRule(7, "include", "node_modules/keep.js"),
+        SyncRule(8, "include", "node_modules/package/**"),
+        SyncRule(9, "exclude", "docs/note.txt"),
     )
-    exclusions = ExclusionSpec(project.exclusions)
-    assert exclusions.excludes(".git", is_directory=True)
-    assert not exclusions.excludes("node_modules/package/index.js")
-    assert not exclusions.excludes("node_modules/keep.js")
-    assert not exclusions.excludes("node_modules/package/nested.js")
-    assert not exclusions.excludes("vendor/README.md")
-    assert not exclusions.excludes("vendor/composer.json")
-    legacy_rules = ExclusionSpec(("README.md", "composer.json"))
-    assert legacy_rules.excludes("vendor/package/README.md")
-    assert legacy_rules.excludes("vendor/package/composer.json")
-    assert exclusions.excludes("src/debug.log")
-    assert not exclusions.excludes("src/main.py")
-    snapshot = snapshot_local(workspace, exclusions)
+    assert project.next_rule_id == 10
+    rules = RuleSet(project.rules)
+    assert rules.excludes(".git", is_directory=True)
+    assert not rules.excludes("node_modules/package/index.js")
+    assert not rules.excludes("node_modules/keep.js")
+    assert not rules.excludes("node_modules/package/nested.js")
+    assert rules.excludes("debug.log")
+    assert not rules.excludes("src/debug.log")
+    assert not rules.excludes("src/main.py")
+    snapshot = snapshot_local(workspace, rules)
     assert [entry.path for entry in snapshot.entries] == [
         "docs",
         "node_modules/keep.js",
@@ -250,31 +252,56 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert invoke(["exc"], store) == (
         0,
         "Exclusion rules for project 'prod':\n"
-        "  /.git/\n"
-        "  /node_modules/\n"
-        "  *.log\n"
-        "  **/.cache/\n"
-        "  /composer.json\n"
-        "  /composer.lock\n"
-        "  /docs/note.txt\n",
+        "  1  exclude .git/**\n"
+        "  2  exclude node_modules/**\n"
+        "  3  exclude *.log\n"
+        "  4  exclude **/.cache/**\n"
+        "  5  exclude composer.json\n"
+        "  6  exclude composer.lock\n"
+        "  9  exclude docs/note.txt\n",
         "",
     )
     assert invoke(["inc"], store) == (
         0,
         "Inclusion rules for project 'prod':\n"
-        "  /node_modules/keep.js\n"
-        "  /node_modules/package/**\n",
+        "  7  include node_modules/keep.js\n"
+        "  8  include node_modules/package/**\n",
+        "",
+    )
+    assert invoke(["explain", "node_modules/package/nested.js"], store) == (
+        0,
+        "Rule decision for 'node_modules/package/nested.js' in project 'prod':\n"
+        "  2  exclude node_modules/**\n"
+        "  8  include node_modules/package/**  <- wins\n"
+        "  Effective: included by rule 8\n",
         "",
     )
     list_stdout = invoke(["list"], store)[1]
     assert "* prod\n" in list_stdout
     assert f"  Local root: {workspace}\n" in list_stdout
-    assert (
-        "  Rules: exclude /.git/, exclude /node_modules/, exclude *.log, "
-        "exclude **/.cache/, exclude /composer.json, exclude /composer.lock, "
-        "include /node_modules/keep.js, include /node_modules/package/**, "
-        "exclude /docs/note.txt\n"
-    ) in list_stdout
+    assert "  Rules:\n" in list_stdout
+    assert "    1  exclude .git/**\n" in list_stdout
+    assert "    8  include node_modules/package/**\n" in list_stdout
+    assert "    9  exclude docs/note.txt\n" in list_stdout
+    assert invoke(["rules", "remove", "8"], store) == (
+        0,
+        "Removed rule 8 from project 'prod': include node_modules/package/**\n",
+        "",
+    )
+    assert store.load().projects["prod"].next_rule_id == 10
+    assert invoke(["inc", "composer.json"], store) == (
+        0,
+        "Recorded inclusion rules for project 'prod':\n"
+        "  10  include composer.json\n",
+        "",
+    )
+    updated = store.load().projects["prod"]
+    assert 5 not in {rule.id for rule in updated.rules}
+    assert updated.next_rule_id == 11
+    assert invoke(["explain", "composer.json"], store)[1].endswith(
+        "  10  include composer.json  <- wins\n"
+        "  Effective: included by rule 10\n"
+    )
     assert "project mapped to the current directory" not in list_stdout
 
 
@@ -308,7 +335,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
     monkeypatch.chdir(workspace)
     assert invoke(["map", "prod"], store)[0] == 0
-    assert invoke(["exclude", "node_modules/,*.log"], store)[0] == 0
+    assert invoke(["exclude", "node_modules/,**/*.log"], store)[0] == 0
 
     transports = []
     operations = []
@@ -323,8 +350,11 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         def __exit__(self, *_):
             return None
 
-        def snapshot(self, exclusions, selector=None, *, include_excluded=False):
-            assert exclusions.patterns == ("/node_modules/", "*.log")
+        def snapshot(self, rules, selector=None, *, include_excluded=False):
+            assert rules.rules == (
+                SyncRule(1, "exclude", "node_modules/**"),
+                SyncRule(2, "exclude", "**/*.log"),
+            )
             snapshot = TreeSnapshot(
                 (
                     TreeEntry(

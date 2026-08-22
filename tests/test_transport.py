@@ -12,7 +12,7 @@ from pyftpdlib.servers import FTPServer
 
 from hls.comparison import build_comparison
 from hls.config import ProjectConfiguration
-from hls.exclusions import ExclusionSpec
+from hls.rules import RuleSet, SyncRule
 from hls.selection import FileSelector
 from hls.snapshot import snapshot_local
 from hls.transfer import execute_transfer
@@ -129,7 +129,13 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
         # The fixture refuses unprotected data connections, so recursive MLSD
         # success proves that PROT P was negotiated rather than merely called.
         snapshot = transport.snapshot(
-            ExclusionSpec(("cache/", "*.log", "!cache/keep.bin"))
+            RuleSet(
+                (
+                    SyncRule(1, "exclude", "cache/**"),
+                    SyncRule(2, "exclude", "*.log"),
+                    SyncRule(3, "include", "cache/keep.bin"),
+                )
+            )
         )
         assert [(entry.path, entry.kind) for entry in snapshot.entries] == [
             ("assets", "directory"),
@@ -137,7 +143,13 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
             ("cache/keep.bin", "file"),
         ]
         diagnostic = transport.snapshot(
-            ExclusionSpec(("cache/", "*.log", "!cache/keep.bin")),
+            RuleSet(
+                (
+                    SyncRule(1, "exclude", "cache/**"),
+                    SyncRule(2, "exclude", "*.log"),
+                    SyncRule(3, "include", "cache/keep.bin"),
+                )
+            ),
             include_excluded=True,
         )
         assert {
@@ -149,7 +161,7 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
             "cache/keep.bin": False,
             "debug.log": True,
         }
-        local = snapshot_local(local_root, ExclusionSpec())
+        local = snapshot_local(local_root, RuleSet())
         comparison = {
             entry.path: entry
             for entry in build_comparison(local, snapshot).entries
@@ -219,7 +231,7 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
     )
 
     with transport:
-        exclusions = ExclusionSpec()
+        rules = RuleSet()
         unrelated = remote_root / "unrelated" / "deep"
         unrelated.mkdir(parents=True)
         (unrelated / "ignored.txt").write_text("ignored", encoding="utf-8")
@@ -233,12 +245,12 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             return original_mlsd(path, facts)
 
         transport._client.mlsd = tracked_mlsd
-        transport.snapshot(exclusions, FileSelector("*"))
+        transport.snapshot(rules, FileSelector("*"))
         assert listed_directories == [""]
 
         selector = FileSelector("nested/*.txt")
-        local = snapshot_local(local_root, exclusions, selector)
-        remote = transport.snapshot(exclusions, selector)
+        local = snapshot_local(local_root, rules, selector)
+        remote = transport.snapshot(rules, selector)
         push = build_comparison(
             local,
             remote,
@@ -255,9 +267,9 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             "local version"
         )
         assert not (remote_root / "unselected.txt").exists()
-        remote = transport.snapshot(exclusions, selector)
+        remote = transport.snapshot(rules, selector)
         after_push = build_comparison(
-            snapshot_local(local_root, exclusions, selector),
+            snapshot_local(local_root, rules, selector),
             remote,
             selector=selector,
         )
@@ -270,8 +282,8 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             remote_selected,
             ns=(remote_timestamp_ns, remote_timestamp_ns),
         )
-        local = snapshot_local(local_root, exclusions, selector)
-        remote = transport.snapshot(exclusions, selector)
+        local = snapshot_local(local_root, rules, selector)
+        remote = transport.snapshot(rules, selector)
         pull = build_comparison(
             local,
             remote,
@@ -291,8 +303,8 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
         orphan = remote_root / "orphan.txt"
         orphan.write_text("delete me", encoding="utf-8")
         orphan_selector = FileSelector("orphan.txt")
-        local = snapshot_local(local_root, exclusions, orphan_selector)
-        remote = transport.snapshot(exclusions, orphan_selector)
+        local = snapshot_local(local_root, rules, orphan_selector)
+        remote = transport.snapshot(rules, orphan_selector)
         prune = build_comparison(
             local,
             remote,

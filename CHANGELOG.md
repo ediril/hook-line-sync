@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.22.17 — 2026-08-22
+
+### Added
+
+- Added stable rule IDs, a unified ordered `hls rules` view, targeted `hls rules
+  remove <id>` repair, and `hls explain <path>` winner diagnostics.
+
+### Changed
+
+- Replaced the mixed raw Gitignore `exclusions` array with explicit structured
+  `include` and `exclude` records in intentionally incompatible configuration
+  schema version 7.
+- Replaced Gitignore matching with project-rooted HLS patterns: `*` matches one
+  level, `**` is recursive, and literal directories cover their complete
+  subtree.
+- Exact repeated patterns now replace their earlier rule automatically without
+  requiring manual cleanup.
+- Removed the `pathspec` runtime dependency.
+
 ## 0.8.22.16 — 2026-08-22
 
 ### Changed

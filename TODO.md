@@ -5,14 +5,13 @@
   - [x] Define the concrete support and service benefits of the voluntary
     Business subscription without implying that the MIT license requires
     payment.
-- [ ] Make persistent rule maintenance scale without requiring user discipline:
-  - Automatically perform only provably semantics-preserving cleanup whenever
-    `hls include` or `hls exclude` mutates the ordered rule list; do not expose
-    a separate tidy command.
-  - Retain the last identical rule, canonicalize safe syntax variants, and
-    preserve Gitignore results for both current and future paths.
-  - Index anchored literal rules separately from wildcard rules while preserving
-    their shared ordering and last-match-wins reconciliation.
+- [ ] Characterize and scale structured rule matching without requiring user
+  discipline:
+  - [x] Replace raw Gitignore entries with explicit, stable-ID HLS rules and
+    automatically retain only the latest rule for an identical normalized
+    pattern.
+  - Index literal rules separately from wildcard rules while preserving their
+    shared ordered reconciliation.
   - Characterize matching cost with hundreds and thousands of mixed rules.
 - [ ] Characterize and improve FTPS scalability without weakening transfer
   guarantees:

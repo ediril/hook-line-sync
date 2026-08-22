@@ -19,12 +19,12 @@ from hls.config import (
     canonical_local_root,
     validate_project_name,
 )
-from hls.exclusions import ExclusionError, ExclusionSpec, rules_from_patterns
 from hls.pattern_operands import (
     PatternOperandError,
     add_pattern_operands,
     normalize_pattern_operands,
 )
+from hls.rules import RuleError, RuleSet, SyncRule, patterns_from_operands
 from hls.selection import FileSelection, FileSelector, FileSelectorSet, SelectionError
 from hls.snapshot import SnapshotError, TreeSnapshot, snapshot_local
 from hls.transfer import TransferError, TransferResult, execute_transfer
@@ -44,6 +44,8 @@ CANONICAL_COMMANDS = (
     "exclude",
     "include",
     "files",
+    "rules",
+    "explain",
     "help",
     "version",
 )
@@ -114,7 +116,7 @@ def build_parser() -> argparse.ArgumentParser:
             rules_parser,
             required=False,
             help_text=(
-                "gitignore-style patterns or comma-separated pattern groups "
+                "HLS path patterns or comma-separated pattern groups "
                 f"relative to the local root; omit to list {rule_name} rules"
             ),
         )
@@ -128,6 +130,27 @@ def build_parser() -> argparse.ArgumentParser:
         "files", help="list local files included in synchronization"
     )
     files_parser.add_argument(
+        "--project",
+        dest="project_name",
+        help="project name; inferred from the current directory when omitted",
+    )
+
+    rules_parser = subparsers.add_parser(
+        "rules", help="list or remove synchronization rules"
+    )
+    rules_parser.add_argument("operation", nargs="?", choices=("remove",))
+    rules_parser.add_argument("rule_id", nargs="?", type=int)
+    rules_parser.add_argument(
+        "--project",
+        dest="project_name",
+        help="project name; inferred from the current directory when omitted",
+    )
+
+    explain_parser = subparsers.add_parser(
+        "explain", help="explain the effective rule decision for a path"
+    )
+    explain_parser.add_argument("path")
+    explain_parser.add_argument(
         "--project",
         dest="project_name",
         help="project name; inferred from the current directory when omitted",
@@ -304,7 +327,27 @@ def _map(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     return f"Mapped '{local_root}' to '{name}:{project.remote_root}'."
 
 
-def _change_exclusions(
+def _format_rules(
+    name: str,
+    rules: tuple[SyncRule, ...],
+    *,
+    heading: str,
+) -> str:
+    if not rules:
+        return f"No {heading.lower()} for project '{name}'."
+    width = len(str(rules[-1].id))
+    return "\n".join(
+        (
+            f"{heading} for project '{name}':",
+            *(
+                f"  {rule.id:>{width}}  {rule.action:<7} {rule.pattern}"
+                for rule in rules
+            ),
+        )
+    )
+
+
+def _change_rules(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
     *,
@@ -313,34 +356,27 @@ def _change_exclusions(
     configuration, name, project = _resolve_project(arguments, store)
     patterns = normalize_pattern_operands(arguments)
     if not patterns:
-        rules = tuple(
-            rule[1:]
-            for rule in project.exclusions
-            if include and rule.startswith("!")
-        )
-        if not include:
-            rules = tuple(
-                rule for rule in project.exclusions if not rule.startswith("!")
-            )
+        action = "include" if include else "exclude"
+        rules = tuple(rule for rule in project.rules if rule.action == action)
         kind = "Inclusion" if include else "Exclusion"
-        if not rules:
-            return f"No {kind.lower()} rules for project '{name}'."
-        return "\n".join(
-            (f"{kind} rules for project '{name}':", *(f"  {rule}" for rule in rules))
-        )
+        return _format_rules(name, rules, heading=f"{kind} rules")
     root = _require_local_root(name, project)
-    rules = rules_from_patterns(
+    normalized = patterns_from_operands(
         patterns,
-        include=include,
         project_root=root,
         current_directory=Path.cwd().resolve(strict=True),
     )
-    configuration.append_exclusion_rules(name, rules)
+    added = configuration.append_rules(
+        name,
+        "include" if include else "exclude",
+        normalized,
+    )
     store.save(configuration)
-    action = "Included" if include else "Excluded"
-    displayed_rules = patterns
-    return "\n".join(
-        (f"{action} for project '{name}':", *(f"  {rule}" for rule in displayed_rules))
+    action = "Inclusion" if include else "Exclusion"
+    return _format_rules(
+        name,
+        added,
+        heading=f"Recorded {action.lower()} rules",
     )
 
 
@@ -352,7 +388,7 @@ def _list_included_files(
     root = _require_local_root(name, project)
     snapshot = snapshot_local(
         root,
-        ExclusionSpec(project.exclusions),
+        RuleSet(project.rules),
         include_excluded=True,
     )
     paths = tuple(
@@ -368,6 +404,56 @@ def _list_included_files(
             *(f"  {path}" for path in paths),
         )
     )
+
+
+def _manage_rules(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+) -> str:
+    configuration, name, project = _resolve_project(arguments, store)
+    if arguments.operation is None:
+        if arguments.rule_id is not None:
+            raise ConfigurationError("a rule id requires the remove operation")
+        return _format_rules(name, project.rules, heading="Synchronization rules")
+    if arguments.rule_id is None:
+        raise ConfigurationError("rules remove requires a rule id")
+    removed = configuration.remove_rule(name, arguments.rule_id)
+    store.save(configuration)
+    return (
+        f"Removed rule {removed.id} from project '{name}': "
+        f"{removed.action} {removed.pattern}"
+    )
+
+
+def _explain_rules(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+) -> str:
+    _, name, project = _resolve_project(arguments, store)
+    root = _require_local_root(name, project)
+    try:
+        selector = FileSelector.from_argument(
+            arguments.path,
+            project_root=root,
+            current_directory=Path.cwd().resolve(strict=True),
+        )
+    except SelectionError as error:
+        raise ConfigurationError(str(error)) from error
+    if "*" in selector.pattern:
+        raise ConfigurationError("explain requires one literal file or directory path")
+    evaluation = RuleSet(project.rules).evaluate(selector.pattern)
+    lines = [f"Rule decision for '{evaluation.path}' in project '{name}':"]
+    if not evaluation.matches:
+        lines.append("  No matching rules.")
+        lines.append("  Effective: included by default")
+        return "\n".join(lines)
+    winner = evaluation.winner
+    for rule in evaluation.matches:
+        suffix = "  <- wins" if rule is winner else ""
+        lines.append(f"  {rule.id}  {rule.action:<7} {rule.pattern}{suffix}")
+    effective = "excluded" if evaluation.excluded else "included"
+    lines.append(f"  Effective: {effective} by rule {winner.id}")
+    return "\n".join(lines)
 
 
 def _remove(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
@@ -391,12 +477,13 @@ def _list_projects(store: ConfigurationStore) -> str:
         lines.append(f"  FTPS: {project.host}:{project.port}")
         lines.append(f"  Remote root: {project.remote_root}")
         lines.append(f"  Local root: {project.local_root or 'not mapped'}")
-        if project.exclusions:
-            rules = ", ".join(
-                f"include {rule[1:]}" if rule.startswith("!") else f"exclude {rule}"
-                for rule in project.exclusions
+        if project.rules:
+            lines.append("  Rules:")
+            width = len(str(project.rules[-1].id))
+            lines.extend(
+                f"    {rule.id:>{width}}  {rule.action:<7} {rule.pattern}"
+                for rule in project.rules
             )
-            lines.append(f"  Rules: {rules}")
         else:
             lines.append("  Rules: none")
     return "\n".join(lines)
@@ -421,7 +508,7 @@ def _format_snapshot(source: str, name: str, snapshot: TreeSnapshot) -> str:
 def _list_local(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
-    snapshot = snapshot_local(root, ExclusionSpec(project.exclusions))
+    snapshot = snapshot_local(root, RuleSet(project.rules))
     return _format_snapshot("Local", name, snapshot)
 
 
@@ -429,7 +516,7 @@ def _list_remote(arguments: argparse.Namespace, store: ConfigurationStore) -> st
     _, name, project = _resolve_project(arguments, store)
     _require_local_root(name, project)
     with ExplicitFTPSTransport(project) as transport:
-        snapshot = transport.snapshot(ExclusionSpec(project.exclusions))
+        snapshot = transport.snapshot(RuleSet(project.rules))
     return _format_snapshot("Remote", name, snapshot)
 
 
@@ -514,18 +601,18 @@ def _build_plan(
     progress: TextIO,
     include_excluded: bool = False,
 ) -> tuple[TreeSnapshot, TreeSnapshot, ComparisonPlan]:
-    exclusions = ExclusionSpec(project.exclusions)
+    rules = RuleSet(project.rules)
     selector = _file_selection(arguments, root)
     print("Scanning local files...", file=progress, flush=True)
     local = snapshot_local(
         root,
-        exclusions,
+        rules,
         selector,
         include_excluded=include_excluded,
     )
     print("Reading remote files over FTPS...", file=progress, flush=True)
     remote = transport.snapshot(
-        exclusions,
+        rules,
         selector,
         include_excluded=include_excluded,
     )
@@ -650,13 +737,17 @@ def run(
         elif arguments.command == "map":
             message = _map(arguments, configuration_store)
         elif arguments.command == "exclude":
-            message = _change_exclusions(
+            message = _change_rules(
                 arguments, configuration_store, include=False
             )
         elif arguments.command == "include":
-            message = _change_exclusions(arguments, configuration_store, include=True)
+            message = _change_rules(arguments, configuration_store, include=True)
         elif arguments.command == "files":
             message = _list_included_files(arguments, configuration_store)
+        elif arguments.command == "rules":
+            message = _manage_rules(arguments, configuration_store)
+        elif arguments.command == "explain":
+            message = _explain_rules(arguments, configuration_store)
         elif arguments.command == "remove":
             message = _remove(arguments, configuration_store)
         elif arguments.command == "list":
@@ -687,7 +778,7 @@ def run(
             return 2
     except (
         ConfigurationError,
-        ExclusionError,
+        RuleError,
         PatternOperandError,
         SelectionError,
         SnapshotError,

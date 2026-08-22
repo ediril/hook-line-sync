@@ -11,7 +11,7 @@ from typing import BinaryIO, Protocol
 from uuid import uuid4
 
 from hls.config import ProjectConfiguration
-from hls.exclusions import ExclusionSpec
+from hls.rules import RuleSet
 from hls.selection import FileSelection
 from hls.snapshot import EntryKind, SnapshotError, TreeEntry, TreeSnapshot
 
@@ -52,7 +52,7 @@ class RemoteTransport(Protocol):
 
     def snapshot(
         self,
-        exclusions: ExclusionSpec,
+        rules: RuleSet,
         selector: FileSelection | None = None,
         *,
         include_excluded: bool = False,
@@ -134,7 +134,7 @@ class ExplicitFTPSTransport:
 
     def snapshot(
         self,
-        exclusions: ExclusionSpec,
+        rules: RuleSet,
         selector: FileSelection | None = None,
         *,
         include_excluded: bool = False,
@@ -180,7 +180,7 @@ class ExplicitFTPSTransport:
                         f"unsupported remote entry type {entry_type!r} "
                         f"for '{relative_path}'"
                     )
-                excluded = exclusions.excludes(
+                excluded = rules.excludes(
                     relative_path,
                     is_directory=kind == "directory",
                 )
@@ -233,7 +233,7 @@ class ExplicitFTPSTransport:
                 exclusion_may_descend = (
                     include_excluded
                     or not excluded
-                    or exclusions.may_include_descendant(relative_path)
+                    or rules.may_include_descendant(relative_path)
                 )
                 if (
                     kind == "directory"

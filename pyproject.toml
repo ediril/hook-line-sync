@@ -24,8 +24,6 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Topic :: System :: Archiving :: Backup",
 ]
-dependencies = ["pathspec>=0.12,<1"]
-
 [project.urls]
 Homepage = "https://github.com/ediril/hook-line-sync"
 Changelog = "https://github.com/ediril/hook-line-sync/blob/main/CHANGELOG.md"
