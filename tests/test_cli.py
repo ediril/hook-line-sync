@@ -30,7 +30,6 @@ def test_project_lifecycle_uses_production_credentials_and_version(
         [
             "add",
             "client-site",
-            "ftps",
             "--host",
             "ftp.example.com",
             "--remote-root",
@@ -54,10 +53,11 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     project = configuration.projects["client-site"]
     assert project.host == "ftp.example.com"
     assert project.remote_root == "/public_html/site"
+    assert project.type == "ftps"
     assert project.port == 21
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.21.7"
+    assert __version__ == "0.8.21.9"
 
     context_store = DirectoryContextStore(store.path.with_name("contexts.json"))
     contexts = DirectoryContexts()
@@ -95,7 +95,6 @@ def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
     arguments = [
         "add",
         "prod",
-        "ftps",
         "--host",
         "ftp.example.com",
         "--remote-root",
@@ -116,7 +115,7 @@ def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
     assert context_status == 1
     assert "no directory context" in context_error
     with pytest.raises(SystemExit):
-        run(["add", "unsafe", "ftps", "--host", "ftp.example.com"], store=store)
+        run(["add", "unsafe", "--host", "ftp.example.com"], store=store)
 
 
 def test_add_supports_custom_port_and_environment_names(tmp_path) -> None:
@@ -126,11 +125,12 @@ def test_add_supports_custom_port_and_environment_names(tmp_path) -> None:
         [
             "add",
             "staging",
-            "ftps",
             "--host",
             "staging.example.com",
             "--remote-root",
             "/clients/staging",
+            "--protocol",
+            "ftps",
             "--port",
             "2121",
             "--username-env",
@@ -143,7 +143,13 @@ def test_add_supports_custom_port_and_environment_names(tmp_path) -> None:
 
     assert status == 0
     project = store.load().projects["staging"]
-    assert (project.port, project.username_env, project.password_env) == (
+    assert (
+        project.type,
+        project.port,
+        project.username_env,
+        project.password_env,
+    ) == (
+        "ftps",
         2121,
         "SHARED_USER",
         "STAGING_SECRET",
@@ -163,7 +169,6 @@ def test_use_is_directory_scoped_and_map_persists_an_absolute_local_path(
         [
             "add",
             "prod",
-            "ftps",
             "--host",
             "ftp.example.com",
             "--remote-root",
@@ -214,7 +219,6 @@ def test_map_rejects_local_and_remote_overlaps(tmp_path) -> None:
         [
             "add",
             "prod",
-            "ftps",
             "--host",
             "ftp.example.com",
             "--remote-root",

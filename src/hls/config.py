@@ -145,7 +145,7 @@ class ProjectConfiguration:
             _normalize_remote_path(self.remote_root, "project remote root"),
         )
         if self.type != "ftps":
-            raise ConfigurationError("server type must be 'ftps'")
+            raise ConfigurationError("project transport must be 'ftps'")
         if isinstance(self.port, bool) or not isinstance(self.port, int):
             raise ConfigurationError("port must be an integer")
         if not 1 <= self.port <= 65535:

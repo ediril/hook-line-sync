@@ -31,9 +31,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_parser = subparsers.add_parser("add", help="add an FTPS project")
     add_parser.add_argument("project_name")
-    add_parser.add_argument("type", choices=("ftps",))
     add_parser.add_argument("--host", required=True)
     add_parser.add_argument("--remote-root", required=True)
+    add_parser.add_argument("--protocol", choices=("ftps",), default="ftps")
     add_parser.add_argument("--port", type=int, default=21)
     add_parser.add_argument("--username-env")
     add_parser.add_argument("--password-env")
@@ -80,7 +80,7 @@ def _save_project(
     if name in configuration.projects:
         raise ConfigurationError(f"project '{name}' already exists")
     project = ProjectConfiguration(
-        type=arguments.type,
+        type=arguments.protocol,
         host=arguments.host,
         remote_root=arguments.remote_root,
         port=arguments.port,

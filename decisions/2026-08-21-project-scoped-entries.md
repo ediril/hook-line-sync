@@ -28,6 +28,8 @@ future transfers.
 - Configuration schema version 4 uses a top-level `projects` object rather than
   `servers`.
 - `hls add` requires both `--host` and `--remote-root`.
+- The connection protocol is selected with `--protocol`; it defaults to `ftps`,
+  the only currently supported value.
 - Projects default to `PROD_FTPS_USERNAME` and `PROD_FTPS_PASSWORD`; either
   environment-variable name may be overridden explicitly.
 - Earlier pre-alpha configuration files are rejected rather than migrated or

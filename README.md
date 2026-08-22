@@ -25,8 +25,11 @@ pytest
 Add a project with its FTPS endpoint and absolute remote root:
 
 ```console
-hls add prod ftps --host ftp.example.com --remote-root /public_html/site
+hls add prod --host ftp.example.com --remote-root /public_html/site
 ```
+
+FTPS is the default and currently the only implemented protocol. The explicit
+form is `--protocol ftps`; unsupported protocols are rejected.
 
 Each project owns its connection details, remote root, and mappings. Multiple
 projects may use the same server. Unless overridden, every project reads
