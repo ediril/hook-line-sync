@@ -5,9 +5,11 @@ Date: 2026-08-22
 ## Decision
 
 All command names accept the shortest unambiguous prefix. Exact command names
-and the established `ls`, `lsl`, `lsr`, and `cmp` spellings take precedence.
-Ambiguous prefixes fail and name every candidate rather than choosing based on
-registration order.
+and the established `lsl` and `lsr` spellings take precedence. `ls` and `cmp`
+are resolver-level compatibility spellings: they remain functional but are not
+registered with the argument parser and therefore do not appear in the help
+menu. Ambiguous prefixes fail and name every candidate rather than choosing
+based on registration order.
 
 `hls map` only maps the current directory. `hls exclude` and `hls include`,
 which naturally permit `hls exc` and `hls inc`, append one or more pattern

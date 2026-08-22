@@ -70,8 +70,9 @@ Removal does not connect to the server or delete remote files.
 
 Command names may be shortened to any unique prefix. For example, `hls con`
 means `hls connect`, while `hls comp` means `hls compare`. An ambiguous prefix
-is rejected and lists its candidates. The established `ls`, `lsl`, `lsr`, and
-`cmp` spellings remain available.
+is rejected and lists its candidates. The established `ls` and `cmp`
+compatibility spellings remain available but are intentionally omitted from the
+help menu; `lsl` and `lsr` remain documented commands.
 
 Every path-pattern command uses the same operand grammar. Compare, push, and
 pull accept zero or more operands; exclude and include require at least one.

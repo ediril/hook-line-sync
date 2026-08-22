@@ -50,8 +50,10 @@ COMMAND_ALIASES = {"ls": "list", "cmp": "compare"}
 
 
 def _resolve_command_name(value: str) -> str:
-    if value in CANONICAL_COMMANDS or value in COMMAND_ALIASES:
+    if value in CANONICAL_COMMANDS:
         return value
+    if value in COMMAND_ALIASES:
+        return COMMAND_ALIASES[value]
     matches = tuple(
         command for command in CANONICAL_COMMANDS if command.startswith(value)
     )
@@ -116,9 +118,7 @@ def build_parser() -> argparse.ArgumentParser:
     remove_parser = subparsers.add_parser("remove", help="remove a project")
     remove_parser.add_argument("project_name")
 
-    list_parser = subparsers.add_parser(
-        "list", aliases=("ls",), help="list configured projects"
-    )
+    list_parser = subparsers.add_parser("list", help="list configured projects")
     list_parser.add_argument(
         "target",
         nargs="?",
@@ -139,7 +139,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     compare_parser = subparsers.add_parser(
         "compare",
-        aliases=("cmp",),
         help="preview file changes without modifying anything",
         description=(
             "Preview file changes without modifying local or remote files. "
@@ -592,7 +591,7 @@ def run(
             message = _change_exclusions(arguments, configuration_store, include=True)
         elif arguments.command == "remove":
             message = _remove(arguments, configuration_store)
-        elif arguments.command in {"list", "ls"}:
+        elif arguments.command == "list":
             if arguments.target == "projects":
                 if arguments.project_name is not None:
                     raise ConfigurationError(
@@ -607,7 +606,7 @@ def run(
             message = _list_local(arguments, configuration_store)
         elif arguments.command == "lsr":
             message = _list_remote(arguments, configuration_store)
-        elif arguments.command in {"compare", "cmp"}:
+        elif arguments.command == "compare":
             message = _compare(arguments, configuration_store, stderr, stdout)
         elif arguments.command in {"push", "pull"}:
             message = _transfer(arguments, configuration_store, stderr)

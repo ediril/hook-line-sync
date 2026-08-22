@@ -24,6 +24,8 @@
   include while retaining comma-separated pattern groups.
 - [x] Extract the common variadic pattern-operand grammar and normalization used
   by compare, push, pull, exclude, and include.
+- [x] Keep exact `ls` and `cmp` compatibility spellings functional while hiding
+  them from the primary command menu.
 - [x] Remove the superseded directory-scoped `hls use` mechanism; project
   selection is inferred from non-overlapping local roots.
 - [x] Implement deterministic `hls list` / `hls ls` project inventory, including
