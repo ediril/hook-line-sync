@@ -21,6 +21,7 @@ from hls.config import (
 from hls.exclusions import ExclusionError, ExclusionSpec
 from hls.selection import FileSelector, SelectionError
 from hls.snapshot import SnapshotError, TreeSnapshot, snapshot_local
+from hls.transfer import TransferError, TransferResult, execute_transfer
 from hls.transport import ExplicitFTPSTransport, TransportError
 
 
@@ -97,6 +98,20 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="project deletion of remote-only paths",
     )
+
+    for command in ("push", "pull"):
+        transfer_parser = subparsers.add_parser(
+            command,
+            help=f"synchronize selected files in the {command} direction",
+        )
+        transfer_parser.add_argument("selector", nargs="?")
+        transfer_parser.add_argument("--project", dest="project_name")
+        transfer_parser.add_argument(
+            "-p",
+            "--prune-remote",
+            action="store_true",
+            help="delete selected remote-only paths",
+        )
 
     help_parser = subparsers.add_parser("help", help="show command help")
     help_parser.add_argument("topic", nargs="?")
@@ -254,11 +269,8 @@ def _format_comparison(name: str, plan: ComparisonPlan) -> str:
     return "\n".join(lines)
 
 
-def _compare(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
-    _, name, project = _resolve_project(arguments, store)
-    root = _require_local_root(name, project)
-    exclusions = ExclusionSpec(project.exclusions)
-    selector = (
+def _file_selector(arguments: argparse.Namespace, root: Path) -> FileSelector | None:
+    return (
         FileSelector.from_argument(
             arguments.selector,
             project_root=root,
@@ -267,17 +279,77 @@ def _compare(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
         if arguments.selector is not None
         else None
     )
+
+
+def _build_plan(
+    arguments: argparse.Namespace,
+    project: ProjectConfiguration,
+    root: Path,
+    transport: ExplicitFTPSTransport,
+    *,
+    direction: str,
+) -> tuple[TreeSnapshot, TreeSnapshot, ComparisonPlan]:
+    exclusions = ExclusionSpec(project.exclusions)
+    selector = _file_selector(arguments, root)
     local = snapshot_local(root, exclusions)
-    with ExplicitFTPSTransport(project) as transport:
-        remote = transport.snapshot(exclusions)
+    remote = transport.snapshot(exclusions)
     plan = build_comparison(
         local,
         remote,
-        direction="pull" if arguments.pull else "push",
+        direction=direction,
         prune_remote=arguments.prune_remote,
         selector=selector,
     )
+    return local, remote, plan
+
+
+def _compare(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+    _, name, project = _resolve_project(arguments, store)
+    root = _require_local_root(name, project)
+    with ExplicitFTPSTransport(project) as transport:
+        _, _, plan = _build_plan(
+            arguments,
+            project,
+            root,
+            transport,
+            direction="pull" if arguments.pull else "push",
+        )
     return _format_comparison(name, plan)
+
+
+def _format_transfer(name: str, result: TransferResult) -> str:
+    direction = result.plan.direction.capitalize()
+    lines = [
+        f"{direction} completed for project '{name}': "
+        f"{result.changed_count} change(s)."
+    ]
+    for entry in result.plan.differences:
+        lines.append(
+            f"  {entry.action:<14} {entry.state:<16} "
+            f"{_comparison_kind(entry):<20} {entry.path}"
+        )
+    return "\n".join(lines)
+
+
+def _transfer(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+    _, name, project = _resolve_project(arguments, store)
+    root = _require_local_root(name, project)
+    with ExplicitFTPSTransport(project) as transport:
+        local, remote, plan = _build_plan(
+            arguments,
+            project,
+            root,
+            transport,
+            direction=arguments.command,
+        )
+        result = execute_transfer(
+            plan,
+            local_root=root,
+            local=local,
+            remote=remote,
+            transport=transport,
+        )
+    return _format_transfer(name, result)
 
 
 def _show_help(parser: argparse.ArgumentParser, topic: str | None) -> str:
@@ -329,6 +401,8 @@ def run(
             message = _list_remote(arguments, configuration_store)
         elif arguments.command in {"compare", "cmp"}:
             message = _compare(arguments, configuration_store)
+        elif arguments.command in {"push", "pull"}:
+            message = _transfer(arguments, configuration_store)
         elif arguments.command == "help":
             message = _show_help(parser, arguments.topic)
         elif arguments.command == "version":
@@ -342,6 +416,7 @@ def run(
         SelectionError,
         SnapshotError,
         TransportError,
+        TransferError,
     ) as error:
         print(f"hls: error: {error}", file=stderr)
         return 1

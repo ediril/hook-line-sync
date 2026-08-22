@@ -178,6 +178,44 @@ File identity uses size and modification timestamps normalized to the coarser
 precision reported by the local filesystem and remote MLSD facts. Identical
 paths are omitted from the output.
 
+## Push and pull
+
+Apply the complete push or pull projection from anywhere inside a mapped
+project:
+
+```console
+hls push
+hls pull
+```
+
+Limit execution with the same selector syntax used by compare:
+
+```console
+hls push index.html
+hls push 'src/*.js'
+hls pull '**/*.css'
+```
+
+Use `--project <name>` outside a mapped project. Push uploads local-only files
+and replaces changed remote files. Pull replaces changed local files, but it
+does not restore remote-only files because missing local paths are treated as
+intentional deletions.
+
+Remote-only paths are reported and left untouched unless pruning is explicitly
+authorized:
+
+```console
+hls push --prune-remote
+hls pull -p 'generated/*.html'
+```
+
+Pruning is limited by the selector and occurs only after all uploads or
+downloads succeed. Remote uploads use temporary files and recoverable backups;
+local downloads use atomic replacement. Type conflicts and symlinks abort the
+entire plan before mutation. Each file replacement is atomic, but FTPS cannot
+provide a transaction across the complete project, so an operation that fails
+later does not roll back earlier completed files.
+
 ## Versioning
 
 Releases use `0.<month>.<day>.<increment>` without leading zeroes. The final

@@ -13,7 +13,9 @@ from pyftpdlib.servers import FTPServer
 from hls.comparison import build_comparison
 from hls.config import ProjectConfiguration
 from hls.exclusions import ExclusionSpec
+from hls.selection import FileSelector
 from hls.snapshot import snapshot_local
+from hls.transfer import execute_transfer
 from hls.transport import ExplicitFTPSTransport, TransportError
 
 
@@ -63,7 +65,12 @@ def tls_ftp_server(tmp_path):
     root = tmp_path / "ftp-root"
     root.mkdir()
     authorizer = DummyAuthorizer()
-    authorizer.add_user("prod-user", "prod-password", os.fspath(root), perm="elr")
+    authorizer.add_user(
+        "prod-user",
+        "prod-password",
+        os.fspath(root),
+        perm="elradfmwMT",
+    )
 
     class Handler(TLS_FTPHandler):
         pass
@@ -172,3 +179,96 @@ def test_rejects_an_inaccessible_project_root(tls_ftp_server, monkeypatch) -> No
 
     with pytest.raises(TransportError, match="No such file or directory"):
         transport.connect()
+
+
+def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
+    tls_ftp_server, tmp_path, monkeypatch
+) -> None:
+    port, certificate, remote_root = tls_ftp_server
+    local_root = tmp_path / "local"
+    nested = local_root / "nested"
+    nested.mkdir(parents=True)
+    selected = nested / "selected.txt"
+    selected.write_text("local version", encoding="utf-8")
+    local_timestamp_ns = 1_700_000_000_000_000_000
+    os.utime(selected, ns=(local_timestamp_ns, local_timestamp_ns))
+    (local_root / "unselected.txt").write_text("stay local", encoding="utf-8")
+    monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
+    monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
+    context = ssl.create_default_context(cafile=os.fspath(certificate))
+    transport = ExplicitFTPSTransport(
+        ProjectConfiguration(host="localhost", remote_root="/", port=port),
+        ssl_context=context,
+    )
+
+    with transport:
+        exclusions = ExclusionSpec()
+        local = snapshot_local(local_root, exclusions)
+        remote = transport.snapshot(exclusions)
+        push = build_comparison(
+            local,
+            remote,
+            selector=FileSelector("nested/*.txt"),
+        )
+        execute_transfer(
+            push,
+            local_root=local_root,
+            local=local,
+            remote=remote,
+            transport=transport,
+        )
+        assert (remote_root / "nested" / "selected.txt").read_text() == (
+            "local version"
+        )
+        assert not (remote_root / "unselected.txt").exists()
+        remote = transport.snapshot(exclusions)
+        after_push = build_comparison(
+            snapshot_local(local_root, exclusions),
+            remote,
+            selector=FileSelector("nested/*.txt"),
+        )
+        assert after_push.entries[0].action == "unchanged"
+
+        remote_selected = remote_root / "nested" / "selected.txt"
+        remote_selected.write_text("remote version", encoding="utf-8")
+        remote_timestamp_ns = local_timestamp_ns + 10_000_000_000
+        os.utime(
+            remote_selected,
+            ns=(remote_timestamp_ns, remote_timestamp_ns),
+        )
+        local = snapshot_local(local_root, exclusions)
+        remote = transport.snapshot(exclusions)
+        pull = build_comparison(
+            local,
+            remote,
+            direction="pull",
+            selector=FileSelector("nested/*.txt"),
+        )
+        execute_transfer(
+            pull,
+            local_root=local_root,
+            local=local,
+            remote=remote,
+            transport=transport,
+        )
+        assert selected.read_text(encoding="utf-8") == "remote version"
+        assert selected.stat().st_mtime_ns == remote_timestamp_ns
+
+        orphan = remote_root / "orphan.txt"
+        orphan.write_text("delete me", encoding="utf-8")
+        local = snapshot_local(local_root, exclusions)
+        remote = transport.snapshot(exclusions)
+        prune = build_comparison(
+            local,
+            remote,
+            prune_remote=True,
+            selector=FileSelector("orphan.txt"),
+        )
+        execute_transfer(
+            prune,
+            local_root=local_root,
+            local=local,
+            remote=remote,
+            transport=transport,
+        )
+        assert not orphan.exists()

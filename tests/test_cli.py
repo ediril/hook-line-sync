@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.21.14"
+    assert __version__ == "0.8.21.15"
 
     list_status, list_stdout, list_stderr = invoke(["list"], store)
     assert (list_status, list_stderr) == (0, "")
@@ -196,6 +196,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )[0] == 0
 
     transports = []
+    operations = []
 
     class FakeTransport:
         def __init__(self, project) -> None:
@@ -220,6 +221,27 @@ def test_current_project_inference_drives_connect_and_tree_listings(
                     ),
                 )
             )
+
+        def make_directory(self, path):
+            operations.append(("mkdir", path))
+
+        def upload_file(
+            self,
+            source,
+            path,
+            *,
+            size,
+            modified_ns,
+            replace,
+        ):
+            operations.append(("upload", path, source.read(), size, replace))
+
+        def download_file(self, path, destination):
+            operations.append(("download", path))
+            destination.write(b"remote")
+
+        def delete_path(self, path, *, is_directory):
+            operations.append(("delete", path, is_directory))
 
     monkeypatch.setattr("hls.cli.ExplicitFTPSTransport", FakeTransport)
     monkeypatch.chdir(source)
@@ -266,7 +288,20 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "Pull projection for project 'prod':\n" in pull_comparison[1]
     assert "delete-remote  remote-only" in pull_comparison[1]
     assert "skip           local-only" in pull_comparison[1]
-    assert len(transports) == 7
+
+    push_result = invoke(["push", "main.py"], store)
+    assert push_result[0] == 0 and push_result[2] == ""
+    assert "Push completed for project 'prod': 1 change(s)." in push_result[1]
+    assert operations == [
+        ("mkdir", "src"),
+        ("upload", "src/main.py", b"print('hello')", 14, False),
+    ]
+    monkeypatch.chdir(workspace)
+    pull_result = invoke(["pull", "deployed.html"], store)
+    assert pull_result[0] == 0 and pull_result[2] == ""
+    assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
+    assert "skip           remote-only" in pull_result[1]
+    assert len(transports) == 9
 
 
 def test_map_rejects_existing_and_overlapping_local_roots(
