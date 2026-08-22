@@ -2,6 +2,8 @@
 
 Date: 2026-08-21
 
+Status: Superseded by `2026-08-21-single-local-root-mapping.md`.
+
 ## Decision
 
 `hls use <project>` associates a project with the canonical current directory.

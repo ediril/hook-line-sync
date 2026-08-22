@@ -20,7 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Topic :: System :: Archiving :: Backup",
 ]
-dependencies = []
+dependencies = ["pathspec>=0.12,<1"]
 
 [project.optional-dependencies]
 dev = [

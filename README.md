@@ -3,9 +3,9 @@
 Hook Line Sync (`hls`) is a Python CLI for transferring files between mapped
 local folders and remote servers over explicit FTP over TLS (FTPS).
 
-The project is in pre-alpha development. The configuration and connection
-foundation is available; mapping and file-transfer commands remain on the work
-queue in [`TODO.md`](TODO.md).
+The project is in pre-alpha development. The configuration, connection, and
+local-root mapping foundation is available; file-transfer commands remain on
+the work queue in [`TODO.md`](TODO.md).
 
 ## Requirements
 
@@ -31,9 +31,9 @@ hls add prod --host ftp.example.com --remote-root /public_html/site
 FTPS is the default and currently the only implemented protocol. The explicit
 form is `--protocol ftps`; unsupported protocols are rejected.
 
-Each project owns its connection details, remote root, and mappings. Multiple
-projects may use the same server. Unless overridden, every project reads
-credentials from:
+Each project owns its connection details, remote root, and local-root mapping.
+Multiple projects may use the same server. Unless overridden, every project
+reads credentials from:
 
 ```text
 PROD_FTPS_USERNAME
@@ -43,34 +43,15 @@ PROD_FTPS_PASSWORD
 Custom names can be supplied with `--username-env` and `--password-env`.
 Credential values are never written to `~/.hls/configs.json`.
 
-Select a project for the current directory tree:
+Verify a project's FTPS connection:
 
 ```console
-cd ~/Sites/my-site
-hls use prod
-hls use
-```
-
-The context is stored in `~/.hls/contexts.json`, keyed by canonical absolute
-directory. Descendants inherit the nearest context. It can be removed from the
-directory where it was set with:
-
-```console
-hls use --clear
-```
-
-Verify the active project's FTPS connection, or name another explicitly:
-
-```console
-hls connect
 hls connect prod
 ```
 
 The connection uses certificate verification and refuses plaintext fallback.
-There is no global default project. An explicit project wins; otherwise a
-command uses the nearest directory context and fails if none exists.
 
-Remove a project and all of its locally stored mappings:
+Remove a project and its locally stored mapping:
 
 ```console
 hls remove prod
@@ -78,8 +59,8 @@ hls remove prod
 
 Removal does not connect to the server or delete remote files.
 
-List everything currently configured, including mappings, and mark the project
-active for the current directory:
+List everything currently configured and mark the project whose local root
+contains the current directory:
 
 ```console
 hls list
@@ -89,26 +70,32 @@ hls ls
 `hls list projects` is the explicit form. The `list` command will later also
 host local, remote, and diff file inventories.
 
-## Mappings
+## Local roots
 
-Bind an existing local folder to a directory relative to the project's remote
-root:
+From the root of a local project, map its entire relative hierarchy to the
+project's remote root:
 
 ```console
-hls map ./site
-hls map ./shared-assets static/assets
-hls map ./site --project prod
+cd ~/Sites/my-site
+hls map prod
 ```
 
-The local folder may be relative or absolute, but its canonical absolute path is
-always persisted. If the remote directory is omitted, it defaults to the
-canonical local folder's basename. For example, `./site` maps to
-`<remote-root>/site`. Use `.` explicitly as the remote directory to map directly
-to the remote root.
+The current directory is canonicalized and persisted as the project's single
+local root. Every relative path underneath it maps to the same relative path
+under the remote root. Local roots may not overlap across projects, so future
+push and pull commands can determine the project and remote subdirectory from
+the current directory without ambient state.
 
-Remote mapping directories must be relative and cannot contain `..`. Within one
-project, neither side of a mapping may duplicate, contain, or be contained by
-another mapping.
+Exclude paths with one quoted, comma-separated list of gitignore-style wildcard
+patterns:
+
+```console
+hls map prod --exclude '.git/,node_modules/,*.log,**/.cache/'
+```
+
+Patterns are relative to the local root. Empty patterns, `..` traversal, and
+gitignore re-inclusion patterns beginning with `!` are rejected. Commas cannot
+be used inside a pattern.
 
 ## Versioning
 
