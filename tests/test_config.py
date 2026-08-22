@@ -24,7 +24,7 @@ def test_configuration_round_trip_does_not_persist_secrets(tmp_path) -> None:
                 remote_root="/public_html",
                 username_env="PROD_FTPS_USERNAME",
                 password_env="PROD_FTPS_PASSWORD",
-                mappings=(DirectoryMapping.create(local_folder, "/public_html"),),
+                mappings=(DirectoryMapping.create(local_folder),),
             )
         }
     )
@@ -33,14 +33,14 @@ def test_configuration_round_trip_does_not_persist_secrets(tmp_path) -> None:
 
     assert store.load() == configuration
     document = json.loads(path.read_text(encoding="utf-8"))
-    assert document["version"] == 4
+    assert document["version"] == 5
     assert "default" not in document
     assert "servers" not in document
     assert "username" not in document["projects"]["prod"]
     assert "password" not in document["projects"]["prod"]
     assert document["projects"]["prod"]["remote_root"] == "/public_html"
     assert document["projects"]["prod"]["mappings"] == [
-        {"local": str(local_folder), "remote": "/public_html"}
+        {"local": str(local_folder), "remote": "site"}
     ]
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
@@ -55,7 +55,7 @@ def test_project_rejects_invalid_ports(port) -> None:
 
 def test_store_rejects_an_unknown_schema_version(tmp_path) -> None:
     path = tmp_path / "configs.json"
-    path.write_text('{"version": 3, "servers": {}}')
+    path.write_text('{"version": 4, "projects": {}}')
 
     with pytest.raises(ConfigurationError, match="unsupported configuration version"):
         ConfigurationStore(path).load()

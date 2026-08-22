@@ -9,8 +9,9 @@ project owns its FTPS endpoint, credential environment-variable names, required
 absolute remote root, and local-to-remote mappings. Multiple projects may point
 to the same FTPS host.
 
-Mapping destinations remain absolute for clarity, but must equal or descend
-from the owning project's remote root. A project is removed locally with
+Mapping destinations were initially absolute and constrained to the owning
+project's remote root. The later directory-context and relative-mapping decision
+supersedes that representation. A project is removed locally with
 `hls remove <project-name>`; removal deletes its configuration and mappings but
 never connects to the server or deletes remote content.
 

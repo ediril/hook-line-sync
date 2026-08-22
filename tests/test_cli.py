@@ -5,12 +5,19 @@ import pytest
 from hls import __version__
 from hls.cli import run
 from hls.config import ConfigurationStore
+from hls.context import DirectoryContexts, DirectoryContextStore
 
 
 def invoke(arguments, store):
     stdout = io.StringIO()
     stderr = io.StringIO()
-    status = run(arguments, store=store, stdout=stdout, stderr=stderr)
+    status = run(
+        arguments,
+        store=store,
+        context_store=DirectoryContextStore(store.path.with_name("contexts.json")),
+        stdout=stdout,
+        stderr=stderr,
+    )
     return status, stdout.getvalue(), stderr.getvalue()
 
 
@@ -48,8 +55,12 @@ def test_project_lifecycle_uses_derived_credentials_and_version(tmp_path) -> Non
     assert project.port == 21
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.21.4"
+    assert __version__ == "0.8.21.5"
 
+    context_store = DirectoryContextStore(store.path.with_name("contexts.json"))
+    contexts = DirectoryContexts()
+    contexts.bind(tmp_path.resolve(), "prod")
+    context_store.save(contexts)
     remove_status, remove_stdout, remove_stderr = invoke(["remove", "prod"], store)
     assert (remove_status, remove_stdout, remove_stderr) == (
         0,
@@ -57,6 +68,7 @@ def test_project_lifecycle_uses_derived_credentials_and_version(tmp_path) -> Non
         "",
     )
     assert store.load().projects == {}
+    assert context_store.load().bindings == {}
     missing_status, _, missing_error = invoke(["remove", "prod"], store)
     assert missing_status == 1
     assert "does not exist" in missing_error
@@ -84,8 +96,9 @@ def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
     assert "already exists" in duplicate_stderr
     assert (missing_status, missing_stdout) == (1, "")
     assert "does not exist" in missing_stderr
-    with pytest.raises(SystemExit):
-        run(["connect"], store=store)
+    context_status, _, context_error = invoke(["connect"], store)
+    assert context_status == 1
+    assert "no directory context" in context_error
     with pytest.raises(SystemExit):
         run(["add", "unsafe", "ftps", "--host", "ftp.example.com"], store=store)
 
@@ -121,12 +134,15 @@ def test_add_supports_custom_port_and_environment_names(tmp_path) -> None:
     )
 
 
-def test_map_uses_an_explicit_project_and_canonicalizes_the_current_folder(
+def test_use_is_directory_scoped_and_map_persists_an_absolute_local_path(
     tmp_path, monkeypatch
 ) -> None:
     store = ConfigurationStore(tmp_path / "configs.json")
-    local_folder = tmp_path / "site"
-    local_folder.mkdir()
+    workspace = tmp_path / "workspace"
+    local_folder = workspace / "site"
+    unrelated = tmp_path / "unrelated"
+    local_folder.mkdir(parents=True)
+    unrelated.mkdir()
     invoke(
         [
             "add",
@@ -139,14 +155,31 @@ def test_map_uses_an_explicit_project_and_canonicalizes_the_current_folder(
         ],
         store,
     )
+    monkeypatch.chdir(workspace)
+    use_status, _, use_error = invoke(["use", "prod"], store)
     monkeypatch.chdir(local_folder)
 
-    status, stdout, stderr = invoke(["map", "prod", "/public_html/"], store)
+    status, stdout, stderr = invoke(["map", "."], store)
 
+    assert use_status == 0 and use_error == ""
     assert status == 0
-    assert stdout == f"Mapped '{local_folder}' to 'prod:/public_html'.\n"
+    assert stdout == f"Mapped '{local_folder}' to 'prod:/public_html/site'.\n"
     assert stderr == ""
-    assert store.load().projects["prod"].mappings[0].local == str(local_folder)
+    mapping = store.load().projects["prod"].mappings[0]
+    assert mapping.local == str(local_folder)
+    assert mapping.remote == "site"
+    show_status, show_stdout, _ = invoke(["use"], store)
+    assert show_status == 0
+    assert show_stdout == f"Using project 'prod' from '{workspace}'.\n"
+
+    monkeypatch.chdir(unrelated)
+    unrelated_status, _, unrelated_error = invoke(["map", "."], store)
+    assert unrelated_status == 1
+    assert "no directory context" in unrelated_error
+
+    monkeypatch.chdir(workspace)
+    clear_status, _, clear_error = invoke(["use", "--clear"], store)
+    assert clear_status == 0 and clear_error == ""
 
 
 def test_map_rejects_local_and_remote_overlaps(tmp_path) -> None:
@@ -170,22 +203,22 @@ def test_map_rejects_local_and_remote_overlaps(tmp_path) -> None:
         ],
         store,
     )
-    assert invoke(["map", "prod", "/project/site", str(site)], store)[0] == 0
+    assert invoke(["map", str(site), "site", "--project", "prod"], store)[0] == 0
 
     local_status, _, local_error = invoke(
-        ["map", "prod", "/project/other", str(child)], store
+        ["map", str(child), "other", "--project", "prod"], store
     )
     remote_status, _, remote_error = invoke(
-        ["map", "prod", "/project/site/assets", str(separate)], store
+        ["map", str(separate), "site/assets", "--project", "prod"], store
     )
-    root_status, _, root_error = invoke(
-        ["map", "prod", "/another-project", str(outside)], store
+    absolute_status, _, absolute_error = invoke(
+        ["map", str(outside), "/another-project", "--project", "prod"], store
     )
 
     assert local_status == 1
     assert "local path" in local_error and "overlaps" in local_error
     assert remote_status == 1
     assert "remote path" in remote_error and "overlaps" in remote_error
-    assert root_status == 1
-    assert "outside project root" in root_error
+    assert absolute_status == 1
+    assert "must be relative" in absolute_error
     assert len(store.load().projects["prod"].mappings) == 1

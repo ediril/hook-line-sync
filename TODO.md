@@ -12,9 +12,12 @@
     `PROT P`, and has no plaintext fallback.
   - Cover configuration behavior with unit tests and FTPS connectivity with an
     integration test against a disposable TLS-enabled FTP server.
-- [x] Implement the mapping model and `hls map`, including canonical local
-  paths, absolute remote POSIX paths, persistence, and local/remote overlap
-  rejection.
+- [x] Implement the mapping model and `hls map`, including canonical absolute
+  local paths, project-root-relative remote POSIX paths, persistence, and
+  local/remote overlap rejection.
+- [x] Implement directory-scoped `hls use` contexts with explicit project
+  override, nearest-ancestor inheritance, inspection, clearing, and cleanup on
+  project removal.
 - [ ] Implement deterministic local and remote tree snapshots, then specify and
   implement `hls list local` and `hls list remote`.
 - [ ] Specify timestamp normalization and comparison states, then implement

@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 import os
 import re
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-CONFIG_VERSION = 4
+from hls.storage import write_json_atomic
+
+CONFIG_VERSION = 5
 PROJECT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 ENVIRONMENT_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -62,6 +63,17 @@ def _normalize_remote_path(value: Any, field_name: str = "mapping remote path") 
     return "/" + "/".join(components)
 
 
+def _normalize_relative_remote_path(value: Any) -> str:
+    remote_value = _required_string(value, "mapping remote directory")
+    remote_path = PurePosixPath(remote_value)
+    if remote_path.is_absolute():
+        raise ConfigurationError("mapping remote directory must be relative")
+    if ".." in remote_path.parts:
+        raise ConfigurationError("mapping remote directory cannot contain '..'")
+    components = [part for part in remote_path.parts if part != "."]
+    return "/".join(components) or "."
+
+
 @dataclass(frozen=True)
 class DirectoryMapping:
     local: str
@@ -77,11 +89,11 @@ class DirectoryMapping:
         if os.path.normpath(local_value) != local_value:
             raise ConfigurationError("mapping local path must be normalized")
 
-        if _normalize_remote_path(self.remote) != self.remote:
-            raise ConfigurationError("mapping remote path must be normalized")
+        if _normalize_relative_remote_path(self.remote) != self.remote:
+            raise ConfigurationError("mapping remote directory must be normalized")
 
     @classmethod
-    def create(cls, local: str | Path, remote: str) -> DirectoryMapping:
+    def create(cls, local: str | Path, remote: str | None = None) -> DirectoryMapping:
         candidate = Path(local).expanduser()
         try:
             local_path = candidate.resolve(strict=True)
@@ -92,8 +104,10 @@ class DirectoryMapping:
         if not local_path.is_dir():
             raise ConfigurationError(f"local mapping path is not a folder: {candidate}")
 
+        remote_directory = local_path.name if remote is None else remote
         return cls(
-            local=os.fspath(local_path), remote=_normalize_remote_path(remote)
+            local=os.fspath(local_path),
+            remote=_normalize_relative_remote_path(remote_directory),
         )
 
     def to_dict(self) -> dict[str, str]:
@@ -151,18 +165,8 @@ class ProjectConfiguration:
             _environment_name(self.password_env, "password_env"),
         )
         for index, mapping in enumerate(self.mappings):
-            self._validate_within_remote_root(mapping)
             for existing in self.mappings[:index]:
                 self._validate_no_overlap(mapping, existing)
-
-    def _validate_within_remote_root(self, mapping: DirectoryMapping) -> None:
-        remote = PurePosixPath(mapping.remote)
-        root = PurePosixPath(self.remote_root)
-        if remote != root and root not in remote.parents:
-            raise ConfigurationError(
-                f"remote path '{mapping.remote}' is outside project root "
-                f"'{self.remote_root}'"
-            )
 
     @staticmethod
     def _validate_no_overlap(
@@ -182,7 +186,6 @@ class ProjectConfiguration:
             )
 
     def with_mapping(self, mapping: DirectoryMapping) -> ProjectConfiguration:
-        self._validate_within_remote_root(mapping)
         for existing in self.mappings:
             self._validate_no_overlap(mapping, existing)
         return ProjectConfiguration(
@@ -194,6 +197,11 @@ class ProjectConfiguration:
             type=self.type,
             mappings=(*self.mappings, mapping),
         )
+
+    def remote_path(self, mapping: DirectoryMapping) -> str:
+        if mapping.remote == ".":
+            return self.remote_root
+        return str(PurePosixPath(self.remote_root) / mapping.remote)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -309,21 +317,9 @@ class ConfigurationStore:
         return ApplicationConfiguration.from_dict(document)
 
     def save(self, configuration: ApplicationConfiguration) -> None:
-        self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        payload = json.dumps(configuration.to_dict(), indent=2, sort_keys=True) + "\n"
-        descriptor, temporary_name = tempfile.mkstemp(
-            dir=self.path.parent,
-            prefix=f".{self.path.name}.",
-            text=True,
-        )
-        temporary_path = Path(temporary_name)
         try:
-            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-                os.chmod(temporary_path, 0o600)
-                handle.write(payload)
-                handle.flush()
-                os.fsync(handle.fileno())
-            temporary_path.replace(self.path)
-        except BaseException:
-            temporary_path.unlink(missing_ok=True)
-            raise
+            write_json_atomic(self.path, configuration.to_dict())
+        except OSError as error:
+            raise ConfigurationError(
+                f"could not write configuration file {self.path}: {error}"
+            ) from error

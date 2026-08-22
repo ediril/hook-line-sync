@@ -16,6 +16,7 @@ from hls.config import (
     credential_environment_names,
     validate_project_name,
 )
+from hls.context import DirectoryContextStore, canonical_directory
 from hls.transport import ExplicitFTPSTransport, TransportError
 
 
@@ -39,15 +40,21 @@ def build_parser() -> argparse.ArgumentParser:
     connect_parser = subparsers.add_parser(
         "connect", help="verify a project's FTPS connection"
     )
-    connect_parser.add_argument("project_name")
+    connect_parser.add_argument("project_name", nargs="?")
 
     map_parser = subparsers.add_parser("map", help="add a folder mapping")
-    map_parser.add_argument("project_name")
-    map_parser.add_argument("remote_folder")
-    map_parser.add_argument("local_folder", nargs="?", default=".")
+    map_parser.add_argument("local_folder")
+    map_parser.add_argument("remote_folder", nargs="?")
+    map_parser.add_argument("--project", dest="project_name")
 
     remove_parser = subparsers.add_parser("remove", help="remove a project")
     remove_parser.add_argument("project_name")
+
+    use_parser = subparsers.add_parser(
+        "use", help="manage the project context for this directory"
+    )
+    use_parser.add_argument("project_name", nargs="?")
+    use_parser.add_argument("--clear", action="store_true")
 
     help_parser = subparsers.add_parser("help", help="show command help")
     help_parser.add_argument("topic", nargs="?")
@@ -79,37 +86,95 @@ def _save_project(
 
 
 def _resolve_project(
-    arguments: argparse.Namespace, store: ConfigurationStore
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    context_store: DirectoryContextStore,
 ) -> tuple[ApplicationConfiguration, str, ProjectConfiguration]:
-    name = validate_project_name(arguments.project_name)
+    supplied_name = getattr(arguments, "project_name", None)
+    if supplied_name is None:
+        resolved = context_store.load().resolve(canonical_directory(Path.cwd()))
+        if resolved is None:
+            raise ConfigurationError(
+                "no project was supplied and no directory context is active"
+            )
+        supplied_name, _ = resolved
+    name = validate_project_name(supplied_name)
     configuration = store.load()
     if name not in configuration.projects:
         raise ConfigurationError(f"project '{name}' does not exist")
     return configuration, name, configuration.projects[name]
 
 
-def _connect(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
-    _, name, project = _resolve_project(arguments, store)
+def _connect(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    context_store: DirectoryContextStore,
+) -> str:
+    _, name, project = _resolve_project(arguments, store, context_store)
     with ExplicitFTPSTransport(project):
         pass
     return f"Connected securely to project '{name}'."
 
 
-def _map(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
-    configuration, name, project = _resolve_project(arguments, store)
+def _map(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    context_store: DirectoryContextStore,
+) -> str:
+    configuration, name, project = _resolve_project(
+        arguments, store, context_store
+    )
     mapping = DirectoryMapping.create(
         local=Path(arguments.local_folder), remote=arguments.remote_folder
     )
     configuration.projects[name] = project.with_mapping(mapping)
     store.save(configuration)
-    return f"Mapped '{mapping.local}' to '{name}:{mapping.remote}'."
+    return f"Mapped '{mapping.local}' to '{name}:{project.remote_path(mapping)}'."
 
 
-def _remove(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
-    configuration, name, _ = _resolve_project(arguments, store)
+def _remove(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    context_store: DirectoryContextStore,
+) -> str:
+    configuration, name, _ = _resolve_project(arguments, store, context_store)
+    contexts = context_store.load()
+    if contexts.remove_project(name):
+        context_store.save(contexts)
     del configuration.projects[name]
     store.save(configuration)
     return f"Removed project '{name}'."
+
+
+def _use(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    context_store: DirectoryContextStore,
+) -> str:
+    if arguments.clear and arguments.project_name is not None:
+        raise ConfigurationError("use accepts a project name or --clear, not both")
+    directory = canonical_directory(Path.cwd())
+    contexts = context_store.load()
+    if arguments.clear:
+        contexts.clear(directory)
+        context_store.save(contexts)
+        return f"Cleared project context for '{directory}'."
+    if arguments.project_name is not None:
+        name = validate_project_name(arguments.project_name)
+        if name not in store.load().projects:
+            raise ConfigurationError(f"project '{name}' does not exist")
+        contexts.bind(directory, name)
+        context_store.save(contexts)
+        return f"Using project '{name}' in '{directory}'."
+    resolved = contexts.resolve(directory)
+    if resolved is None:
+        raise ConfigurationError(f"no project context is active for '{directory}'")
+    name, source = resolved
+    if name not in store.load().projects:
+        raise ConfigurationError(
+            f"directory context at '{source}' references missing project '{name}'"
+        )
+    return f"Using project '{name}' from '{source}'."
 
 
 def _show_help(parser: argparse.ArgumentParser, topic: str | None) -> str:
@@ -129,21 +194,29 @@ def run(
     argv: Sequence[str] | None = None,
     *,
     store: ConfigurationStore | None = None,
+    context_store: DirectoryContextStore | None = None,
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
 ) -> int:
     parser = build_parser()
     arguments = parser.parse_args(argv)
     configuration_store = store or ConfigurationStore()
+    directory_context_store = context_store or DirectoryContextStore()
     try:
         if arguments.command == "add":
             message = _save_project(arguments, configuration_store)
         elif arguments.command == "connect":
-            message = _connect(arguments, configuration_store)
+            message = _connect(
+                arguments, configuration_store, directory_context_store
+            )
         elif arguments.command == "map":
-            message = _map(arguments, configuration_store)
+            message = _map(arguments, configuration_store, directory_context_store)
         elif arguments.command == "remove":
-            message = _remove(arguments, configuration_store)
+            message = _remove(
+                arguments, configuration_store, directory_context_store
+            )
+        elif arguments.command == "use":
+            message = _use(arguments, configuration_store, directory_context_store)
         elif arguments.command == "help":
             message = _show_help(parser, arguments.topic)
         elif arguments.command == "version":
