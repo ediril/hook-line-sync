@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from hls.selection import FileSelector, SelectionError
+from hls.selection import FileSelection, SelectionError
 from hls.snapshot import EntryKind, TreeEntry, TreeSnapshot
 
 Direction = Literal["push", "pull"]
@@ -73,7 +73,7 @@ def build_comparison(
     *,
     direction: Direction = "push",
     prune_remote: bool = False,
-    selector: FileSelector | None = None,
+    selector: FileSelection | None = None,
 ) -> ComparisonPlan:
     local_entries = {entry.path: entry for entry in local.entries}
     remote_entries = {entry.path: entry for entry in remote.entries}

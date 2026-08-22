@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.22.4"
+    assert __version__ == "0.8.22.5"
 
     help_output = invoke(["help"], store)[1]
     assert "compare (cmp)       preview file changes without modifying anything" in (
@@ -307,6 +307,16 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "README.md" not in selected_comparison[1]
     assert "deployed.html" not in selected_comparison[1]
 
+    monkeypatch.chdir(workspace)
+    expanded_comparison = invoke(
+        ["compare", "README.md", "src", "src/main.py"], store
+    )
+    assert expanded_comparison[0] == 0
+    assert "+  README.md\n" in expanded_comparison[1]
+    assert "+  src/main.py\n" in expanded_comparison[1]
+    assert "+  src\n" not in expanded_comparison[1]
+    monkeypatch.chdir(source)
+
     colored_comparison = invoke(
         ["compare", "main.py", "--color", "always"], store
     )
@@ -335,7 +345,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
-    assert len(transports) == 10
+    assert len(transports) == 11
 
 
 def test_map_rejects_existing_and_overlapping_local_roots(

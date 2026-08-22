@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from hls.config import ProjectConfiguration
 from hls.exclusions import ExclusionSpec
-from hls.selection import FileSelector
+from hls.selection import FileSelection
 from hls.snapshot import EntryKind, SnapshotError, TreeEntry, TreeSnapshot
 
 
@@ -53,7 +53,7 @@ class RemoteTransport(Protocol):
     def snapshot(
         self,
         exclusions: ExclusionSpec,
-        selector: FileSelector | None = None,
+        selector: FileSelection | None = None,
     ) -> TreeSnapshot: ...
 
     def make_directory(self, relative_path: str) -> None: ...
@@ -133,7 +133,7 @@ class ExplicitFTPSTransport:
     def snapshot(
         self,
         exclusions: ExclusionSpec,
-        selector: FileSelector | None = None,
+        selector: FileSelection | None = None,
     ) -> TreeSnapshot:
         if self._client is None:
             raise TransportError("FTPS transport is not connected")

@@ -20,7 +20,7 @@ from hls.config import (
     validate_project_name,
 )
 from hls.exclusions import ExclusionError, ExclusionSpec
-from hls.selection import FileSelector, SelectionError
+from hls.selection import FileSelection, FileSelector, FileSelectorSet, SelectionError
 from hls.snapshot import SnapshotError, TreeSnapshot, snapshot_local
 from hls.transfer import TransferError, TransferResult, execute_transfer
 from hls.transport import ExplicitFTPSTransport, TransportError
@@ -92,9 +92,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     compare_parser.add_argument(
-        "selector",
-        nargs="?",
-        help="relative file path or quoted wildcard; defaults to the whole project",
+        "selectors",
+        nargs="*",
+        help=(
+            "relative file paths or wildcard patterns; defaults to the whole project"
+        ),
     )
     compare_parser.add_argument(
         "--project",
@@ -140,10 +142,11 @@ def build_parser() -> argparse.ArgumentParser:
             description=transfer_description[command],
         )
         transfer_parser.add_argument(
-            "selector",
-            nargs="?",
+            "selectors",
+            nargs="*",
             help=(
-                "relative file path or quoted wildcard; defaults to the whole project"
+                "relative file paths or wildcard patterns; defaults to the whole "
+                "project"
             ),
         )
         transfer_parser.add_argument(
@@ -343,16 +346,20 @@ def _format_comparison(
     return "\n".join(lines)
 
 
-def _file_selector(arguments: argparse.Namespace, root: Path) -> FileSelector | None:
-    return (
+def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection | None:
+    selectors = tuple(
         FileSelector.from_argument(
-            arguments.selector,
+            value,
             project_root=root,
             current_directory=Path.cwd().resolve(strict=True),
         )
-        if arguments.selector is not None
-        else None
+        for value in arguments.selectors
     )
+    if not selectors:
+        return None
+    if len(selectors) == 1:
+        return selectors[0]
+    return FileSelectorSet(selectors)
 
 
 def _build_plan(
@@ -365,7 +372,7 @@ def _build_plan(
     progress: TextIO,
 ) -> tuple[TreeSnapshot, TreeSnapshot, ComparisonPlan]:
     exclusions = ExclusionSpec(project.exclusions)
-    selector = _file_selector(arguments, root)
+    selector = _file_selection(arguments, root)
     print("Scanning local files...", file=progress, flush=True)
     local = snapshot_local(root, exclusions, selector)
     print("Reading remote files over FTPS...", file=progress, flush=True)

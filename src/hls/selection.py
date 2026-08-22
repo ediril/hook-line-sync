@@ -96,3 +96,36 @@ class FileSelector:
             PurePosixPath(self.pattern).parts,
             directory.parts,
         )
+
+
+@dataclass(frozen=True)
+class FileSelectorSet:
+    selectors: tuple[FileSelector, ...]
+
+    def __post_init__(self) -> None:
+        if not self.selectors:
+            raise SelectionError("file selector set cannot be empty")
+        unique = {selector.pattern: selector for selector in self.selectors}
+        object.__setattr__(
+            self,
+            "selectors",
+            tuple(unique[pattern] for pattern in sorted(unique)),
+        )
+
+    @property
+    def pattern(self) -> str:
+        return ", ".join(selector.pattern for selector in self.selectors)
+
+    def matches(self, project_relative_path: str) -> bool:
+        return any(
+            selector.matches(project_relative_path) for selector in self.selectors
+        )
+
+    def may_match_descendant(self, project_relative_directory: str) -> bool:
+        return any(
+            selector.may_match_descendant(project_relative_directory)
+            for selector in self.selectors
+        )
+
+
+FileSelection = FileSelector | FileSelectorSet

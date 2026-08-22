@@ -36,18 +36,21 @@ A local-only path remains local during pull and is eligible for upload during
 push. The overwrite policy for changed paths will be decided with comparison
 states.
 
-Compare, push, and pull accept one optional path selector. It is interpreted
+Compare, push, and pull accept zero or more path selectors. Each is interpreted
 relative to the current directory within the mapped local root and converted to
-a project-relative POSIX pattern. A literal selects one file; `*` matches
-within one path segment and `**` permits recursive matching. Shell wildcards
-must be quoted to reach HLS unchanged. An omitted selector addresses the
-complete project.
+a project-relative POSIX pattern. Multiple selectors form a deterministic
+union, allowing shell-expanded arguments such as unquoted `*`; directories in
+that expansion do not select their descendants. Quote a wildcard when HLS
+should interpret it unchanged. A literal selects one file, `*` matches within
+one path segment, and `**` permits recursive matching. An omitted selector
+addresses the complete project.
 
 Selectors cannot be absolute, traverse with `..`, or escape the mapped root. A
-selector that matches no non-excluded file on either side is an error rather
-than a successful no-op. Selection never expands the configured exclusion
-scope. `--prune-remote` deletes remote-only paths only inside the selected
-scope.
+selection whose complete union matches no non-excluded file on either side is
+an error rather than a successful no-op. Individual unmatched members do not
+invalidate an otherwise matched union, because shells include directory names
+when expanding `*`. Selection never expands the configured exclusion scope.
+`--prune-remote` deletes remote-only paths only inside the selected scope.
 
 Selectors are applied during snapshot traversal, before comparison. Local and
 remote walkers enter only directories whose project-relative prefixes can
@@ -55,7 +58,7 @@ still satisfy the pattern. A single-segment `*` therefore scans only the
 corresponding directory; recursive traversal occurs only where `**` or later
 pattern segments can match descendants.
 
-The positional argument is reserved for the selector. An explicit project
+The positional arguments are reserved for selectors. An explicit project
 override therefore uses `--project <name>`; otherwise the current directory
 selects the project from its mapped root. When the current directory is inside
 the selected project, selectors are relative to it. Otherwise an explicit

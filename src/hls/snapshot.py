@@ -6,7 +6,7 @@ from pathlib import Path, PurePosixPath
 from typing import Literal
 
 from hls.exclusions import ExclusionSpec
-from hls.selection import FileSelector
+from hls.selection import FileSelection
 
 EntryKind = Literal["directory", "file", "symlink"]
 
@@ -64,7 +64,7 @@ class TreeSnapshot:
 def snapshot_local(
     root: Path,
     exclusions: ExclusionSpec,
-    selector: FileSelector | None = None,
+    selector: FileSelection | None = None,
 ) -> TreeSnapshot:
     if not root.is_dir():
         raise SnapshotError(f"local root is not an accessible directory: {root}")

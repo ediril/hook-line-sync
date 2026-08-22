@@ -147,17 +147,23 @@ Use the pull projection when needed:
 hls compare --pull
 ```
 
-Limit the projection to one file or a quoted wildcard pattern relative to the
+Limit the projection to one or more paths or wildcard patterns relative to the
 current directory:
 
 ```console
 hls compare index.html
+hls compare index.html app.js styles.css
+hls compare *
 hls compare 'src/*.js'
 hls compare '**/*.css'
 ```
 
-`*` stays within one path segment and `**` matches recursively. An unmatched,
-excluded, absolute, or parent-traversing selector is rejected. Use
+An unquoted wildcard may be expanded by the shell into multiple arguments; HLS
+treats them as one union. Directories included by that expansion do not cause
+recursion. Quote a wildcard when HLS should interpret it itself. `*` stays
+within one path segment and `**` matches recursively. A selection whose entire
+union is unmatched or excluded, or that contains an absolute or
+parent-traversing path, is rejected. Use
 `--project <name>` to select a project explicitly; outside that project's local
 root, its selectors are project-root-relative.
 
@@ -209,10 +215,12 @@ hls push
 hls pull
 ```
 
-Limit execution with the same selector syntax used by compare:
+Limit execution with the same selection syntax used by compare:
 
 ```console
 hls push index.html
+hls push index.html app.js styles.css
+hls push *
 hls push 'src/*.js'
 hls pull '**/*.css'
 ```
