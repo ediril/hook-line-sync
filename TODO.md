@@ -18,6 +18,8 @@
 - [x] Implement directory-scoped `hls use` contexts with explicit project
   override, nearest-ancestor inheritance, inspection, clearing, and cleanup on
   project removal.
+- [x] Implement deterministic `hls list` / `hls ls` project inventory, including
+  endpoints, roots, mappings, and the active directory context.
 - [ ] Implement deterministic local and remote tree snapshots, then specify and
   implement `hls list local` and `hls list remote`.
 - [ ] Specify timestamp normalization and comparison states, then implement

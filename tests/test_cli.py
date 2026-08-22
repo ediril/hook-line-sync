@@ -21,13 +21,15 @@ def invoke(arguments, store):
     return status, stdout.getvalue(), stderr.getvalue()
 
 
-def test_project_lifecycle_uses_derived_credentials_and_version(tmp_path) -> None:
+def test_project_lifecycle_uses_production_credentials_and_version(
+    tmp_path, monkeypatch
+) -> None:
     store = ConfigurationStore(tmp_path / "configs.json")
 
     add_status, add_stdout, add_stderr = invoke(
         [
             "add",
-            "prod",
+            "client-site",
             "ftps",
             "--host",
             "ftp.example.com",
@@ -40,7 +42,7 @@ def test_project_lifecycle_uses_derived_credentials_and_version(tmp_path) -> Non
 
     assert (add_status, add_stdout, add_stderr) == (
         0,
-        "Added FTPS project 'prod'.\n",
+        "Added FTPS project 'client-site'.\n",
         "",
     )
     assert (version_status, version_stdout, version_stderr) == (
@@ -49,27 +51,41 @@ def test_project_lifecycle_uses_derived_credentials_and_version(tmp_path) -> Non
         "",
     )
     configuration = store.load()
-    project = configuration.projects["prod"]
+    project = configuration.projects["client-site"]
     assert project.host == "ftp.example.com"
     assert project.remote_root == "/public_html/site"
     assert project.port == 21
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.21.5"
+    assert __version__ == "0.8.21.7"
 
     context_store = DirectoryContextStore(store.path.with_name("contexts.json"))
     contexts = DirectoryContexts()
-    contexts.bind(tmp_path.resolve(), "prod")
+    contexts.bind(tmp_path.resolve(), "client-site")
     context_store.save(contexts)
-    remove_status, remove_stdout, remove_stderr = invoke(["remove", "prod"], store)
+    monkeypatch.chdir(tmp_path)
+    list_status, list_stdout, list_stderr = invoke(["list"], store)
+    alias_status, alias_stdout, alias_stderr = invoke(["ls"], store)
+    assert (list_status, list_stderr) == (0, "")
+    assert (alias_status, alias_stderr) == (0, "")
+    assert alias_stdout == list_stdout
+    assert "* client-site\n" in list_stdout
+    assert "  FTPS: ftp.example.com:21\n" in list_stdout
+    assert "  Remote root: /public_html/site\n" in list_stdout
+    assert "  Mappings: none\n" in list_stdout
+    assert f"* active project from '{tmp_path.resolve()}'\n" in list_stdout
+    remove_status, remove_stdout, remove_stderr = invoke(
+        ["remove", "client-site"], store
+    )
     assert (remove_status, remove_stdout, remove_stderr) == (
         0,
-        "Removed project 'prod'.\n",
+        "Removed project 'client-site'.\n",
         "",
     )
     assert store.load().projects == {}
     assert context_store.load().bindings == {}
-    missing_status, _, missing_error = invoke(["remove", "prod"], store)
+    assert invoke(["list"], store)[1] == "No projects configured.\n"
+    missing_status, _, missing_error = invoke(["remove", "client-site"], store)
     assert missing_status == 1
     assert "does not exist" in missing_error
 
@@ -168,6 +184,9 @@ def test_use_is_directory_scoped_and_map_persists_an_absolute_local_path(
     mapping = store.load().projects["prod"].mappings[0]
     assert mapping.local == str(local_folder)
     assert mapping.remote == "site"
+    list_status, list_stdout, _ = invoke(["list", "projects"], store)
+    assert list_status == 0
+    assert f"    {local_folder} -> /public_html/site\n" in list_stdout
     show_status, show_stdout, _ = invoke(["use"], store)
     assert show_status == 0
     assert show_stdout == f"Using project 'prod' from '{workspace}'.\n"

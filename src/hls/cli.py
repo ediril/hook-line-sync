@@ -8,12 +8,13 @@ from typing import TextIO
 
 from hls import __version__
 from hls.config import (
+    DEFAULT_PASSWORD_ENV,
+    DEFAULT_USERNAME_ENV,
     ApplicationConfiguration,
     ConfigurationError,
     ConfigurationStore,
     DirectoryMapping,
     ProjectConfiguration,
-    credential_environment_names,
     validate_project_name,
 )
 from hls.context import DirectoryContextStore, canonical_directory
@@ -56,6 +57,13 @@ def build_parser() -> argparse.ArgumentParser:
     use_parser.add_argument("project_name", nargs="?")
     use_parser.add_argument("--clear", action="store_true")
 
+    list_parser = subparsers.add_parser(
+        "list", aliases=("ls",), help="list configured projects"
+    )
+    list_parser.add_argument(
+        "target", nargs="?", choices=("projects",), default="projects"
+    )
+
     help_parser = subparsers.add_parser("help", help="show command help")
     help_parser.add_argument("topic", nargs="?")
 
@@ -71,14 +79,21 @@ def _save_project(
     configuration = store.load()
     if name in configuration.projects:
         raise ConfigurationError(f"project '{name}' already exists")
-    default_username_env, default_password_env = credential_environment_names(name)
     project = ProjectConfiguration(
         type=arguments.type,
         host=arguments.host,
         remote_root=arguments.remote_root,
         port=arguments.port,
-        username_env=arguments.username_env or default_username_env,
-        password_env=arguments.password_env or default_password_env,
+        username_env=(
+            arguments.username_env
+            if arguments.username_env is not None
+            else DEFAULT_USERNAME_ENV
+        ),
+        password_env=(
+            arguments.password_env
+            if arguments.password_env is not None
+            else DEFAULT_PASSWORD_ENV
+        ),
     )
     configuration.projects[name] = project
     store.save(configuration)
@@ -177,6 +192,45 @@ def _use(
     return f"Using project '{name}' from '{source}'."
 
 
+def _list_projects(
+    store: ConfigurationStore,
+    context_store: DirectoryContextStore,
+) -> str:
+    configuration = store.load()
+    if not configuration.projects:
+        return "No projects configured."
+
+    resolved = context_store.load().resolve(Path.cwd().resolve(strict=True))
+    active_name = resolved[0] if resolved is not None else None
+    lines: list[str] = []
+    for name, project in sorted(configuration.projects.items()):
+        marker = "*" if name == active_name else "-"
+        lines.append(f"{marker} {name}")
+        lines.append(f"  FTPS: {project.host}:{project.port}")
+        lines.append(f"  Remote root: {project.remote_root}")
+        if project.mappings:
+            lines.append("  Mappings:")
+            for mapping in sorted(
+                project.mappings, key=lambda item: (item.local, item.remote)
+            ):
+                lines.append(
+                    f"    {mapping.local} -> {project.remote_path(mapping)}"
+                )
+        else:
+            lines.append("  Mappings: none")
+
+    if resolved is not None:
+        name, source = resolved
+        lines.append("")
+        if name in configuration.projects:
+            lines.append(f"* active project from '{source}'")
+        else:
+            lines.append(
+                f"! context at '{source}' references missing project '{name}'"
+            )
+    return "\n".join(lines)
+
+
 def _show_help(parser: argparse.ArgumentParser, topic: str | None) -> str:
     if topic is None:
         return parser.format_help().rstrip()
@@ -217,6 +271,10 @@ def run(
             )
         elif arguments.command == "use":
             message = _use(arguments, configuration_store, directory_context_store)
+        elif arguments.command in {"list", "ls"}:
+            message = _list_projects(
+                configuration_store, directory_context_store
+            )
         elif arguments.command == "help":
             message = _show_help(parser, arguments.topic)
         elif arguments.command == "version":

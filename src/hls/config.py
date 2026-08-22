@@ -12,6 +12,8 @@ from hls.storage import write_json_atomic
 CONFIG_VERSION = 5
 PROJECT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 ENVIRONMENT_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+DEFAULT_USERNAME_ENV = "PROD_FTPS_USERNAME"
+DEFAULT_PASSWORD_ENV = "PROD_FTPS_PASSWORD"
 
 
 class ConfigurationError(ValueError):
@@ -25,12 +27,6 @@ def validate_project_name(name: str) -> str:
             "only letters, digits, '.', '_', or '-'"
         )
     return name
-
-
-def credential_environment_names(project_name: str) -> tuple[str, str]:
-    validate_project_name(project_name)
-    prefix = re.sub(r"[^A-Za-z0-9]", "_", project_name).upper()
-    return f"{prefix}_FTPS_USERNAME", f"{prefix}_FTPS_PASSWORD"
 
 
 def _required_string(value: Any, field_name: str) -> str:
@@ -136,8 +132,8 @@ class ProjectConfiguration:
     host: str
     remote_root: str
     port: int = 21
-    username_env: str = "FTPS_USERNAME"
-    password_env: str = "FTPS_PASSWORD"
+    username_env: str = DEFAULT_USERNAME_ENV
+    password_env: str = DEFAULT_PASSWORD_ENV
     type: str = "ftps"
     mappings: tuple[DirectoryMapping, ...] = ()
 

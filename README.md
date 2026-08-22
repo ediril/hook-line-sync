@@ -29,8 +29,8 @@ hls add prod ftps --host ftp.example.com --remote-root /public_html/site
 ```
 
 Each project owns its connection details, remote root, and mappings. Multiple
-projects may use the same server. By default, credential variable names are
-derived from the project name. The command above reads credentials from:
+projects may use the same server. Unless overridden, every project reads
+credentials from:
 
 ```text
 PROD_FTPS_USERNAME
@@ -74,6 +74,17 @@ hls remove prod
 ```
 
 Removal does not connect to the server or delete remote files.
+
+List everything currently configured, including mappings, and mark the project
+active for the current directory:
+
+```console
+hls list
+hls ls
+```
+
+`hls list projects` is the explicit form. The `list` command will later also
+host local, remote, and diff file inventories.
 
 ## Mappings
 
