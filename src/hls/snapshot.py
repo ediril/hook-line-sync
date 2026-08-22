@@ -22,12 +22,15 @@ class TreeEntry:
     size: int | None = None
     modified_ns: int | None = None
     timestamp_precision_ns: int | None = None
+    excluded: bool = False
 
     def __post_init__(self) -> None:
         path = PurePosixPath(self.path)
         if path.is_absolute() or not path.parts or ".." in path.parts:
             raise SnapshotError(f"snapshot path must be relative: {self.path!r}")
         object.__setattr__(self, "path", path.as_posix())
+        if not isinstance(self.excluded, bool):
+            raise SnapshotError("snapshot exclusion state must be a boolean")
         metadata = (self.size, self.modified_ns, self.timestamp_precision_ns)
         if self.kind == "file":
             if any(value is None for value in metadata):
@@ -65,6 +68,8 @@ def snapshot_local(
     root: Path,
     exclusions: ExclusionSpec,
     selector: FileSelection | None = None,
+    *,
+    include_excluded: bool = False,
 ) -> TreeSnapshot:
     if not root.is_dir():
         raise SnapshotError(f"local root is not an accessible directory: {root}")
@@ -102,7 +107,8 @@ def snapshot_local(
                 relative_path,
                 is_directory=kind == "directory",
             )
-            selected = not excluded and (
+            visible = not excluded or (include_excluded and kind != "directory")
+            selected = visible and (
                 selector is None or selector.matches(relative_path)
             )
             if selected and kind == "file":
@@ -120,15 +126,18 @@ def snapshot_local(
                         size=stat.st_size,
                         modified_ns=stat.st_mtime_ns,
                         timestamp_precision_ns=1,
+                        excluded=excluded,
                     )
                 )
             elif selected:
-                entries.append(TreeEntry(relative_path, kind))
+                entries.append(TreeEntry(relative_path, kind, excluded=excluded))
             selection_may_descend = (
                 selector is None or selector.may_match_descendant(relative_path)
             )
             exclusion_may_descend = (
-                not excluded or exclusions.may_include_descendant(relative_path)
+                include_excluded
+                or not excluded
+                or exclusions.may_include_descendant(relative_path)
             )
             if kind == "directory" and selection_may_descend and exclusion_may_descend:
                 walk(directory / child.name, relative)

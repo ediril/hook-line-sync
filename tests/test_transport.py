@@ -136,6 +136,19 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
             ("assets/logo.svg", "file"),
             ("cache/keep.bin", "file"),
         ]
+        diagnostic = transport.snapshot(
+            ExclusionSpec(("cache/", "*.log", "!cache/keep.bin")),
+            include_excluded=True,
+        )
+        assert {
+            entry.path: entry.excluded for entry in diagnostic.entries
+        } == {
+            "assets": False,
+            "assets/logo.svg": False,
+            "cache/index.bin": True,
+            "cache/keep.bin": False,
+            "debug.log": True,
+        }
         local = snapshot_local(local_root, ExclusionSpec())
         comparison = {
             entry.path: entry

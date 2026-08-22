@@ -23,7 +23,7 @@ class TransferResult:
     def changed_count(self) -> int:
         return sum(
             entry.action
-            not in {"unchanged", "skip"}
+            not in {"unchanged", "skip", "excluded"}
             for entry in self.plan.entries
         )
 

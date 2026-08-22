@@ -367,6 +367,8 @@ def _comparison_kind(entry: ComparisonEntry) -> str:
 
 
 def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
+    if entry.action == "excluded":
+        return "·"
     if entry.action == "conflict":
         return "!"
     if entry.state == "changed":
@@ -400,6 +402,7 @@ def _format_comparison(
         "~": "\033[33m",
         "-": "\033[31m",
         "!": "\033[35m",
+        "·": "\033[90m",
     }
     for entry in plan.differences:
         marker = _comparison_marker(entry, plan.direction)
@@ -432,13 +435,23 @@ def _build_plan(
     *,
     direction: str,
     progress: TextIO,
+    include_excluded: bool = False,
 ) -> tuple[TreeSnapshot, TreeSnapshot, ComparisonPlan]:
     exclusions = ExclusionSpec(project.exclusions)
     selector = _file_selection(arguments, root)
     print("Scanning local files...", file=progress, flush=True)
-    local = snapshot_local(root, exclusions, selector)
+    local = snapshot_local(
+        root,
+        exclusions,
+        selector,
+        include_excluded=include_excluded,
+    )
     print("Reading remote files over FTPS...", file=progress, flush=True)
-    remote = transport.snapshot(exclusions, selector)
+    remote = transport.snapshot(
+        exclusions,
+        selector,
+        include_excluded=include_excluded,
+    )
     print(f"Building {direction} plan...", file=progress, flush=True)
     plan = build_comparison(
         local,
@@ -468,6 +481,7 @@ def _compare(
             transport,
             direction="pull" if arguments.pull else "push",
             progress=progress,
+            include_excluded=True,
         )
     return _format_comparison(
         name,

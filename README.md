@@ -117,9 +117,10 @@ hls inc 'var/generated/index.html'
 The project is inferred from the current directory; use `--project <name>`
 elsewhere. Patterns are relative to the local root and evaluated in command
 order, so a later rule overrides an earlier matching rule. Excluded paths stay
-outside listing, comparison, push, pull, and remote pruning. Empty patterns,
-`..` traversal, and direct `!` input are rejected; `include` records the
-negation internally. Commas cannot be used inside a pattern.
+outside tree listings, push, pull, and remote pruning, but compare displays
+excluded files as neutral gray diagnostic entries. Empty patterns, `..`
+traversal, and direct `!` input are rejected; `include` records the negation
+internally. Commas cannot be used inside a pattern.
 
 ## Tree inventories
 
@@ -194,12 +195,19 @@ Compare uses a compact, perspective-relative status column:
 ~  present on both sides but modified
 -  missing from the selected side
 !  type or symlink conflict
+·  excluded from synchronization
 ```
 
 The default selected side is local; `--pull` reverses it to remote. Status lines
 are green, yellow, red, and magenta on terminals. Color is disabled when output
-is redirected or `NO_COLOR` is set, and can be controlled explicitly with
+is redirected or `NO_COLOR` is set; excluded entries are gray. Color can be
+controlled explicitly with
 `--color auto|always|never`.
+
+Compare uses diagnostic snapshots that inspect excluded directories so their
+files can be shown. Push and pull continue to omit excluded paths entirely.
+Selectors are still applied before traversal, so a path-limited comparison does
+not scan unrelated excluded branches.
 
 Local path existence remains authoritative for transfer behavior, so a
 remote-only path is skipped rather than restored or deleted by default. Include

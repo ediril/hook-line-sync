@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.22.6"
+    assert __version__ == "0.8.22.7"
 
     help_output = invoke(["help"], store)[1]
     assert "compare (cmp)       preview file changes without modifying anything" in (
@@ -249,7 +249,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         def __exit__(self, *_):
             return None
 
-        def snapshot(self, exclusions, selector=None):
+        def snapshot(self, exclusions, selector=None, *, include_excluded=False):
             assert exclusions.patterns == ("node_modules/", "*.log")
             snapshot = TreeSnapshot(
                 (
@@ -327,6 +327,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "+  README.md\n" in push_comparison[1]
     assert "-  deployed.html\n" in push_comparison[1]
     assert "!  linked\n" in push_comparison[1]
+    assert "·  node_modules/package.js\n" in push_comparison[1]
+    assert "·  src/debug.log\n" in push_comparison[1]
     assert invoke(["cmp"], store) == push_comparison
 
     selected_comparison = invoke(["compare", "main.py"], store)
@@ -346,10 +348,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "+  src\n" not in expanded_comparison[1]
     monkeypatch.chdir(source)
 
-    colored_comparison = invoke(
-        ["compare", "main.py", "--color", "always"], store
-    )
+    colored_comparison = invoke(["compare", "*", "--color", "always"], store)
     assert "\033[32m+  src/main.py\033[0m" in colored_comparison[1]
+    assert "\033[90m·  src/debug.log\033[0m" in colored_comparison[1]
 
     pull_comparison = invoke(["compare", "--pull", "-p"], store)
     assert pull_comparison[0] == 0

@@ -15,10 +15,17 @@ the inferred project's persistent synchronization scope. `--project <name>` is
 the explicit override. Rules use gitignore matching and retain insertion order;
 a later include or exclude therefore overrides an earlier matching rule.
 
-Walkers do not expose excluded entries. When a later inclusion can match below
-an excluded directory, local and remote walkers traverse only the potentially
-relevant excluded branch so the override is reachable. File selectors continue
-to prune traversal independently, and both conditions must permit descent.
+Operational walkers do not expose excluded entries. When a later inclusion can
+match below an excluded directory, local and remote walkers traverse only the
+potentially relevant excluded branch so the override is reachable. File
+selectors continue to prune traversal independently, and both conditions must
+permit descent.
+
+Compare requests diagnostic snapshots that expose excluded files with an
+explicit exclusion flag and traverse excluded directories needed to enumerate
+them. Comparison converts those entries to a neutral `excluded` action, shown
+with a gray `·` marker. Push, pull, tree listings, and pruning continue to use
+operational snapshots in which excluded paths are absent.
 
 ## Rationale
 
@@ -41,3 +48,6 @@ changing when a new command is added.
 - Inclusion patterns with an indeterminate wildcard prefix may require scanning
   more excluded directories to preserve correctness, but never broaden the
   resulting synchronization scope.
+- A complete compare inspects excluded directories to report their files and
+  can therefore do more local and remote I/O than a transfer. Selector-limited
+  compares retain selector-first traversal pruning.

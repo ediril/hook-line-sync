@@ -12,6 +12,7 @@ ComparisonState = Literal[
     "local-only",
     "remote-only",
     "changed",
+    "excluded",
     "type-conflict",
     "symlink-conflict",
 ]
@@ -24,6 +25,7 @@ PlanAction = Literal[
     "replace-local",
     "delete-remote",
     "conflict",
+    "excluded",
 ]
 
 
@@ -89,6 +91,20 @@ def build_comparison(
             )
             if not is_file or not selector.matches(path):
                 continue
+        if any(
+            entry is not None and entry.excluded
+            for entry in (local_entry, remote_entry)
+        ):
+            comparison.append(
+                ComparisonEntry(
+                    path=path,
+                    state="excluded",
+                    action="excluded",
+                    local_kind=local_entry.kind if local_entry else None,
+                    remote_kind=remote_entry.kind if remote_entry else None,
+                )
+            )
+            continue
         if local_entry is None:
             comparison.append(
                 ComparisonEntry(
@@ -145,6 +161,6 @@ def build_comparison(
 
     if selector is not None and not comparison:
         raise SelectionError(
-            f"file selector '{selector.pattern}' matched no non-excluded files"
+            f"file selector '{selector.pattern}' matched no files"
         )
     return ComparisonPlan(direction, prune_remote, tuple(comparison))

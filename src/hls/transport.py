@@ -54,6 +54,8 @@ class RemoteTransport(Protocol):
         self,
         exclusions: ExclusionSpec,
         selector: FileSelection | None = None,
+        *,
+        include_excluded: bool = False,
     ) -> TreeSnapshot: ...
 
     def make_directory(self, relative_path: str) -> None: ...
@@ -134,6 +136,8 @@ class ExplicitFTPSTransport:
         self,
         exclusions: ExclusionSpec,
         selector: FileSelection | None = None,
+        *,
+        include_excluded: bool = False,
     ) -> TreeSnapshot:
         if self._client is None:
             raise TransportError("FTPS transport is not connected")
@@ -180,7 +184,8 @@ class ExplicitFTPSTransport:
                     relative_path,
                     is_directory=kind == "directory",
                 )
-                selected = not excluded and (
+                visible = not excluded or (include_excluded and kind != "directory")
+                selected = visible and (
                     selector is None or selector.matches(relative_path)
                 )
                 if selected and kind == "file":
@@ -209,6 +214,7 @@ class ExplicitFTPSTransport:
                             size=size,
                             modified_ns=modified_ns,
                             timestamp_precision_ns=precision_ns,
+                            excluded=excluded,
                         )
                     except SnapshotError as error:
                         raise TransportError(
@@ -217,13 +223,16 @@ class ExplicitFTPSTransport:
                         ) from error
                     entries.append(entry)
                 elif selected:
-                    entries.append(TreeEntry(relative_path, kind))
+                    entries.append(
+                        TreeEntry(relative_path, kind, excluded=excluded)
+                    )
                 selection_may_descend = (
                     selector is None
                     or selector.may_match_descendant(relative_path)
                 )
                 exclusion_may_descend = (
-                    not excluded
+                    include_excluded
+                    or not excluded
                     or exclusions.may_include_descendant(relative_path)
                 )
                 if (
