@@ -1,0 +1,58 @@
+# Changelog
+
+## 0.8.22.14 — 2026-08-22
+
+### Added
+
+- Added the Python package, `hls` console entry point, Python 3.10+ metadata,
+  development tooling, and atomic configuration storage in
+  `~/.hls/configs.json` without credential values.
+- Added project lifecycle commands for adding, removing, listing, inspecting,
+  and verifying FTPS projects. Production credential variables default to
+  `PROD_FTPS_USERNAME` and `PROD_FTPS_PASSWORD`.
+- Added verified explicit FTPS with `AUTH TLS`, protected `PROT P` data
+  connections, certificate validation, structured MLSD listings, and no
+  plaintext fallback.
+- Added one canonical local root per project, recursive relative-path mapping,
+  global overlap rejection, and current-directory project inference.
+- Added deterministic local and remote tree inventories through
+  `hls list local`, `hls list remote`, `hls lsl`, and `hls lsr`.
+- Added push-oriented `hls compare`, its pull projection, compact colored status
+  markers, immediately flushed progress, and `--prune-remote` / `-p` planning.
+- Added shared path selection for compare, push, and pull, including literal
+  paths, shell-expanded argument unions, quoted `*` and `**` patterns,
+  selector-first traversal pruning, exclusion enforcement, unmatched-selection
+  errors, and prune containment.
+- Added executable push and pull pipelines with fresh comparison plans,
+  conflict preflight, local-source revalidation, staged and size-verified
+  uploads, remote timestamp preservation, recoverable remote replacement,
+  atomic local replacement, and delete-last remote pruning.
+- Added persistent ordered Gitignore rules through `hls exclude` and
+  `hls include`, including comma-separated groups, shell-expanded operands,
+  descendant re-inclusion, and exact project-relative anchoring for literal
+  paths.
+- Added complementary effective local-file listings through no-argument
+  `exclude` and `include`, with explicit `--list` equivalents.
+- Added compare-only diagnostic snapshots that display excluded files with a
+  neutral gray `·` marker while keeping excluded paths out of transfers and
+  pruning.
+- Added unique command-prefix resolution with ambiguity errors.
+
+### Changed
+
+- Project mapping now establishes only the local-root correspondence;
+  synchronization rules are managed independently through `exclude` and
+  `include`.
+- Removed the superseded directory-scoped `hls use` mechanism.
+- Standardized path-pattern argument parsing across compare, push, pull,
+  exclude, and include.
+- Kept `ls` and `cmp` as functional compatibility spellings while omitting them
+  from the primary help menu.
+- Stored synchronization rules are interpreted verbatim with ordered Gitignore
+  last-match-wins semantics.
+
+### Verification
+
+- Added focused configuration and CLI characterization plus full local-to-FTPS
+  and FTPS-to-local integration coverage against a disposable TLS-enabled FTP
+  server.

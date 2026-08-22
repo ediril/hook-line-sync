@@ -5,7 +5,8 @@ local folders and remote servers over explicit FTP over TLS (FTPS).
 
 The project is in pre-alpha development. Configuration, connection, mapping,
 tree inventory, comparison, and file transfer are available. Release packaging
-remains on the work queue in [`TODO.md`](TODO.md).
+remains on the work queue in [`TODO.md`](TODO.md). Completed work is recorded in
+[`CHANGELOG.md`](CHANGELOG.md).
 
 ## Requirements
 
