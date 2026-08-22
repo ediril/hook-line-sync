@@ -26,6 +26,29 @@ A local-only path remains local during pull and is eligible for upload during
 push. The overwrite policy for changed paths will be decided with comparison
 states.
 
+Compare, push, and pull accept one optional path selector. It is interpreted
+relative to the current directory within the mapped local root and converted to
+a project-relative POSIX pattern. A literal selects one file; `*` matches
+within one path segment and `**` permits recursive matching. Shell wildcards
+must be quoted to reach HLS unchanged. An omitted selector addresses the
+complete project.
+
+Selectors cannot be absolute, traverse with `..`, or escape the mapped root. A
+selector that matches no non-excluded file on either side is an error rather
+than a successful no-op. Selection never expands the configured exclusion
+scope. `--prune-remote` deletes remote-only paths only inside the selected
+scope.
+
+The positional argument is reserved for the selector. An explicit project
+override therefore uses `--project <name>`; otherwise the current directory
+selects the project from its mapped root. When the current directory is inside
+the selected project, selectors are relative to it. Otherwise an explicit
+project override makes selectors relative to that project's local root.
+
+Explicit selection does not override path-existence policy. Selecting a
+remote-only file in pull mode still reports it as skipped rather than restoring
+it locally.
+
 ## Rationale
 
 A single comparison command avoids separate dry modes on mutation commands.
@@ -52,3 +75,5 @@ authorization to perform a destructive action.
 - Pull does not restore a missing local path merely because it exists remotely.
 - Independent remote additions remain untouched unless `--prune-remote` is
   explicitly supplied.
+- Compare and transfer selection share one matcher and operate only on regular
+  files. Required parent directories are plan mechanics, not selected content.

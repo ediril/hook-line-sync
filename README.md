@@ -147,6 +147,20 @@ Use the pull projection when needed:
 hls compare --pull
 ```
 
+Limit the projection to one file or a quoted wildcard pattern relative to the
+current directory:
+
+```console
+hls compare index.html
+hls compare 'src/*.js'
+hls compare '**/*.css'
+```
+
+`*` stays within one path segment and `**` matches recursively. An unmatched,
+excluded, absolute, or parent-traversing selector is rejected. Use
+`--project <name>` to select a project explicitly; outside that project's local
+root, its selectors are project-root-relative.
+
 The projection reports uploads, directional replacements, conflicts, skipped
 paths, and remote deletions. Local path existence is authoritative, so a
 remote-only path is skipped rather than restored or deleted by default. Include
@@ -156,6 +170,9 @@ its remote deletion in the projection explicitly with:
 hls compare --prune-remote
 hls cmp --pull -p
 ```
+
+When a selector is present, pruning is strictly limited to matching remote-only
+files.
 
 File identity uses size and modification timestamps normalized to the coarser
 precision reported by the local filesystem and remote MLSD facts. Identical

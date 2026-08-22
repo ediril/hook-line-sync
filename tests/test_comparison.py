@@ -1,4 +1,7 @@
+import pytest
+
 from hls.comparison import build_comparison
+from hls.selection import FileSelector, SelectionError
 from hls.snapshot import TreeEntry, TreeSnapshot
 
 
@@ -89,3 +92,20 @@ def test_comparison_projects_push_pull_prune_and_timestamp_precision() -> None:
     assert pull["remote.txt"].action == "delete-remote"
     assert push["conflict"].action == "conflict"
     assert push["linked"].action == "conflict"
+
+    selected = build_comparison(
+        local,
+        remote,
+        selector=FileSelector("*.txt"),
+    )
+    assert [entry.path for entry in selected.entries] == [
+        "changed.txt",
+        "local.txt",
+        "remote.txt",
+    ]
+    with pytest.raises(SelectionError, match="matched no"):
+        build_comparison(
+            local,
+            remote,
+            selector=FileSelector("missing/**/*.js"),
+        )

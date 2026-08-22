@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from hls.selection import FileSelector, SelectionError
 from hls.snapshot import EntryKind, TreeEntry, TreeSnapshot
 
 Direction = Literal["push", "pull"]
@@ -72,6 +73,7 @@ def build_comparison(
     *,
     direction: Direction = "push",
     prune_remote: bool = False,
+    selector: FileSelector | None = None,
 ) -> ComparisonPlan:
     local_entries = {entry.path: entry for entry in local.entries}
     remote_entries = {entry.path: entry for entry in remote.entries}
@@ -80,6 +82,13 @@ def build_comparison(
     for path in sorted(local_entries.keys() | remote_entries.keys()):
         local_entry = local_entries.get(path)
         remote_entry = remote_entries.get(path)
+        if selector is not None:
+            is_file = any(
+                entry is not None and entry.kind == "file"
+                for entry in (local_entry, remote_entry)
+            )
+            if not is_file or not selector.matches(path):
+                continue
         if local_entry is None:
             comparison.append(
                 ComparisonEntry(
@@ -134,4 +143,8 @@ def build_comparison(
             )
         )
 
+    if selector is not None and not comparison:
+        raise SelectionError(
+            f"file selector '{selector.pattern}' matched no non-excluded files"
+        )
     return ComparisonPlan(direction, prune_remote, tuple(comparison))

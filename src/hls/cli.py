@@ -19,6 +19,7 @@ from hls.config import (
     validate_project_name,
 )
 from hls.exclusions import ExclusionError, ExclusionSpec
+from hls.selection import FileSelector, SelectionError
 from hls.snapshot import SnapshotError, TreeSnapshot, snapshot_local
 from hls.transport import ExplicitFTPSTransport, TransportError
 
@@ -83,7 +84,8 @@ def build_parser() -> argparse.ArgumentParser:
         aliases=("cmp",),
         help="show the projected push or pull actions",
     )
-    compare_parser.add_argument("project_name", nargs="?")
+    compare_parser.add_argument("selector", nargs="?")
+    compare_parser.add_argument("--project", dest="project_name")
     compare_parser.add_argument(
         "--pull",
         action="store_true",
@@ -256,6 +258,15 @@ def _compare(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
     exclusions = ExclusionSpec(project.exclusions)
+    selector = (
+        FileSelector.from_argument(
+            arguments.selector,
+            project_root=root,
+            current_directory=Path.cwd().resolve(strict=True),
+        )
+        if arguments.selector is not None
+        else None
+    )
     local = snapshot_local(root, exclusions)
     with ExplicitFTPSTransport(project) as transport:
         remote = transport.snapshot(exclusions)
@@ -264,6 +275,7 @@ def _compare(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
         remote,
         direction="pull" if arguments.pull else "push",
         prune_remote=arguments.prune_remote,
+        selector=selector,
     )
     return _format_comparison(name, plan)
 
@@ -327,6 +339,7 @@ def run(
     except (
         ConfigurationError,
         ExclusionError,
+        SelectionError,
         SnapshotError,
         TransportError,
     ) as error:

@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.21.13"
+    assert __version__ == "0.8.21.14"
 
     list_status, list_stdout, list_stderr = invoke(["list"], store)
     assert (list_status, list_stderr) == (0, "")
@@ -255,12 +255,18 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "skip           remote-only" in push_comparison[1]
     assert invoke(["cmp"], store) == push_comparison
 
+    selected_comparison = invoke(["compare", "main.py"], store)
+    assert selected_comparison[0] == 0 and selected_comparison[2] == ""
+    assert "src/main.py" in selected_comparison[1]
+    assert "README.md" not in selected_comparison[1]
+    assert "deployed.html" not in selected_comparison[1]
+
     pull_comparison = invoke(["compare", "--pull", "-p"], store)
     assert pull_comparison[0] == 0 and pull_comparison[2] == ""
     assert "Pull projection for project 'prod':\n" in pull_comparison[1]
     assert "delete-remote  remote-only" in pull_comparison[1]
     assert "skip           local-only" in pull_comparison[1]
-    assert len(transports) == 6
+    assert len(transports) == 7
 
 
 def test_map_rejects_existing_and_overlapping_local_roots(
