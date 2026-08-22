@@ -30,18 +30,11 @@ def release_version() -> tuple[str, int, int]:
     return match["version"], int(match["month"]), int(match["day"])
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--tag",
-        help="release tag to verify; must be v followed by the package version",
-    )
-    arguments = parser.parse_args()
-
+def validate_release(tag: str | None = None) -> str:
     version, month, day = release_version()
-    if arguments.tag is not None and arguments.tag != f"v{version}":
+    if tag is not None and tag != f"v{version}":
         raise SystemExit(
-            f"release check failed: tag {arguments.tag!r} does not match v{version}"
+            f"release check failed: tag {tag!r} does not match v{version}"
         )
 
     heading_pattern = re.compile(
@@ -57,6 +50,17 @@ def main() -> None:
 
     release_date = date(int(heading["year"]), month, day)
     print(f"Release identity valid: {version} ({release_date.isoformat()})")
+    return version
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--tag",
+        help="release tag to verify; must be v followed by the package version",
+    )
+    arguments = parser.parse_args()
+    validate_release(arguments.tag)
 
 
 if __name__ == "__main__":

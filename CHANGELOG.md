@@ -4,9 +4,9 @@
 
 ### Added
 
-- Added release identity validation and a documented manual PyPI procedure that
-  tests, builds, validates, and installs each release artifact before the
-  maintainer publishes it with Twine.
+- Added a one-command release preparation script that validates release
+  identity, lint, tests, package metadata, and a clean wheel installation before
+  placing version-specific artifacts under `dist/` for manual Twine upload.
 
 ### Changed
 

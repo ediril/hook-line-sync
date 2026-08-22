@@ -14,30 +14,28 @@ repository.
 1. Set `src/hls/__init__.py` to the next
    `0.<month>.<day>.<increment>` version without leading zeroes.
 2. Add a matching dated section to `CHANGELOG.md`.
-3. Commit the release changes, tag that commit with exactly `v<version>`, such
-   as `v0.8.22.15`, and work from a clean checkout of that tag.
-4. With development dependencies installed, run:
+3. Commit the release changes. From that clean checkout, with development
+   dependencies installed, run:
 
    ```console
-   python scripts/check_release.py --tag "$(git describe --tags --exact-match)"
-   ruff check .
-   pytest
-   release_root="$(mktemp -d)"
-   python -m build --outdir "$release_root/dist"
-   python -m twine check "$release_root/dist/"*
-   python -m venv "$release_root/venv"
-   "$release_root/venv/bin/python" -m pip install "$release_root/dist/"*.whl
-   "$release_root/venv/bin/hls" --version
+   python scripts/prepare_release.py
    ```
 
-5. Review the output, then publish the two validated artifacts manually:
+   The script runs the release identity check, lint, tests, isolated package
+   build, Twine metadata check, and a clean wheel installation. It places the
+   validated wheel and source archive in `dist/<version>/` and prints the exact
+   upload command.
+4. Review the output, then run the printed command. For example:
 
    ```console
-   python -m twine upload "$release_root/dist/"*
+   python -m twine upload dist/0.8.22.15/*
    ```
 
-6. Push the tag, create its GitHub Release, then install the published version
-   in a clean environment and run `hls --version` before announcing it.
+5. A Git tag is not required by PyPI. It is strongly recommended for source
+   provenance: tag the release commit as `v<version>`, push that tag, and create
+   a corresponding GitHub Release.
+6. Install the published version in a clean environment and run `hls --version`
+   before announcing it.
 
 PyPI does not allow a published version to be replaced. If publication fails
 after accepting either artifact, increment the version and create a new
