@@ -106,6 +106,7 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
     cache.mkdir()
     (assets / "logo.svg").write_text("logo", encoding="utf-8")
     (cache / "index.bin").write_bytes(b"ignored")
+    (cache / "keep.bin").write_bytes(b"included")
     (root / "debug.log").write_text("ignored", encoding="utf-8")
     local_root = root.parent / "local-root"
     local_root.mkdir()
@@ -127,10 +128,13 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
     with transport:
         # The fixture refuses unprotected data connections, so recursive MLSD
         # success proves that PROT P was negotiated rather than merely called.
-        snapshot = transport.snapshot(ExclusionSpec(("cache/", "*.log")))
+        snapshot = transport.snapshot(
+            ExclusionSpec(("cache/", "*.log", "!cache/keep.bin"))
+        )
         assert [(entry.path, entry.kind) for entry in snapshot.entries] == [
             ("assets", "directory"),
             ("assets/logo.svg", "file"),
+            ("cache/keep.bin", "file"),
         ]
         local = snapshot_local(local_root, ExclusionSpec())
         comparison = {

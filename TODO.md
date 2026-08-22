@@ -13,8 +13,11 @@
   - Cover configuration behavior with unit tests and FTPS connectivity with an
     integration test against a disposable TLS-enabled FTP server.
 - [x] Implement one canonical local root per project with `hls map`, recursive
-  relative-path correspondence, global overlap rejection, and comma-separated
-  gitignore-style exclusions.
+  relative-path correspondence and global overlap rejection.
+- [x] Move synchronization scope out of `hls map`; implement persistent ordered
+  `hls exclude` / `hls include` rules with comma-separated patterns, safe
+  descendant re-inclusion, current-project inference, and unique command-prefix
+  resolution while retaining established exact aliases.
 - [x] Remove the superseded directory-scoped `hls use` mechanism; project
   selection is inferred from non-overlapping local roots.
 - [x] Implement deterministic `hls list` / `hls ls` project inventory, including

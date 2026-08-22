@@ -134,9 +134,7 @@ class ProjectConfiguration:
         if self.local_root is None and self.exclusions:
             raise ConfigurationError("an unmapped project cannot have exclusions")
 
-    def with_local_root(
-        self, local_root: str, exclusions: tuple[str, ...]
-    ) -> ProjectConfiguration:
+    def with_local_root(self, local_root: str) -> ProjectConfiguration:
         if self.local_root is not None:
             raise ConfigurationError(
                 f"project is already mapped to local root '{self.local_root}'"
@@ -149,6 +147,20 @@ class ProjectConfiguration:
             password_env=self.password_env,
             type=self.type,
             local_root=local_root,
+            exclusions=(),
+        )
+
+    def with_exclusions(self, exclusions: tuple[str, ...]) -> ProjectConfiguration:
+        if self.local_root is None:
+            raise ConfigurationError("cannot change rules for an unmapped project")
+        return ProjectConfiguration(
+            host=self.host,
+            remote_root=self.remote_root,
+            port=self.port,
+            username_env=self.username_env,
+            password_env=self.password_env,
+            type=self.type,
+            local_root=self.local_root,
             exclusions=exclusions,
         )
 
@@ -236,9 +248,7 @@ class ApplicationConfiguration:
                         f"'{other_name}' root '{other_root}'"
                     )
 
-    def map_project(
-        self, project_name: str, local_root: str, exclusions: tuple[str, ...]
-    ) -> None:
+    def map_project(self, project_name: str, local_root: str) -> None:
         project = self.projects[project_name]
         if project.local_root is not None:
             raise ConfigurationError(
@@ -255,7 +265,17 @@ class ApplicationConfiguration:
                     f"local root '{root}' for project '{project_name}' overlaps "
                     f"project '{other_name}' root '{other_root}'"
                 )
-        self.projects[project_name] = project.with_local_root(local_root, exclusions)
+        self.projects[project_name] = project.with_local_root(local_root)
+
+    def append_exclusion_rules(
+        self, project_name: str, rules: tuple[str, ...]
+    ) -> None:
+        project = self.projects[project_name]
+        ordered = list(project.exclusions)
+        for rule in rules:
+            ordered = [existing for existing in ordered if existing != rule]
+            ordered.append(rule)
+        self.projects[project_name] = project.with_exclusions(tuple(ordered))
 
     def project_for_path(
         self, local_path: Path

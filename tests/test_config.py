@@ -35,7 +35,7 @@ def test_configuration_round_trip_persists_mapping_without_secrets(tmp_path) -> 
     project = document["projects"]["prod"]
     assert document["version"] == 6
     assert project["local_root"] == str(local_root)
-    assert project["exclusions"] == ["*.log", "node_modules/"]
+    assert project["exclusions"] == ["node_modules/", "*.log"]
     assert "username" not in project and "password" not in project
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
 

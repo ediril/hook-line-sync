@@ -176,12 +176,13 @@ class ExplicitFTPSTransport:
                         f"unsupported remote entry type {entry_type!r} "
                         f"for '{relative_path}'"
                     )
-                if exclusions.excludes(
+                excluded = exclusions.excludes(
                     relative_path,
                     is_directory=kind == "directory",
-                ):
-                    continue
-                selected = selector is None or selector.matches(relative_path)
+                )
+                selected = not excluded and (
+                    selector is None or selector.matches(relative_path)
+                )
                 if selected and kind == "file":
                     size_value = facts.get("size")
                     modified_value = facts.get("modify")
@@ -217,9 +218,18 @@ class ExplicitFTPSTransport:
                     entries.append(entry)
                 elif selected:
                     entries.append(TreeEntry(relative_path, kind))
-                if kind == "directory" and (
+                selection_may_descend = (
                     selector is None
                     or selector.may_match_descendant(relative_path)
+                )
+                exclusion_may_descend = (
+                    not excluded
+                    or exclusions.may_include_descendant(relative_path)
+                )
+                if (
+                    kind == "directory"
+                    and selection_may_descend
+                    and exclusion_may_descend
                 ):
                     walk(relative)
 

@@ -19,17 +19,53 @@ from hls.config import (
     canonical_local_root,
     validate_project_name,
 )
-from hls.exclusions import ExclusionError, ExclusionSpec
+from hls.exclusions import ExclusionError, ExclusionSpec, rules_from_csv
 from hls.selection import FileSelection, FileSelector, FileSelectorSet, SelectionError
 from hls.snapshot import SnapshotError, TreeSnapshot, snapshot_local
 from hls.transfer import TransferError, TransferResult, execute_transfer
 from hls.transport import ExplicitFTPSTransport, TransportError
 
+CANONICAL_COMMANDS = (
+    "add",
+    "connect",
+    "map",
+    "remove",
+    "list",
+    "lsl",
+    "lsr",
+    "compare",
+    "push",
+    "pull",
+    "exclude",
+    "include",
+    "help",
+    "version",
+)
+COMMAND_ALIASES = {"ls": "list", "cmp": "compare"}
+
+
+def _resolve_command_name(value: str) -> str:
+    if value in CANONICAL_COMMANDS or value in COMMAND_ALIASES:
+        return value
+    matches = tuple(
+        command for command in CANONICAL_COMMANDS if command.startswith(value)
+    )
+    if not matches:
+        raise ConfigurationError(f"unknown command '{value}'")
+    if len(matches) > 1:
+        raise ConfigurationError(
+            f"ambiguous command '{value}': {', '.join(matches)}"
+        )
+    return matches[0]
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hls",
-        description="Transfer mapped files over explicit FTP over TLS.",
+        description=(
+            "Transfer mapped files over explicit FTP over TLS. Commands may be "
+            "shortened to any unique prefix."
+        ),
     )
     parser.add_argument("--version", action="version", version=__version__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -52,10 +88,21 @@ def build_parser() -> argparse.ArgumentParser:
         "map", help="map the current directory to a project"
     )
     map_parser.add_argument("project_name")
-    map_parser.add_argument(
-        "--exclude",
-        help="comma-separated gitignore-style patterns relative to the local root",
-    )
+
+    for command, help_text in (
+        ("exclude", "permanently exclude paths from synchronization"),
+        ("include", "permanently re-include paths in synchronization"),
+    ):
+        rules_parser = subparsers.add_parser(command, help=help_text)
+        rules_parser.add_argument(
+            "patterns",
+            help="comma-separated gitignore-style patterns relative to the local root",
+        )
+        rules_parser.add_argument(
+            "--project",
+            dest="project_name",
+            help="project name; inferred from the current directory when omitted",
+        )
 
     remove_parser = subparsers.add_parser("remove", help="remove a project")
     remove_parser.add_argument("project_name")
@@ -226,13 +273,24 @@ def _connect(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
 def _map(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     configuration, name, project = _resolve_project(arguments, store)
     local_root = canonical_local_root(Path.cwd())
-    exclusions = ExclusionSpec.from_csv(arguments.exclude).patterns
-    configuration.map_project(name, local_root, exclusions)
+    configuration.map_project(name, local_root)
     store.save(configuration)
-    message = f"Mapped '{local_root}' to '{name}:{project.remote_root}'."
-    if exclusions:
-        message += f" Excluding: {', '.join(exclusions)}."
-    return message
+    return f"Mapped '{local_root}' to '{name}:{project.remote_root}'."
+
+
+def _change_exclusions(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    *,
+    include: bool,
+) -> str:
+    configuration, name, _ = _resolve_project(arguments, store)
+    rules = rules_from_csv(arguments.patterns, include=include)
+    configuration.append_exclusion_rules(name, rules)
+    store.save(configuration)
+    action = "Included" if include else "Excluded"
+    display = ", ".join(rule[1:] if include else rule for rule in rules)
+    return f"{action} for project '{name}': {display}."
 
 
 def _remove(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
@@ -257,9 +315,13 @@ def _list_projects(store: ConfigurationStore) -> str:
         lines.append(f"  Remote root: {project.remote_root}")
         lines.append(f"  Local root: {project.local_root or 'not mapped'}")
         if project.exclusions:
-            lines.append(f"  Excludes: {', '.join(project.exclusions)}")
+            rules = ", ".join(
+                f"include {rule[1:]}" if rule.startswith("!") else f"exclude {rule}"
+                for rule in project.exclusions
+            )
+            lines.append(f"  Rules: {rules}")
         else:
-            lines.append("  Excludes: none")
+            lines.append("  Rules: none")
     return "\n".join(lines)
 
 
@@ -469,9 +531,8 @@ def _show_help(parser: argparse.ArgumentParser, topic: str | None) -> str:
         for action in parser._actions
         if isinstance(action, argparse._SubParsersAction)
     )
-    if topic not in subparser.choices:
-        raise ConfigurationError(f"unknown help topic '{topic}'")
-    return subparser.choices[topic].format_help().rstrip()
+    resolved = _resolve_command_name(topic)
+    return subparser.choices[resolved].format_help().rstrip()
 
 
 def run(
@@ -482,7 +543,13 @@ def run(
     stderr: TextIO = sys.stderr,
 ) -> int:
     parser = build_parser()
-    arguments = parser.parse_args(argv)
+    raw_arguments = list(sys.argv[1:] if argv is None else argv)
+    if raw_arguments and not raw_arguments[0].startswith("-"):
+        try:
+            raw_arguments[0] = _resolve_command_name(raw_arguments[0])
+        except ConfigurationError as error:
+            parser.error(str(error))
+    arguments = parser.parse_args(raw_arguments)
     configuration_store = store or ConfigurationStore()
     try:
         if arguments.command == "add":
@@ -491,6 +558,12 @@ def run(
             message = _connect(arguments, configuration_store)
         elif arguments.command == "map":
             message = _map(arguments, configuration_store)
+        elif arguments.command == "exclude":
+            message = _change_exclusions(
+                arguments, configuration_store, include=False
+            )
+        elif arguments.command == "include":
+            message = _change_exclusions(arguments, configuration_store, include=True)
         elif arguments.command == "remove":
             message = _remove(arguments, configuration_store)
         elif arguments.command in {"list", "ls"}:

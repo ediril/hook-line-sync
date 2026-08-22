@@ -6,7 +6,7 @@ from hls import __version__
 from hls.cli import run
 from hls.config import ConfigurationStore
 from hls.exclusions import ExclusionSpec
-from hls.snapshot import TreeEntry, TreeSnapshot
+from hls.snapshot import TreeEntry, TreeSnapshot, snapshot_local
 
 
 def invoke(arguments, store):
@@ -33,7 +33,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
         ],
         store,
     )
-    version_status, version_stdout, version_stderr = invoke(["version"], store)
+    version_status, version_stdout, version_stderr = invoke(["v"], store)
 
     assert (add_status, add_stdout, add_stderr) == (
         0,
@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.22.5"
+    assert __version__ == "0.8.22.6"
 
     help_output = invoke(["help"], store)[1]
     assert "compare (cmp)       preview file changes without modifying anything" in (
@@ -64,6 +64,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
         "pull                replace changed local files from the remote project"
     )
     assert pull_help in help_output
+    assert "usage: hls compare" in invoke(["help", "comp"], store)[1]
 
     list_status, list_stdout, list_stderr = invoke(["list"], store)
     assert (list_status, list_stderr) == (0, "")
@@ -98,6 +99,8 @@ def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
     assert missing_status == 1 and "does not exist" in missing_error
     with pytest.raises(SystemExit):
         run(["add", "unsafe", "--host", "ftp.example.com"], store=store)
+    with pytest.raises(SystemExit):
+        run(["co"], store=store)
 
 
 def test_add_supports_explicit_protocol_port_and_environment_names(tmp_path) -> None:
@@ -133,7 +136,7 @@ def test_add_supports_explicit_protocol_port_and_environment_names(tmp_path) -> 
     )
 
 
-def test_map_uses_current_directory_and_compiles_comma_separated_exclusions(
+def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     tmp_path, monkeypatch
 ) -> None:
     store = ConfigurationStore(tmp_path / "configs.json")
@@ -151,26 +154,53 @@ def test_map_uses_current_directory_and_compiles_comma_separated_exclusions(
         store,
     )
     monkeypatch.chdir(workspace)
+    ignored = workspace / "node_modules"
+    ignored.mkdir()
+    (ignored / "drop.js").write_text("drop", encoding="utf-8")
+    (ignored / "keep.js").write_text("keep", encoding="utf-8")
 
-    status, stdout, stderr = invoke(
-        ["map", "prod", "--exclude", ".git/, node_modules/,*.log,**/.cache/"],
-        store,
+    status, stdout, stderr = invoke(["m", "prod"], store)
+    exclude_result = invoke(
+        ["exc", ".git/, node_modules/,*.log,**/.cache/"], store
     )
+    include_result = invoke(["inc", "node_modules/keep.js"], store)
 
     assert status == 0 and stderr == ""
-    assert stdout.startswith(f"Mapped '{workspace}' to 'prod:/public_html'.")
+    assert stdout == f"Mapped '{workspace}' to 'prod:/public_html'.\n"
+    assert exclude_result == (
+        0,
+        "Excluded for project 'prod': .git/, node_modules/, *.log, **/.cache/.\n",
+        "",
+    )
+    assert include_result == (
+        0,
+        "Included for project 'prod': node_modules/keep.js.\n",
+        "",
+    )
     project = store.load().projects["prod"]
     assert project.local_root == str(workspace)
-    assert project.exclusions == ("**/.cache/", "*.log", ".git/", "node_modules/")
+    assert project.exclusions == (
+        ".git/",
+        "node_modules/",
+        "*.log",
+        "**/.cache/",
+        "!node_modules/keep.js",
+    )
     exclusions = ExclusionSpec(project.exclusions)
     assert exclusions.excludes(".git", is_directory=True)
     assert exclusions.excludes("node_modules/package/index.js")
+    assert not exclusions.excludes("node_modules/keep.js")
     assert exclusions.excludes("src/debug.log")
     assert not exclusions.excludes("src/main.py")
+    snapshot = snapshot_local(workspace, exclusions)
+    assert [entry.path for entry in snapshot.entries] == ["node_modules/keep.js"]
     list_stdout = invoke(["list"], store)[1]
     assert "* prod\n" in list_stdout
     assert f"  Local root: {workspace}\n" in list_stdout
-    assert "  Excludes: **/.cache/, *.log, .git/, node_modules/\n" in list_stdout
+    assert (
+        "  Rules: exclude .git/, exclude node_modules/, exclude *.log, "
+        "exclude **/.cache/, include node_modules/keep.js\n"
+    ) in list_stdout
     assert "project mapped to the current directory" not in list_stdout
 
 
@@ -203,9 +233,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         store,
     )
     monkeypatch.chdir(workspace)
-    assert invoke(
-        ["map", "prod", "--exclude", "node_modules/,*.log"], store
-    )[0] == 0
+    assert invoke(["map", "prod"], store)[0] == 0
+    assert invoke(["exclude", "node_modules/,*.log"], store)[0] == 0
 
     transports = []
     operations = []
@@ -221,7 +250,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
             return None
 
         def snapshot(self, exclusions, selector=None):
-            assert exclusions.patterns == ("*.log", "node_modules/")
+            assert exclusions.patterns == ("node_modules/", "*.log")
             snapshot = TreeSnapshot(
                 (
                     TreeEntry(

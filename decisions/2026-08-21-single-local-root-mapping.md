@@ -13,11 +13,9 @@ The `hls use` command and directory-context storage are removed. Commands can
 infer a project by locating the unique mapped local root containing their
 canonical current path.
 
-`hls map` accepts one optional `--exclude` value containing comma-separated,
-gitignore-style wildcard patterns. Patterns are evaluated against POSIX paths
-relative to the local root and apply to future listing, diff, push, and pull
-operations. Excluded paths remain outside synchronization scope and are not
-deleted remotely.
+`hls map` only establishes the root correspondence. Persistent synchronization
+scope is managed independently by the ordered rules described in the
+2026-08-22 command-prefix and synchronization-rules decision.
 
 ## Rationale
 
@@ -34,7 +32,5 @@ current-directory inference has exactly one answer.
 - Mapping an already-mapped project fails rather than replacing its root.
 - Overlap is detected when `hls map` learns the local root, not when `hls add`
   creates an unmapped project.
-- Exclusion patterns cannot contain commas, empty entries, `..`, or re-inclusion
-  syntax beginning with `!`.
 - The obsolete `~/.hls/contexts.json` file is ignored. The application does not
   delete it automatically.

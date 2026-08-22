@@ -4,8 +4,8 @@ Hook Line Sync (`hls`) is a Python CLI for transferring files between mapped
 local folders and remote servers over explicit FTP over TLS (FTPS).
 
 The project is in pre-alpha development. Configuration, connection, mapping,
-and tree inventory are available; comparison and file-transfer commands remain
-on the work queue in [`TODO.md`](TODO.md).
+tree inventory, comparison, and file transfer are available. Release packaging
+remains on the work queue in [`TODO.md`](TODO.md).
 
 ## Requirements
 
@@ -68,6 +68,11 @@ hls remove prod
 
 Removal does not connect to the server or delete remote files.
 
+Command names may be shortened to any unique prefix. For example, `hls con`
+means `hls connect`, while `hls comp` means `hls compare`. An ambiguous prefix
+is rejected and lists its candidates. The established `ls`, `lsl`, `lsr`, and
+`cmp` spellings remain available.
+
 List everything currently configured and mark the project whose local root
 contains the current directory:
 
@@ -94,16 +99,27 @@ under the remote root. Local roots may not overlap across projects, so future
 push and pull commands can determine the project and remote subdirectory from
 the current directory without ambient state.
 
-Exclude paths with one quoted, comma-separated list of gitignore-style wildcard
-patterns:
+Persist exclusions after mapping with one quoted, comma-separated list of
+gitignore-style wildcard patterns:
 
 ```console
-hls map prod --exclude '.git/,node_modules/,*.log,**/.cache/'
+hls exclude '.git/,node_modules/,*.log,**/.cache/'
+hls exc '*.bak'
 ```
 
-Patterns are relative to the local root. Empty patterns, `..` traversal, and
-gitignore re-inclusion patterns beginning with `!` are rejected. Commas cannot
-be used inside a pattern.
+Re-include narrower paths later by appending an ordered override:
+
+```console
+hls include 'node_modules/required-package/dist/**'
+hls inc 'var/generated/index.html'
+```
+
+The project is inferred from the current directory; use `--project <name>`
+elsewhere. Patterns are relative to the local root and evaluated in command
+order, so a later rule overrides an earlier matching rule. Excluded paths stay
+outside listing, comparison, push, pull, and remote pruning. Empty patterns,
+`..` traversal, and direct `!` input are rejected; `include` records the
+negation internally. Commas cannot be used inside a pattern.
 
 ## Tree inventories
 
