@@ -40,6 +40,12 @@ Unique-prefix resolution provides predictable shorthand without maintaining a
 growing alias table. Rejecting ambiguity prevents command meaning from silently
 changing when a new command is added.
 
+Compare, push, pull, exclude, and include register one shared pattern-operand
+grammar. It accepts shell-expanded argument lists, preserves quoted wildcards,
+and flattens comma-separated groups before command-specific validation. The
+shared declaration controls whether operands are optional or required; commands
+do not independently implement argument cardinality or normalization.
+
 ## Consequences
 
 - Stored `exclusions` remains an array in schema version 6, but order is now
@@ -47,6 +53,8 @@ changing when a new command is added.
 - Existing configurations remain valid; their previously persisted order is
   retained.
 - Direct command patterns cannot be empty, contain `..`, or begin with `!`.
+- Commas delimit operand groups consistently and therefore cannot address a
+  literal filename containing a comma.
 - Inclusion patterns with an indeterminate wildcard prefix may require scanning
   more excluded directories to preserve correctness, but never broaden the
   resulting synchronization scope.

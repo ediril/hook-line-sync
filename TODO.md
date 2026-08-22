@@ -22,6 +22,8 @@
   snapshots while keeping them absent from all transfer and prune plans.
 - [x] Accept shell-expanded multi-argument patterns consistently in exclude and
   include while retaining comma-separated pattern groups.
+- [x] Extract the common variadic pattern-operand grammar and normalization used
+  by compare, push, pull, exclude, and include.
 - [x] Remove the superseded directory-scoped `hls use` mechanism; project
   selection is inferred from non-overlapping local roots.
 - [x] Implement deterministic `hls list` / `hls ls` project inventory, including

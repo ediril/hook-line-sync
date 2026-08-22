@@ -26,8 +26,10 @@ def _validate_pattern(pattern: object) -> str:
     return normalized
 
 
-def rules_from_csv(value: str, *, include: bool) -> tuple[str, ...]:
-    patterns = tuple(_validate_pattern(item) for item in value.split(","))
+def rules_from_patterns(
+    values: tuple[str, ...], *, include: bool
+) -> tuple[str, ...]:
+    patterns = tuple(_validate_pattern(item) for item in values)
     if any(pattern.startswith("!") for pattern in patterns):
         raise ExclusionError("command patterns must not begin with '!'")
     if include:

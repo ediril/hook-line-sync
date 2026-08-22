@@ -19,7 +19,12 @@ from hls.config import (
     canonical_local_root,
     validate_project_name,
 )
-from hls.exclusions import ExclusionError, ExclusionSpec, rules_from_csv
+from hls.exclusions import ExclusionError, ExclusionSpec, rules_from_patterns
+from hls.pattern_operands import (
+    PatternOperandError,
+    add_pattern_operands,
+    normalize_pattern_operands,
+)
 from hls.selection import FileSelection, FileSelector, FileSelectorSet, SelectionError
 from hls.snapshot import SnapshotError, TreeSnapshot, snapshot_local
 from hls.transfer import TransferError, TransferResult, execute_transfer
@@ -94,10 +99,10 @@ def build_parser() -> argparse.ArgumentParser:
         ("include", "permanently re-include paths in synchronization"),
     ):
         rules_parser = subparsers.add_parser(command, help=help_text)
-        rules_parser.add_argument(
-            "patterns",
-            nargs="+",
-            help=(
+        add_pattern_operands(
+            rules_parser,
+            required=True,
+            help_text=(
                 "gitignore-style patterns or comma-separated pattern groups "
                 "relative to the local root"
             ),
@@ -142,10 +147,10 @@ def build_parser() -> argparse.ArgumentParser:
             "perspective."
         ),
     )
-    compare_parser.add_argument(
-        "selectors",
-        nargs="*",
-        help=(
+    add_pattern_operands(
+        compare_parser,
+        required=False,
+        help_text=(
             "relative file paths or wildcard patterns; defaults to the whole project"
         ),
     )
@@ -192,10 +197,10 @@ def build_parser() -> argparse.ArgumentParser:
             help=transfer_help[command],
             description=transfer_description[command],
         )
-        transfer_parser.add_argument(
-            "selectors",
-            nargs="*",
-            help=(
+        add_pattern_operands(
+            transfer_parser,
+            required=False,
+            help_text=(
                 "relative file paths or wildcard patterns; defaults to the whole "
                 "project"
             ),
@@ -289,10 +294,9 @@ def _change_exclusions(
     include: bool,
 ) -> str:
     configuration, name, _ = _resolve_project(arguments, store)
-    rules = tuple(
-        rule
-        for value in arguments.patterns
-        for rule in rules_from_csv(value, include=include)
+    rules = rules_from_patterns(
+        normalize_pattern_operands(arguments),
+        include=include,
     )
     configuration.append_exclusion_rules(name, rules)
     store.save(configuration)
@@ -426,7 +430,7 @@ def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection 
             project_root=root,
             current_directory=Path.cwd().resolve(strict=True),
         )
-        for value in arguments.selectors
+        for value in normalize_pattern_operands(arguments)
     )
     if not selectors:
         return None
@@ -617,6 +621,7 @@ def run(
     except (
         ConfigurationError,
         ExclusionError,
+        PatternOperandError,
         SelectionError,
         SnapshotError,
         TransportError,

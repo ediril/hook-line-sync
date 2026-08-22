@@ -73,6 +73,12 @@ means `hls connect`, while `hls comp` means `hls compare`. An ambiguous prefix
 is rejected and lists its candidates. The established `ls`, `lsl`, `lsr`, and
 `cmp` spellings remain available.
 
+Every path-pattern command uses the same operand grammar. Compare, push, and
+pull accept zero or more operands; exclude and include require at least one.
+Shell-expanded paths, quoted wildcards, multiple operands, and comma-separated
+groups are normalized consistently. A literal filename containing a comma
+cannot be addressed because commas delimit pattern groups.
+
 List everything currently configured and mark the project whose local root
 contains the current directory:
 
@@ -174,6 +180,7 @@ current directory:
 ```console
 hls compare index.html
 hls compare index.html app.js styles.css
+hls compare 'index.html,app.js,styles.css'
 hls compare *
 hls compare 'src/*.js'
 hls compare '**/*.css'
