@@ -9,6 +9,16 @@ projection of the complete local and remote project trees. By default it shows
 what `hls push` would do. `hls compare --pull` instead shows what `hls pull`
 would do. It replaces the planned `hls list diff` and push/pull `--dry` modes.
 
+CLI output is a compact status view relative to the selected side. The default
+local perspective uses `+` for local-only, `~` for modified, `-` for
+remote-only (missing locally), and `!` for conflicts. `--pull` selects the
+remote perspective, reversing which one-sided state receives `+` or `-` while
+leaving modified and conflict markers unchanged. Identical paths are omitted.
+
+Status lines use green, yellow, red, and magenta when stdout is a terminal.
+Color is disabled for redirected output and the `NO_COLOR` convention, with
+`--color auto|always|never` as an explicit override.
+
 Comparison derives upload, download, replace, delete, skip, conflict, and
 unchanged actions from local-only, remote-only, changed, type-conflict, and
 identical states. The local tree is authoritative for path existence. A
@@ -58,10 +68,10 @@ it locally.
 ## Rationale
 
 A single comparison command avoids separate dry modes on mutation commands.
-Push perspective is the default because the local tree is authoritative;
-`--pull` makes the less common reverse direction explicit. Action-oriented
-output answers what the corresponding command would do rather than requiring
-the user to translate neutral states.
+Local perspective is the default because the local tree is authoritative;
+`--pull` makes the less common remote perspective explicit. Compact symbolic
+output keeps large comparisons scannable while the shared internal plan retains
+the concrete transfer actions.
 
 Fresh snapshots prevent a stale comparison from being treated as an executable
 plan. Requiring `--prune-remote` separates evidence of deletion from

@@ -51,7 +51,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.local_root is None
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
-    assert __version__ == "0.8.22.3"
+    assert __version__ == "0.8.22.4"
 
     help_output = invoke(["help"], store)[1]
     assert "compare (cmp)       preview file changes without modifying anything" in (
@@ -294,9 +294,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "Building push plan...\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
-    assert "Push projection for project 'prod':\n" in push_comparison[1]
-    assert "upload         local-only" in push_comparison[1]
-    assert "skip           remote-only" in push_comparison[1]
+    assert "Local -> Remote for project 'prod':\n" in push_comparison[1]
+    assert "+  README.md\n" in push_comparison[1]
+    assert "-  deployed.html\n" in push_comparison[1]
+    assert "!  linked\n" in push_comparison[1]
     assert invoke(["cmp"], store) == push_comparison
 
     selected_comparison = invoke(["compare", "main.py"], store)
@@ -306,12 +307,17 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "README.md" not in selected_comparison[1]
     assert "deployed.html" not in selected_comparison[1]
 
+    colored_comparison = invoke(
+        ["compare", "main.py", "--color", "always"], store
+    )
+    assert "\033[32m+  src/main.py\033[0m" in colored_comparison[1]
+
     pull_comparison = invoke(["compare", "--pull", "-p"], store)
     assert pull_comparison[0] == 0
     assert pull_comparison[2].endswith("Building pull plan...\n")
-    assert "Pull projection for project 'prod':\n" in pull_comparison[1]
-    assert "delete-remote  remote-only" in pull_comparison[1]
-    assert "skip           local-only" in pull_comparison[1]
+    assert "Remote -> Local for project 'prod':\n" in pull_comparison[1]
+    assert "+  deployed.html\n" in pull_comparison[1]
+    assert "-  README.md\n" in pull_comparison[1]
 
     push_result = invoke(["push", "main.py"], store)
     assert push_result[0] == 0
@@ -329,7 +335,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
-    assert len(transports) == 9
+    assert len(transports) == 10
 
 
 def test_map_rejects_existing_and_overlapping_local_roots(

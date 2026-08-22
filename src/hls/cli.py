@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -86,7 +87,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="preview file changes without modifying anything",
         description=(
             "Preview file changes without modifying local or remote files. "
-            "Shows push actions by default; use --pull to preview pull actions."
+            "Shows the local perspective by default; use --pull for the remote "
+            "perspective."
         ),
     )
     compare_parser.add_argument(
@@ -102,13 +104,19 @@ def build_parser() -> argparse.ArgumentParser:
     compare_parser.add_argument(
         "--pull",
         action="store_true",
-        help="project pull actions instead of push actions",
+        help="show changes from the remote perspective",
     )
     compare_parser.add_argument(
         "-p",
         "--prune-remote",
         action="store_true",
         help="project deletion of remote-only paths",
+    )
+    compare_parser.add_argument(
+        "--color",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help="color status lines; defaults to auto detection",
     )
 
     transfer_help = {
@@ -293,16 +301,45 @@ def _comparison_kind(entry: ComparisonEntry) -> str:
     return entry.local_kind or entry.remote_kind or "unknown"
 
 
-def _format_comparison(name: str, plan: ComparisonPlan) -> str:
-    direction = plan.direction.capitalize()
+def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
+    if entry.action == "conflict":
+        return "!"
+    if entry.state == "changed":
+        return "~"
+    if direction == "push":
+        return "+" if entry.state == "local-only" else "-"
+    return "+" if entry.state == "remote-only" else "-"
+
+
+def _use_color(mode: str, output: TextIO) -> bool:
+    if mode == "always":
+        return True
+    if mode == "never" or "NO_COLOR" in os.environ:
+        return False
+    is_terminal = getattr(output, "isatty", None)
+    return bool(is_terminal and is_terminal())
+
+
+def _format_comparison(
+    name: str,
+    plan: ComparisonPlan,
+    *,
+    color: bool,
+) -> str:
+    perspective = "Local -> Remote" if plan.direction == "push" else "Remote -> Local"
     if not plan.differences:
-        return f"{direction} projection for project '{name}': no differences."
-    lines = [f"{direction} projection for project '{name}':"]
+        return f"{perspective} for project '{name}': no differences."
+    lines = [f"{perspective} for project '{name}':"]
+    colors = {
+        "+": "\033[32m",
+        "~": "\033[33m",
+        "-": "\033[31m",
+        "!": "\033[35m",
+    }
     for entry in plan.differences:
-        lines.append(
-            f"  {entry.action:<14} {entry.state:<16} "
-            f"{_comparison_kind(entry):<20} {entry.path}"
-        )
+        marker = _comparison_marker(entry, plan.direction)
+        line = f"{marker}  {entry.path}"
+        lines.append(f"{colors[marker]}{line}\033[0m" if color else line)
     return "\n".join(lines)
 
 
@@ -348,6 +385,7 @@ def _compare(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
     progress: TextIO,
+    output: TextIO,
 ) -> str:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
@@ -362,7 +400,11 @@ def _compare(
             direction="pull" if arguments.pull else "push",
             progress=progress,
         )
-    return _format_comparison(name, plan)
+    return _format_comparison(
+        name,
+        plan,
+        color=_use_color(arguments.color, output),
+    )
 
 
 def _format_transfer(name: str, result: TransferResult) -> str:
@@ -460,7 +502,7 @@ def run(
         elif arguments.command == "lsr":
             message = _list_remote(arguments, configuration_store)
         elif arguments.command in {"compare", "cmp"}:
-            message = _compare(arguments, configuration_store, stderr)
+            message = _compare(arguments, configuration_store, stderr, stdout)
         elif arguments.command in {"push", "pull"}:
             message = _transfer(arguments, configuration_store, stderr)
         elif arguments.command == "help":

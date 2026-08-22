@@ -165,10 +165,23 @@ Selectors are applied before local and remote snapshots are built. HLS descends
 only into directories that can contain a match: `*` scans the corresponding
 directory without recursion, while `**` permits recursive traversal.
 
-The projection reports uploads, directional replacements, conflicts, skipped
-paths, and remote deletions. Local path existence is authoritative, so a
+Compare uses a compact, perspective-relative status column:
+
+```text
++  present only on the selected side
+~  present on both sides but modified
+-  missing from the selected side
+!  type or symlink conflict
+```
+
+The default selected side is local; `--pull` reverses it to remote. Status lines
+are green, yellow, red, and magenta on terminals. Color is disabled when output
+is redirected or `NO_COLOR` is set, and can be controlled explicitly with
+`--color auto|always|never`.
+
+Local path existence remains authoritative for transfer behavior, so a
 remote-only path is skipped rather than restored or deleted by default. Include
-its remote deletion in the projection explicitly with:
+its remote deletion in the projected plan explicitly with:
 
 ```console
 hls compare --prune-remote
@@ -183,7 +196,7 @@ precision reported by the local filesystem and remote MLSD facts. Identical
 paths are omitted from the output.
 
 Compare prints immediately flushed progress milestones to stderr while it
-connects and scans. The final projection is written to stdout, so it can be
+connects and scans. The final status view is written to stdout, so it can be
 redirected without mixing status messages into the result.
 
 ## Push and pull
