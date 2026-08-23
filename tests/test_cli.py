@@ -67,6 +67,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     )
     assert "compare (cmp)" not in help_output
     assert "list (ls)" not in help_output
+    assert "explain" not in help_output
     assert "push                upload local changes to the remote project" in (
         help_output
     )
@@ -308,14 +309,6 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         "  8  include node_modules/package/**\n",
         "",
     )
-    assert invoke(["explain", "node_modules/package/nested.js"], store) == (
-        0,
-        "Rule decision for 'node_modules/package/nested.js' in project 'prod':\n"
-        "  2  exclude node_modules/**\n"
-        "  8  include node_modules/package/**  <- wins\n"
-        "  Effective: included by rule 8\n",
-        "",
-    )
     list_stdout = invoke(["list"], store)[1]
     assert "* prod\n" in list_stdout
     assert f"  Local root: {workspace}\n" in list_stdout
@@ -338,10 +331,6 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     updated = store.load().projects["prod"]
     assert 5 not in {rule.id for rule in updated.rules}
     assert updated.next_rule_id == 11
-    assert invoke(["explain", "composer.json"], store)[1].endswith(
-        "  10  include composer.json  <- wins\n"
-        "  Effective: included by rule 10\n"
-    )
     assert "project mapped to the current directory" not in list_stdout
 
 

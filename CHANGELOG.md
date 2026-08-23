@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.22.22 — 2026-08-22
+
+### Removed
+
+- Removed the unrequested `hls explain` rule-diagnostic command.
+
 ## 0.8.22.21 — 2026-08-22
 
 ### Changed

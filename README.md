@@ -181,13 +181,6 @@ any other unwanted rule by its stable ID:
 hls rules remove 3
 ```
 
-Explain every rule matching a particular path and identify the winner:
-
-```console
-hls explain AGENTS.md
-hls explain vendor/package/index.php
-```
-
 List the unified effective set of local files currently included in
 synchronization with:
 

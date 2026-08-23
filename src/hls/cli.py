@@ -45,7 +45,6 @@ CANONICAL_COMMANDS = (
     "include",
     "files",
     "rules",
-    "explain",
     "help",
     "version",
 )
@@ -143,16 +142,6 @@ def build_parser() -> argparse.ArgumentParser:
     rules_parser.add_argument("operation", nargs="?", choices=("remove",))
     rules_parser.add_argument("rule_id", nargs="?", type=int)
     rules_parser.add_argument(
-        "--project",
-        dest="project_name",
-        help="project name; inferred from the current directory when omitted",
-    )
-
-    explain_parser = subparsers.add_parser(
-        "explain", help="explain the effective rule decision for a path"
-    )
-    explain_parser.add_argument("path")
-    explain_parser.add_argument(
         "--project",
         dest="project_name",
         help="project name; inferred from the current directory when omitted",
@@ -484,37 +473,6 @@ def _manage_rules(
     )
 
 
-def _explain_rules(
-    arguments: argparse.Namespace,
-    store: ConfigurationStore,
-) -> str:
-    _, name, project = _resolve_project(arguments, store)
-    root = _require_local_root(name, project)
-    try:
-        selector = FileSelector.from_argument(
-            arguments.path,
-            project_root=root,
-            current_directory=Path.cwd().resolve(strict=True),
-        )
-    except SelectionError as error:
-        raise ConfigurationError(str(error)) from error
-    if "*" in selector.pattern:
-        raise ConfigurationError("explain requires one literal file or directory path")
-    evaluation = RuleSet(project.rules).evaluate(selector.pattern)
-    lines = [f"Rule decision for '{evaluation.path}' in project '{name}':"]
-    if not evaluation.matches:
-        lines.append("  No matching rules.")
-        lines.append("  Effective: included by default")
-        return "\n".join(lines)
-    winner = evaluation.winner
-    for rule in evaluation.matches:
-        suffix = "  <- wins" if rule is winner else ""
-        lines.append(f"  {rule.id}  {rule.action:<7} {rule.pattern}{suffix}")
-    effective = "excluded" if evaluation.excluded else "included"
-    lines.append(f"  Effective: {effective} by rule {winner.id}")
-    return "\n".join(lines)
-
-
 def _remove(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     configuration, name, _ = _resolve_project(arguments, store)
     del configuration.projects[name]
@@ -806,8 +764,6 @@ def run(
             message = _list_included_files(arguments, configuration_store)
         elif arguments.command == "rules":
             message = _manage_rules(arguments, configuration_store)
-        elif arguments.command == "explain":
-            message = _explain_rules(arguments, configuration_store)
         elif arguments.command == "remove":
             message = _remove(arguments, configuration_store)
         elif arguments.command == "list":

@@ -97,20 +97,6 @@ class SyncRule:
 
 
 @dataclass(frozen=True)
-class RuleEvaluation:
-    path: str
-    matches: tuple[SyncRule, ...]
-
-    @property
-    def winner(self) -> SyncRule | None:
-        return self.matches[-1] if self.matches else None
-
-    @property
-    def excluded(self) -> bool:
-        return self.winner is not None and self.winner.action == "exclude"
-
-
-@dataclass(frozen=True)
 class RuleSet:
     rules: tuple[SyncRule, ...] = ()
 
@@ -123,19 +109,18 @@ class RuleSet:
         if ids != tuple(sorted(ids)):
             raise RuleError("rules must be ordered by increasing id")
 
-    def evaluate(self, project_relative_path: str) -> RuleEvaluation:
+    def excludes(self, relative_path: str, *, is_directory: bool = False) -> bool:
+        del is_directory
+        project_relative_path = relative_path
         path = PurePosixPath(project_relative_path)
         if path.is_absolute() or not path.parts or ".." in path.parts:
             raise RuleError("evaluated paths must be non-empty project-relative paths")
         candidate = path.as_posix()
-        return RuleEvaluation(
-            candidate,
-            tuple(rule for rule in self.rules if rule.matches(candidate)),
+        winner = next(
+            (rule for rule in reversed(self.rules) if rule.matches(candidate)),
+            None,
         )
-
-    def excludes(self, relative_path: str, *, is_directory: bool = False) -> bool:
-        del is_directory
-        return self.evaluate(relative_path).excluded
+        return winner is not None and winner.action == "exclude"
 
     def may_include_descendant(self, relative_directory: str) -> bool:
         return any(
