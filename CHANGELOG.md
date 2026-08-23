@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.22.20 — 2026-08-22
+
+### Changed
+
+- `hls add` now proposes the current directory as the project's local root and
+  maps it immediately after confirmation; declining leaves the project
+  available for a later explicit `hls map`.
+- `hls map` now prompts before replacing an existing local root, defaults to
+  keeping it, and retains the project's relative synchronization rules when a
+  replacement is confirmed.
+
 ## 0.8.22.19 — 2026-08-22
 
 ### Changed

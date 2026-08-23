@@ -160,6 +160,19 @@ class ProjectConfiguration:
             next_rule_id=1,
         )
 
+    def with_replaced_local_root(self, local_root: str) -> ProjectConfiguration:
+        return ProjectConfiguration(
+            host=self.host,
+            remote_root=self.remote_root,
+            port=self.port,
+            username_env=self.username_env,
+            password_env=self.password_env,
+            type=self.type,
+            local_root=local_root,
+            rules=self.rules,
+            next_rule_id=self.next_rule_id,
+        )
+
     def with_rules(
         self,
         rules: tuple[SyncRule, ...],
@@ -289,6 +302,22 @@ class ApplicationConfiguration:
                     f"project '{other_name}' root '{other_root}'"
                 )
         self.projects[project_name] = project.with_local_root(local_root)
+
+    def remap_project(self, project_name: str, local_root: str) -> None:
+        project = self.projects[project_name]
+        if project.local_root is None:
+            raise ConfigurationError(f"project '{project_name}' has not been mapped")
+        root = Path(local_root)
+        for other_name, other in self.projects.items():
+            if other_name == project_name or other.local_root is None:
+                continue
+            other_root = Path(other.local_root)
+            if _paths_overlap(root, other_root):
+                raise ConfigurationError(
+                    f"local root '{root}' for project '{project_name}' overlaps "
+                    f"project '{other_name}' root '{other_root}'"
+                )
+        self.projects[project_name] = project.with_replaced_local_root(local_root)
 
     def append_rules(
         self,

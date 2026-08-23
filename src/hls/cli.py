@@ -80,7 +80,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=__version__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    add_parser = subparsers.add_parser("add", help="add an FTPS project")
+    add_parser = subparsers.add_parser(
+        "add", help="add an FTPS project and offer to map the current directory"
+    )
     add_parser.add_argument("project_name")
     add_parser.add_argument("--host", required=True)
     add_parser.add_argument("--remote-root", required=True)
@@ -95,7 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
     connect_parser.add_argument("project_name", nargs="?")
 
     map_parser = subparsers.add_parser(
-        "map", help="map the current directory to a project"
+        "map", help="map or remap the current directory to a project"
     )
     map_parser.add_argument("project_name")
 
@@ -264,9 +266,25 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _confirm(prompt: str, stdin: TextIO, stdout: TextIO) -> bool:
+    while True:
+        print(prompt, end="", file=stdout, flush=True)
+        answer = stdin.readline()
+        if answer == "":
+            raise ConfigurationError("confirmation requires yes or no")
+        normalized = answer.strip().lower()
+        if normalized in {"y", "yes"}:
+            return True
+        if normalized in {"", "n", "no"}:
+            return False
+        print("Please answer yes or no.", file=stdout)
+
+
 def _save_project(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
+    stdin: TextIO,
+    stdout: TextIO,
 ) -> str:
     name = validate_project_name(arguments.project_name)
     configuration = store.load()
@@ -289,8 +307,21 @@ def _save_project(
         ),
     )
     configuration.projects[name] = project
+    local_root = canonical_local_root(Path.cwd())
+    prompt = (
+        f"Map current directory '{local_root}' to "
+        f"'{name}:{project.remote_root}'? [y/N] "
+    )
+    if _confirm(prompt, stdin, stdout):
+        configuration.map_project(name, local_root)
+        message = (
+            f"Added FTPS project '{name}'.\n"
+            f"Mapped '{local_root}' to '{name}:{project.remote_root}'."
+        )
+    else:
+        message = f"Added FTPS project '{name}' without a local mapping."
     store.save(configuration)
-    return f"Added FTPS project '{name}'."
+    return message
 
 
 def _resolve_project(
@@ -319,9 +350,29 @@ def _connect(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     return f"Verified secure connectivity to project '{name}'."
 
 
-def _map(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+def _map(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    stdin: TextIO,
+    stdout: TextIO,
+) -> str:
     configuration, name, project = _resolve_project(arguments, store)
     local_root = canonical_local_root(Path.cwd())
+    if project.local_root == local_root:
+        return f"Project '{name}' is already mapped to '{local_root}'."
+    if project.local_root is not None:
+        prompt = (
+            f"Project '{name}' is mapped to '{project.local_root}'. Change it "
+            f"to '{local_root}'? [y/N] "
+        )
+        if not _confirm(prompt, stdin, stdout):
+            return f"Kept existing mapping '{project.local_root}' for '{name}'."
+        configuration.remap_project(name, local_root)
+        store.save(configuration)
+        return (
+            f"Remapped '{name}' from '{project.local_root}' "
+            f"to '{local_root}'."
+        )
     configuration.map_project(name, local_root)
     store.save(configuration)
     return f"Mapped '{local_root}' to '{name}:{project.remote_root}'."
@@ -717,6 +768,7 @@ def run(
     argv: Sequence[str] | None = None,
     *,
     store: ConfigurationStore | None = None,
+    stdin: TextIO = sys.stdin,
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
 ) -> int:
@@ -731,11 +783,11 @@ def run(
     configuration_store = store or ConfigurationStore()
     try:
         if arguments.command == "add":
-            message = _save_project(arguments, configuration_store)
+            message = _save_project(arguments, configuration_store, stdin, stdout)
         elif arguments.command == "connect":
             message = _connect(arguments, configuration_store)
         elif arguments.command == "map":
-            message = _map(arguments, configuration_store)
+            message = _map(arguments, configuration_store, stdin, stdout)
         elif arguments.command == "exclude":
             message = _change_rules(
                 arguments, configuration_store, include=False

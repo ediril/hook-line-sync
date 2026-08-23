@@ -60,6 +60,10 @@ Add a project with its FTPS endpoint and absolute remote root:
 hls add prod --host ftp.example.com --remote-root /public_html/site
 ```
 
+`hls add` proposes the current directory as the project's local root. Confirm
+the prompt to map it immediately, or decline to save the project without a
+mapping. The project is not saved if that local root overlaps another project.
+
 FTPS is the default and currently the only implemented protocol. The explicit
 form is `--protocol ftps`; unsupported protocols are rejected.
 
@@ -122,8 +126,8 @@ hls ls
 
 ## Local roots
 
-From the root of a local project, map its entire relative hierarchy to the
-project's remote root:
+If mapping was declined during `hls add`, run `hls map` later from the root of
+the local project:
 
 ```console
 cd ~/Sites/my-site
@@ -134,7 +138,10 @@ The current directory is canonicalized and persisted as the project's single
 local root. Every relative path underneath it maps to the same relative path
 under the remote root. Local roots may not overlap across projects, so future
 push and pull commands can determine the project and remote subdirectory from
-the current directory without ambient state.
+the current directory without ambient state. If the project is already mapped,
+`hls map` shows the existing and proposed roots and requires confirmation before
+replacing the mapping; no is the default. Existing relative synchronization
+rules are retained when the root changes.
 
 Persist exclusions after mapping with one or more HLS path patterns:
 

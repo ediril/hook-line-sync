@@ -9,10 +9,17 @@ from hls.rules import RuleSet, SyncRule
 from hls.snapshot import TreeEntry, TreeSnapshot, snapshot_local
 
 
-def invoke(arguments, store):
+def invoke(arguments, store, *, stdin="no\n"):
+    input_stream = io.StringIO(stdin)
     stdout = io.StringIO()
     stderr = io.StringIO()
-    status = run(arguments, store=store, stdout=stdout, stderr=stderr)
+    status = run(
+        arguments,
+        store=store,
+        stdin=input_stream,
+        stdout=stdout,
+        stderr=stderr,
+    )
     return status, stdout.getvalue(), stderr.getvalue()
 
 
@@ -37,7 +44,9 @@ def test_project_lifecycle_uses_production_credentials_and_version(
 
     assert (add_status, add_stdout, add_stderr) == (
         0,
-        "Added FTPS project 'client-site'.\n",
+        f"Map current directory '{tmp_path}' to "
+        "'client-site:/public_html/site'? [y/N] "
+        "Added FTPS project 'client-site' without a local mapping.\n",
         "",
     )
     assert (version_status, version_stdout, version_stderr) == (
@@ -79,6 +88,37 @@ def test_project_lifecycle_uses_production_credentials_and_version(
         "",
     )
     assert invoke(["list"], store)[1] == "No projects configured.\n"
+
+
+def test_add_maps_the_current_directory_after_confirmation(
+    tmp_path, monkeypatch
+) -> None:
+    store = ConfigurationStore(tmp_path / "configs.json")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+
+    result = invoke(
+        [
+            "add",
+            "prod",
+            "--host",
+            "ftp.example.com",
+            "--remote-root",
+            "/public_html",
+        ],
+        store,
+        stdin="yes\n",
+    )
+
+    assert result == (
+        0,
+        f"Map current directory '{workspace}' to 'prod:/public_html'? [y/N] "
+        "Added FTPS project 'prod'.\n"
+        f"Mapped '{workspace}' to 'prod:/public_html'.\n",
+        "",
+    )
+    assert store.load().projects["prod"].local_root == str(workspace)
 
 
 def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
@@ -482,7 +522,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert len(transports) == 11
 
 
-def test_map_rejects_existing_and_overlapping_local_roots(
+def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
     tmp_path, monkeypatch
 ) -> None:
     store = ConfigurationStore(tmp_path / "configs.json")
@@ -506,14 +546,29 @@ def test_map_rejects_existing_and_overlapping_local_roots(
 
     monkeypatch.chdir(root)
     assert invoke(["map", "prod"], store)[0] == 0
+    assert invoke(["exclude", "*.log"], store)[0] == 0
     monkeypatch.chdir(child)
     overlap_status, _, overlap_error = invoke(["map", "staging"], store)
     monkeypatch.chdir(separate)
-    existing_status, _, existing_error = invoke(["map", "prod"], store)
+    declined = invoke(["map", "prod"], store)
+    remapped = invoke(["map", "prod"], store, stdin="yes\n")
 
     assert overlap_status == 1
     assert "overlaps project 'prod'" in overlap_error
     assert str(root) in overlap_error and str(child) in overlap_error
-    assert existing_status == 1
-    assert "already mapped" in existing_error
+    assert declined == (
+        0,
+        f"Project 'prod' is mapped to '{root}'. Change it to '{separate}'? [y/N] "
+        f"Kept existing mapping '{root}' for 'prod'.\n",
+        "",
+    )
+    assert remapped == (
+        0,
+        f"Project 'prod' is mapped to '{root}'. Change it to '{separate}'? [y/N] "
+        f"Remapped 'prod' from '{root}' to '{separate}'.\n",
+        "",
+    )
+    remapped_project = store.load().projects["prod"]
+    assert remapped_project.local_root == str(separate)
+    assert remapped_project.rules == (SyncRule(1, "exclude", "*.log"),)
     assert store.load().projects["staging"].local_root is None
