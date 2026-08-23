@@ -324,8 +324,8 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     local_view = invoke(["list"], store)
     assert local_view[0] == 0 and local_view[2] == ""
     assert "    node_modules/keep.js\n" in local_view[1]
-    assert "!   composer.json\n" in local_view[1]
-    assert "!   docs/note.txt\n" in local_view[1]
+    assert "x   composer.json\n" in local_view[1]
+    assert "x   docs/note.txt\n" in local_view[1]
     assert invoke(["exc"], store) == (
         0,
         "Exclusion rules for project 'prod':\n"
@@ -500,11 +500,11 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "Local tree for project 'prod':\n"
         "    README.md\n"
         "    linked\n"
-        "! d node_modules\n"
-        "!   node_modules/package.js\n"
+        "x d node_modules\n"
+        "x   node_modules/package.js\n"
         "    same.txt\n"
         "  d src\n"
-        "!   src/debug.log\n"
+        "x   src/debug.log\n"
         "    src/main.py\n",
         "",
     )
@@ -513,10 +513,14 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert invoke(["list", "*"], store) == (
         0,
         "Local tree for project 'prod':\n"
-        "!   src/debug.log\n"
+        "x   src/debug.log\n"
         "    src/main.py\n",
         "",
     )
+    colored_list = invoke(["list", "--color", "always"], store)
+    assert "\033[90mx   src/debug.log\033[0m" in colored_list[1]
+    assert "  \033[94md src\033[0m" in colored_list[1]
+    assert "\033[90mx\033[0m \033[34md node_modules\033[0m" in colored_list[1]
     push_comparison = invoke(["diff"], store)
     push_progress = (
         "Checking differences for project 'prod'...\n"

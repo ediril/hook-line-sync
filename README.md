@@ -223,12 +223,15 @@ hls list 'vendor/**'
 ```
 
 `hls list` inspects only the mapped local root and does not connect to FTPS.
-Directories use a `d` type marker and excluded paths use `!`; included files
+Directories use a `d` type marker and excluded paths use `x`; included files
 leave both columns blank. Use `--project <name>` when outside a mapped root.
 Path operands use the same current-directory-relative selector syntax as diff:
 `*` selects one level, `.` selects the current subtree, and `**` is recursive.
 Quoted and shell-expanded wildcards both work, and unrelated directories are
-not traversed. `hls ls` remains an unadvertised compatibility spelling.
+not traversed. On terminals, included directories are bright blue, excluded
+directories are darker blue, and excluded files are gray. Use
+`--color auto|always|never` to control coloring. `hls ls` remains an
+unadvertised compatibility spelling.
 
 Re-include narrower paths later by appending an ordered override:
 

@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Use `x` and diff-consistent terminal coloring for excluded paths in
+  `hls list`.
 - [x] Align the homepage mini-diff with the push-only pruning markers.
 - [x] Simplify inspection commands and make remote comparison interruptible:
   - [x] Use `profiles` for configured entries and `list` for the complete local

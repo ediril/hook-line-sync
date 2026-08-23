@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.23.14 — 2026-08-23
+
+### Changed
+
+- Changed the local-list exclusion marker from `!` to `x` and applied the same
+  automatic directory and exclusion coloring used by diff, with explicit
+  `--color auto|always|never` control.
+
 ## 0.8.23.13 — 2026-08-23
 
 ### Changed

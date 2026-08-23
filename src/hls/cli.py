@@ -245,6 +245,12 @@ def build_parser() -> argparse.ArgumentParser:
         dest="project_name",
         help="project name; inferred from the current directory when omitted",
     )
+    list_parser.add_argument(
+        "--color",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help="color paths; defaults to auto detection",
+    )
 
     diff_parser = subparsers.add_parser(
         "diff",
@@ -609,7 +615,11 @@ def _require_local_root(name: str, project: ProjectConfiguration) -> Path:
     return Path(project.local_root)
 
 
-def _list_local(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
+def _list_local(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    output: TextIO,
+) -> str:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
     selector = _file_selection(arguments, root)
@@ -624,10 +634,19 @@ def _list_local(arguments: argparse.Namespace, store: ConfigurationStore) -> str
     if not snapshot.entries:
         return f"Local tree for project '{name}' is empty."
     lines = [f"Local tree for project '{name}':"]
+    color = _use_color(arguments.color, output)
     for entry in snapshot.entries:
-        marker = "!" if entry.excluded else " "
-        kind = "d" if entry.kind == "directory" else " "
-        lines.append(f"{marker} {kind} {entry.path}")
+        marker = "x" if entry.excluded else " "
+        lines.append(
+            _format_path_line(
+                marker,
+                directory=entry.kind == "directory",
+                path=entry.path,
+                color=color,
+                marker_color="\033[90m" if entry.excluded else None,
+                excluded=entry.excluded,
+            )
+        )
     return "\n".join(lines)
 
 
@@ -671,6 +690,30 @@ def _use_color(mode: str, output: TextIO) -> bool:
     return bool(is_terminal and is_terminal())
 
 
+def _format_path_line(
+    marker: str,
+    *,
+    directory: bool,
+    path: str,
+    color: bool,
+    marker_color: str | None,
+    excluded: bool,
+) -> str:
+    kind = "d" if directory else " "
+    line = f"{marker} {kind} {path}"
+    if not color:
+        return line
+    if directory:
+        directory_color = "\033[34m" if excluded else "\033[94m"
+        colored_marker = (
+            f"{marker_color}{marker}\033[0m" if marker_color else marker
+        )
+        return f"{colored_marker} {directory_color}d {path}\033[0m"
+    if marker_color:
+        return f"{marker_color}{line}\033[0m"
+    return line
+
+
 def _format_comparison_entries(
     entries: Sequence[ComparisonEntry],
     direction: str,
@@ -690,18 +733,16 @@ def _format_comparison_entries(
     for entry in entries:
         marker = _comparison_marker(entry, direction)
         directory = _comparison_entry_kind(entry, direction) == "directory"
-        kind = "d" if directory else " "
-        line = f"{marker} {kind} {entry.path}"
-        if not color:
-            lines.append(line)
-        elif directory:
-            directory_color = "\033[34m" if entry.action == "excluded" else "\033[94m"
-            lines.append(
-                f"{colors[marker]}{marker}\033[0m "
-                f"{directory_color}d {entry.path}\033[0m"
+        lines.append(
+            _format_path_line(
+                marker,
+                directory=directory,
+                path=entry.path,
+                color=color,
+                marker_color=colors[marker],
+                excluded=entry.action == "excluded",
             )
-        else:
-            lines.append(f"{colors[marker]}{line}\033[0m")
+        )
     return tuple(lines)
 
 
@@ -1078,7 +1119,7 @@ def run(
         elif arguments.command == "profiles":
             message = _list_profiles(configuration_store)
         elif arguments.command == "list":
-            message = _list_local(arguments, configuration_store)
+            message = _list_local(arguments, configuration_store, stdout)
         elif arguments.command == "diff":
             _diff(arguments, configuration_store, stderr, stdout)
             message = None
