@@ -280,11 +280,11 @@ hls diff '**/*.css'
 ```
 
 An unquoted wildcard may be expanded by the shell into multiple arguments; HLS
-treats them as one union. Directories included by that expansion do not cause
-recursion. Quote a wildcard when HLS should interpret it itself. `*` stays
-within one path segment and `**` matches recursively. A selection whose entire
-union is unmatched or excluded, or that contains an absolute or
-parent-traversing path, is rejected. Use
+treats them as one union. Selected directories appear as entries, but their
+contents are not scanned unless the selector is recursive. Quote a wildcard
+when HLS should interpret it itself. `*` stays within one path segment and `**`
+matches recursively. A selection whose entire union is unmatched or excluded,
+or that contains an absolute or parent-traversing path, is rejected. Use
 `--project <name>` to select a project explicitly; outside that project's local
 root, its selectors are project-root-relative.
 

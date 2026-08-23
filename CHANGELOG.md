@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.22.25 — 2026-08-22
+
+### Fixed
+
+- `hls diff *` now includes matching directory entries while retaining
+  non-recursive traversal for non-recursive selectors.
+
 ## 0.8.22.24 — 2026-08-22
 
 ### Changed

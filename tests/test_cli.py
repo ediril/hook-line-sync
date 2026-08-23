@@ -476,7 +476,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert expanded_comparison[0] == 0
     assert "+  README.md\n" in expanded_comparison[1]
     assert "+  src/main.py\n" in expanded_comparison[1]
-    assert "+  src\n" not in expanded_comparison[1]
+    assert "+  src\n" in expanded_comparison[1]
     monkeypatch.chdir(source)
 
     colored_comparison = invoke(["diff", "*", "--color", "always"], store)

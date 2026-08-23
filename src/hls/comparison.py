@@ -84,13 +84,8 @@ def build_comparison(
     for path in sorted(local_entries.keys() | remote_entries.keys()):
         local_entry = local_entries.get(path)
         remote_entry = remote_entries.get(path)
-        if selector is not None:
-            is_file = any(
-                entry is not None and entry.kind == "file"
-                for entry in (local_entry, remote_entry)
-            )
-            if not is_file or not selector.matches(path):
-                continue
+        if selector is not None and not selector.matches(path):
+            continue
         if any(
             entry is not None and entry.excluded
             for entry in (local_entry, remote_entry)
@@ -161,6 +156,6 @@ def build_comparison(
 
     if selector is not None and not comparison:
         raise SelectionError(
-            f"file selector '{selector.pattern}' matched no files"
+            f"file selector '{selector.pattern}' matched no paths"
         )
     return ComparisonPlan(direction, prune_remote, tuple(comparison))

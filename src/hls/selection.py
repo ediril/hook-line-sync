@@ -7,7 +7,7 @@ from pathlib import Path, PurePosixPath
 
 
 class SelectionError(ValueError):
-    """Raised when a file selector is unsafe or matches no files."""
+    """Raised when a file selector is unsafe or matches no paths."""
 
 
 @cache
