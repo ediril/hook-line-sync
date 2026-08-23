@@ -61,5 +61,9 @@ def test_store_rejects_an_unknown_schema_version(tmp_path) -> None:
     path = tmp_path / "configs.json"
     path.write_text('{"version": 6, "projects": {}}')
 
-    with pytest.raises(ConfigurationError, match="unsupported configuration version"):
+    message = (
+        r"config version mismatch \(found 6, expected 7\); rules format "
+        r"changed—recreate config"
+    )
+    with pytest.raises(ConfigurationError, match=message):
         ConfigurationStore(path).load()

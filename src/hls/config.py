@@ -353,7 +353,8 @@ class ApplicationConfiguration:
             raise ConfigurationError("configuration document must be an object")
         if value.get("version") != CONFIG_VERSION:
             raise ConfigurationError(
-                f"unsupported configuration version: {value.get('version')!r}"
+                f"config version mismatch (found {value.get('version')!r}, "
+                f"expected {CONFIG_VERSION}); rules format changed—recreate config"
             )
         if set(value) != {"version", "projects"}:
             raise ConfigurationError("configuration has unknown or missing fields")

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.22.19 — 2026-08-22
+
+### Changed
+
+- Shortened the schema-mismatch diagnostic while retaining its cause and
+  recovery action.
+
+## 0.8.22.18 — 2026-08-22
+
+### Changed
+
+- Configuration schema mismatch errors now report the stored and required
+  versions, explain that synchronization-rule storage changed, and identify
+  configuration recreation as the required recovery.
+
 ## 0.8.22.17 — 2026-08-22
 
 ### Added
