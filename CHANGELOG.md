@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.23.4 — 2026-08-23
+
+### Changed
+
+- Repositioned the project website around the gap between manual FTP uploads
+  and full deployment infrastructure, replaced abstract copy with concrete HLS
+  behavior, and removed placeholder Field Notes that were not standalone
+  articles.
+
+## 0.8.23.3 — 2026-08-23
+
+### Added
+
+- Added a responsive PHP 8.3 project website for Apache shared hosting, with a
+  terminal-inspired product overview, workflow, design principles, field-note
+  previews, open-source support positioning, and deployment configuration.
+- Extended release identity validation to prevent the standalone website from
+  displaying a package version that has drifted from the CLI.
+
 ## 0.8.23.2 — 2026-08-23
 
 ### Changed

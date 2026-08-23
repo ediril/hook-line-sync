@@ -52,6 +52,10 @@ python -m pip install hook-line-sync
 Maintainer release instructions are in
 [`RELEASING.md`](https://github.com/ediril/hook-line-sync/blob/main/RELEASING.md).
 
+The deployable PHP 8.3 project website lives in [`website/`](website/README.md).
+That directory is self-contained and can be used directly as an Apache document
+root on shared hosting.
+
 ## Projects
 
 Add a project with its FTPS endpoint and absolute remote root:
