@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.23.7 — 2026-08-23
+
+### Changed
+
+- Replaced ambiguous generated usage for `hls list`, `hls exclude`, and `hls
+  include` with explicit valid command forms.
+
+## 0.8.23.6 — 2026-08-23
+
+### Changed
+
+- Replaced the ambiguous generated `hls rules` usage with explicit list and
+  remove forms, and documented the role of each positional argument.
+
 ## 0.8.23.5 — 2026-08-23
 
 ### Changed

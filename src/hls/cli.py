@@ -118,10 +118,19 @@ def build_parser() -> argparse.ArgumentParser:
             "inclusion",
         ),
     ):
-        rules_parser = subparsers.add_parser(command, help=help_text)
+        rules_parser = subparsers.add_parser(
+            command,
+            help=help_text,
+            usage=(
+                f"hls {command} [PATH ...] [--project PROJECT_NAME]\n"
+                f"       hls {command} --pattern PATTERN ... "
+                "[--project PROJECT_NAME]"
+            ),
+        )
         add_pattern_operands(
             rules_parser,
             required=False,
+            metavar="PATH",
             help_text=(
                 "local paths, wildcard expressions, or comma-separated groups; "
                 f"omit to list {rule_name} rules"
@@ -148,10 +157,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     rules_parser = subparsers.add_parser(
-        "rules", help="list or remove synchronization rules"
+        "rules",
+        help="list or remove synchronization rules",
+        usage=(
+            "hls rules [--project PROJECT_NAME]\n"
+            "       hls rules remove RULE_ID [--project PROJECT_NAME]"
+        ),
+        description=(
+            "List synchronization rules, or remove one rule by its numeric ID."
+        ),
     )
-    rules_parser.add_argument("operation", nargs="?", choices=("remove",))
-    rules_parser.add_argument("rule_id", nargs="?", type=int)
+    rules_parser.add_argument(
+        "operation",
+        nargs="?",
+        choices=("remove",),
+        metavar="remove",
+        help="remove one rule; omit to list rules",
+    )
+    rules_parser.add_argument(
+        "rule_id",
+        nargs="?",
+        type=int,
+        metavar="RULE_ID",
+        help="numeric rule ID required by remove",
+    )
     rules_parser.add_argument(
         "--project",
         dest="project_name",
@@ -161,14 +190,32 @@ def build_parser() -> argparse.ArgumentParser:
     remove_parser = subparsers.add_parser("remove", help="remove a project")
     remove_parser.add_argument("project_name")
 
-    list_parser = subparsers.add_parser("list", help="list configured projects")
+    list_parser = subparsers.add_parser(
+        "list",
+        help="list configured projects or a project's local or remote tree",
+        usage=(
+            "hls list [projects]\n"
+            "       hls list local [PROJECT]\n"
+            "       hls list remote [PROJECT]"
+        ),
+        description=(
+            "List configured projects, or list the local or remote tree for one "
+            "project."
+        ),
+    )
     list_parser.add_argument(
         "target",
         nargs="?",
         choices=("projects", "local", "remote"),
         default="projects",
+        help="projects lists configurations; local or remote lists a tree",
     )
-    list_parser.add_argument("project_name", nargs="?")
+    list_parser.add_argument(
+        "project_name",
+        nargs="?",
+        metavar="PROJECT",
+        help="optional with local or remote; inferred from the current directory",
+    )
 
     local_list_parser = subparsers.add_parser(
         "lsl", help="list the local tree for a mapped project"

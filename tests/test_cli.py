@@ -76,6 +76,19 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     )
     assert pull_help in help_output
     assert "usage: hls diff" in invoke(["help", "d"], store)[1]
+    rules_help = invoke(["help", "rules"], store)[1]
+    assert "hls rules [--project PROJECT_NAME]" in rules_help
+    assert "hls rules remove RULE_ID [--project PROJECT_NAME]" in rules_help
+    assert "[{remove}] [rule_id]" not in rules_help
+    list_help = invoke(["help", "list"], store)[1]
+    assert "hls list [projects]" in list_help
+    assert "hls list local [PROJECT]" in list_help
+    assert "hls list remote [PROJECT]" in list_help
+    assert "[{projects,local,remote}] [project_name]" not in list_help
+    for command in ("exclude", "include"):
+        rule_help = invoke(["help", command], store)[1]
+        assert f"hls {command} [PATH ...]" in rule_help
+        assert f"hls {command} --pattern PATTERN ..." in rule_help
 
     list_status, list_stdout, list_stderr = invoke(["list"], store)
     assert (list_status, list_stderr) == (0, "")

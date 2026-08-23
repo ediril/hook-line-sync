@@ -12,11 +12,12 @@ def add_pattern_operands(
     *,
     required: bool,
     help_text: str,
+    metavar: str = "pattern",
 ) -> None:
     parser.add_argument(
         "pattern_operands",
         nargs="+" if required else "*",
-        metavar="pattern",
+        metavar=metavar,
         help=help_text,
     )
 

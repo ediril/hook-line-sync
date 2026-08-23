@@ -1,3 +1,3 @@
 """Hook Line Sync."""
 
-__version__ = "0.8.23.5"
+__version__ = "0.8.23.7"
