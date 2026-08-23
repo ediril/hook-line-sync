@@ -47,6 +47,7 @@ CANONICAL_COMMANDS = (
     "connect",
     "map",
     "remove",
+    "profile",
     "profiles",
     "list",
     "diff",
@@ -61,7 +62,12 @@ CANONICAL_COMMANDS = (
 COMMAND_ALIASES = {"ls": "list"}
 
 
-def _resolve_command_name(value: str) -> str:
+def _resolve_command_name(
+    value: str,
+    *,
+    stdin: TextIO | None = None,
+    stdout: TextIO | None = None,
+) -> str:
     if value in CANONICAL_COMMANDS:
         return value
     if value in COMMAND_ALIASES:
@@ -72,6 +78,28 @@ def _resolve_command_name(value: str) -> str:
     if not matches:
         raise ConfigurationError(f"unknown command '{value}'")
     if len(matches) > 1:
+        is_terminal = getattr(stdin, "isatty", None)
+        if stdin is not None and stdout is not None and is_terminal and is_terminal():
+            print(f"'{value}' matches multiple commands:\n", file=stdout)
+            for index, command in enumerate(matches, start=1):
+                print(f"  {index}. {command}", file=stdout)
+            while True:
+                print(
+                    f"\nChoose a command [1-{len(matches)}]: ",
+                    end="",
+                    file=stdout,
+                    flush=True,
+                )
+                answer = stdin.readline()
+                if answer == "":
+                    raise ConfigurationError("command selection cancelled")
+                try:
+                    selection = int(answer.strip())
+                except ValueError:
+                    selection = 0
+                if 1 <= selection <= len(matches):
+                    return matches[selection - 1]
+                print("Enter one of the listed numbers.", file=stdout)
         raise ConfigurationError(
             f"ambiguous command '{value}': {', '.join(matches)}"
         )
@@ -184,6 +212,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     remove_parser = subparsers.add_parser("remove", help="remove a project")
     remove_parser.add_argument("project_name")
+
+    profile_parser = subparsers.add_parser(
+        "profile", help="show details for one profile"
+    )
+    profile_parser.add_argument(
+        "project_name",
+        nargs="?",
+        metavar="PROFILE",
+        help="profile name; inferred from the current directory when omitted",
+    )
 
     subparsers.add_parser("profiles", help="list configured profiles")
 
@@ -521,24 +559,29 @@ def _list_profiles(store: ConfigurationStore) -> str:
 
     active = configuration.project_for_path(Path.cwd().resolve(strict=True))
     active_name = active[0] if active is not None else None
-    lines: list[str] = []
-    for name, project in sorted(configuration.projects.items()):
-        marker = "*" if name == active_name else "-"
-        lines.append(f"{marker} {name}")
-        lines.append(f"  FTPS: {project.host}:{project.port}")
-        lines.append(f"  Remote root: {project.remote_root}")
-        lines.append(f"  Local root: {project.local_root or 'not mapped'}")
-        if project.rules:
-            lines.append("  Rules:")
-            width = len(str(project.rules[-1].id))
-            lines.extend(
-                f"    {rule.id:>{width}}  {rule.action:<7} "
-                f"{_format_rule_expression(rule)}"
-                for rule in project.rules
-            )
-        else:
-            lines.append("  Rules: none")
-    return "\n".join(lines)
+    return "\n".join(
+        f"{'*' if name == active_name else ' '} {name}"
+        for name in sorted(configuration.projects)
+    )
+
+
+def _show_profile(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+) -> str:
+    _, name, project = _resolve_project(arguments, store)
+    return "\n".join(
+        (
+            f"Profile '{name}':",
+            f"  Protocol: {project.type.upper()}",
+            f"  Host: {project.host}:{project.port}",
+            f"  Remote root: {project.remote_root}",
+            f"  Local root: {project.local_root or 'not mapped'}",
+            f"  Username env: {project.username_env}",
+            f"  Password env: {project.password_env}",
+            f"  Rules: {len(project.rules)}",
+        )
+    )
 
 
 def _require_local_root(name: str, project: ProjectConfiguration) -> Path:
@@ -949,7 +992,12 @@ def _transfer(
     return _format_transfer(name, result)
 
 
-def _show_help(parser: argparse.ArgumentParser, topic: str | None) -> str:
+def _show_help(
+    parser: argparse.ArgumentParser,
+    topic: str | None,
+    stdin: TextIO,
+    stdout: TextIO,
+) -> str:
     if topic is None:
         return parser.format_help().rstrip()
     subparser = next(
@@ -957,7 +1005,7 @@ def _show_help(parser: argparse.ArgumentParser, topic: str | None) -> str:
         for action in parser._actions
         if isinstance(action, argparse._SubParsersAction)
     )
-    resolved = _resolve_command_name(topic)
+    resolved = _resolve_command_name(topic, stdin=stdin, stdout=stdout)
     return subparser.choices[resolved].format_help().rstrip()
 
 
@@ -973,7 +1021,11 @@ def run(
     raw_arguments = list(sys.argv[1:] if argv is None else argv)
     if raw_arguments and not raw_arguments[0].startswith("-"):
         try:
-            raw_arguments[0] = _resolve_command_name(raw_arguments[0])
+            raw_arguments[0] = _resolve_command_name(
+                raw_arguments[0],
+                stdin=stdin,
+                stdout=stdout,
+            )
         except ConfigurationError as error:
             parser.error(str(error))
     arguments = parser.parse_args(raw_arguments)
@@ -995,6 +1047,8 @@ def run(
             message = _manage_rules(arguments, configuration_store)
         elif arguments.command == "remove":
             message = _remove(arguments, configuration_store)
+        elif arguments.command == "profile":
+            message = _show_profile(arguments, configuration_store)
         elif arguments.command == "profiles":
             message = _list_profiles(configuration_store)
         elif arguments.command == "list":
@@ -1005,7 +1059,7 @@ def run(
         elif arguments.command in {"push", "pull"}:
             message = _transfer(arguments, configuration_store, stderr)
         elif arguments.command == "help":
-            message = _show_help(parser, arguments.topic)
+            message = _show_help(parser, arguments.topic, stdin, stdout)
         elif arguments.command == "version":
             message = __version__
         else:

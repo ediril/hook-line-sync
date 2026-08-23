@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.23.11 — 2026-08-23
+
+### Added
+
+- Added `hls profile [PROFILE]` for inferred or explicitly selected profile
+  details.
+- Added a central interactive chooser for ambiguous command prefixes, with
+  noninteractive ambiguity remaining a safe error.
+
+### Changed
+
+- Reduced `hls profiles` to a minimal name list with `*` marking the profile
+  containing the current directory.
+
 ## 0.8.23.10 — 2026-08-23
 
 ### Added

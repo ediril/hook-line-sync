@@ -6,6 +6,9 @@
   - [x] Stream diff results one deterministic directory at a time.
   - [x] Add `--all` for unchanged and excluded paths.
   - [x] Add stateless `--paged` and `--resume` directory cursors.
+- [x] Split profile inspection into a minimal `profiles` list and detailed
+  `profile [PROFILE]` view, and interactively resolve ambiguous command prefixes
+  without guessing in noninteractive use.
 - [x] Complete packaging documentation, release checks, and PyPI publication
   preparation:
   - [x] Define the concrete support and service benefits of the voluntary

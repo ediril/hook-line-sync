@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.23.10';
+$version = '0.8.23.11';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 

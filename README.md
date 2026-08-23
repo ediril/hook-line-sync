@@ -126,6 +126,25 @@ contains the current directory:
 hls profiles
 ```
 
+The active profile is marked with `*`; other profile names are printed without
+connection details. Inspect the current profile inferred from the working
+directory, or name one explicitly from anywhere:
+
+```console
+hls profile
+hls profile staging
+```
+
+The detail view shows protocol, host and port, local and remote roots,
+credential environment-variable names, and the number of synchronization
+rules. It never displays credential values; use `hls rules` to inspect the
+rules themselves.
+
+When a command prefix matches more than one command, an interactive terminal
+lists the candidates and requires a numbered choice with no default. A
+noninteractive invocation fails with the candidate list instead of waiting for
+input or guessing, which keeps scripts safe.
+
 ## Local roots
 
 If mapping was declined during `hls add`, run `hls map` later from the root of

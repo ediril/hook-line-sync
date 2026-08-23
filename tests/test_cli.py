@@ -9,8 +9,13 @@ from hls.rules import RuleSet, SyncRule
 from hls.snapshot import TreeEntry, TreeSnapshot, snapshot_local
 
 
+class TerminalInput(io.StringIO):
+    def isatty(self) -> bool:
+        return True
+
+
 def invoke(arguments, store, *, stdin="no\n"):
-    input_stream = io.StringIO(stdin)
+    input_stream = stdin if hasattr(stdin, "readline") else io.StringIO(stdin)
     stdout = io.StringIO()
     stderr = io.StringIO()
     status = run(
@@ -83,6 +88,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert "hls rules [--project PROJECT_NAME]" in rules_help
     assert "hls rules remove RULE_ID [--project PROJECT_NAME]" in rules_help
     assert "[{remove}] [rule_id]" not in rules_help
+    assert "profile             show details for one profile" in help_output
     assert "profiles            list configured profiles" in help_output
     assert "list                list the mapped local tree" in help_output
     for command in ("exclude", "include"):
@@ -92,8 +98,19 @@ def test_project_lifecycle_uses_production_credentials_and_version(
 
     list_status, list_stdout, list_stderr = invoke(["profiles"], store)
     assert (list_status, list_stderr) == (0, "")
-    assert "- client-site\n" in list_stdout
-    assert "  Local root: not mapped\n" in list_stdout
+    assert list_stdout == "  client-site\n"
+    assert invoke(["profile", "client-site"], store) == (
+        0,
+        "Profile 'client-site':\n"
+        "  Protocol: FTPS\n"
+        "  Host: ftp.example.com:21\n"
+        "  Remote root: /public_html/site\n"
+        "  Local root: not mapped\n"
+        "  Username env: PROD_FTPS_USERNAME\n"
+        "  Password env: PROD_FTPS_PASSWORD\n"
+        "  Rules: 0\n",
+        "",
+    )
 
     assert invoke(["remove", "client-site"], store) == (
         0,
@@ -155,6 +172,16 @@ def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
         run(["add", "unsafe", "--host", "ftp.example.com"], store=store)
     with pytest.raises(SystemExit):
         run(["p"], store=store)
+
+    selected = invoke(["prof"], store, stdin=TerminalInput("2\n"))
+    assert selected == (
+        0,
+        "'prof' matches multiple commands:\n\n"
+        "  1. profile\n"
+        "  2. profiles\n"
+        "\nChoose a command [1-2]:   prod\n",
+        "",
+    )
 
 
 def test_add_supports_explicit_protocol_port_and_environment_names(tmp_path) -> None:
@@ -320,11 +347,9 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     )
     list_stdout = invoke(["profiles"], store)[1]
     assert "* prod\n" in list_stdout
-    assert f"  Local root: {workspace}\n" in list_stdout
-    assert "  Rules:\n" in list_stdout
-    assert "    1  exclude .git/**\n" in list_stdout
-    assert "    8  include node_modules/package/**\n" in list_stdout
-    assert "    9  exclude ./docs/note.txt\n" in list_stdout
+    profile_stdout = invoke(["profile"], store)[1]
+    assert f"  Local root: {workspace}\n" in profile_stdout
+    assert "  Rules: 9\n" in profile_stdout
     assert invoke(["rules", "remove", "8"], store) == (
         0,
         "Removed rule 8 from project 'prod': include node_modules/package/**\n",
@@ -340,7 +365,7 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     updated = store.load().projects["prod"]
     assert 5 not in {rule.id for rule in updated.rules}
     assert updated.next_rule_id == 11
-    assert "project mapped to the current directory" not in list_stdout
+    assert "project mapped to the current directory" not in profile_stdout
 
 
 def test_current_project_inference_drives_connect_and_tree_listings(
