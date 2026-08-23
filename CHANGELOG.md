@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.23.2 — 2026-08-23
+
+### Changed
+
+- Include and exclude now expand quoted and unquoted wildcard operands into the
+  same exact local paths; the new `--pattern` flag explicitly records reusable
+  wildcard rules.
+
 ## 0.8.23.1 — 2026-08-23
 
 ### Changed

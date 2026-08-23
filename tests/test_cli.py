@@ -212,10 +212,10 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
 
     status, stdout, stderr = invoke(["m", "prod"], store)
     exclude_result = invoke(
-        ["exc", ".git/, node_modules/,*.log,**/.cache/"], store
+        ["exc", "--pattern", ".git/, node_modules/,*.log,**/.cache/"], store
     )
     expanded_exclude_result = invoke(
-        ["exc", "composer.json", "composer.lock"], store
+        ["exc", "composer.*"], store
     )
     include_result = invoke(["inc", "node_modules/keep.js"], store)
     directory_include_result = invoke(["inc", "node_modules/package"], store)
@@ -364,7 +364,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
     monkeypatch.chdir(workspace)
     assert invoke(["map", "prod"], store)[0] == 0
-    assert invoke(["exclude", "node_modules/,**/*.log"], store)[0] == 0
+    assert invoke(
+        ["exclude", "--pattern", "node_modules/,**/*.log"], store
+    )[0] == 0
 
     transports = []
     operations = []
@@ -537,7 +539,7 @@ def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
 
     monkeypatch.chdir(root)
     assert invoke(["map", "prod"], store)[0] == 0
-    assert invoke(["exclude", "*.log"], store)[0] == 0
+    assert invoke(["exclude", "--pattern", "*.log"], store)[0] == 0
     monkeypatch.chdir(child)
     overlap_status, _, overlap_error = invoke(["map", "staging"], store)
     monkeypatch.chdir(separate)

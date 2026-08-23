@@ -24,7 +24,13 @@ from hls.pattern_operands import (
     add_pattern_operands,
     normalize_pattern_operands,
 )
-from hls.rules import RuleError, RuleSet, SyncRule, patterns_from_operands
+from hls.rules import (
+    RuleError,
+    RuleSet,
+    SyncRule,
+    expand_path_operands,
+    patterns_from_operands,
+)
 from hls.selection import FileSelection, FileSelector, FileSelectorSet, SelectionError
 from hls.snapshot import SnapshotError, TreeSnapshot, snapshot_local
 from hls.transfer import TransferError, TransferResult, execute_transfer
@@ -117,9 +123,14 @@ def build_parser() -> argparse.ArgumentParser:
             rules_parser,
             required=False,
             help_text=(
-                "HLS path patterns or comma-separated pattern groups "
-                f"relative to the local root; omit to list {rule_name} rules"
+                "local paths, wildcard expressions, or comma-separated groups; "
+                f"omit to list {rule_name} rules"
             ),
+        )
+        rules_parser.add_argument(
+            "--pattern",
+            action="store_true",
+            help="record operands as reusable wildcard patterns",
         )
         rules_parser.add_argument(
             "--project",
@@ -404,15 +415,27 @@ def _change_rules(
     configuration, name, project = _resolve_project(arguments, store)
     patterns = normalize_pattern_operands(arguments)
     if not patterns:
+        if arguments.pattern:
+            raise ConfigurationError("--pattern requires at least one operand")
         action = "include" if include else "exclude"
         rules = tuple(rule for rule in project.rules if rule.action == action)
         kind = "Inclusion" if include else "Exclusion"
         return _format_rules(name, rules, heading=f"{kind} rules")
     root = _require_local_root(name, project)
+    current_directory = Path.cwd().resolve(strict=True)
+    operands = (
+        patterns
+        if arguments.pattern
+        else expand_path_operands(
+            patterns,
+            project_root=root,
+            current_directory=current_directory,
+        )
+    )
     normalized = patterns_from_operands(
-        patterns,
+        operands,
         project_root=root,
-        current_directory=Path.cwd().resolve(strict=True),
+        current_directory=current_directory,
     )
     added = configuration.append_rules(
         name,

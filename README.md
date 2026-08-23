@@ -110,10 +110,11 @@ rejected and lists its candidates. The established `ls` compatibility spelling
 remains available but is intentionally omitted from the help menu; `lsl` and
 `lsr` remain documented commands.
 
-Every path-pattern command uses the same operand grammar. Compare, push, and
-pull use no operands for the whole project; exclude and include use no operands
-to list their rules. Shell-expanded paths, quoted wildcards, multiple operands,
-and comma-separated groups are normalized consistently.
+Every path-accepting command supports multiple operands and comma-separated
+groups. Diff, push, and pull interpret wildcards as selectors and use no
+operands for the whole project. Exclude and include resolve wildcard operands
+to current local paths by default, use `--pattern` to retain wildcards, and use
+no operands to list their rules.
 
 List everything currently configured and mark the project whose local root
 contains the current directory:
@@ -144,19 +145,29 @@ the current directory without ambient state. If the project is already mapped,
 replacing the mapping; no is the default. Existing relative synchronization
 rules are retained when the root changes.
 
-Persist exclusions after mapping with one or more HLS path patterns:
+Persist exclusions after mapping by naming local paths:
 
 ```console
-hls exclude '.git/,node_modules/,**/*.log,**/.cache/'
-hls exc '*.bak'
+hls exclude .git node_modules
+hls exc '*.md'
 hls exc composer.*
 ```
 
-Patterns are relative to the current directory within the project. `*` matches
-within one directory level and `**` crosses directory levels. Therefore
-`'*.md'` affects Markdown files in the current directory, while `'**/*.md'`
-affects them recursively. Quote wildcards when HLS, rather than the shell,
-should interpret them. A literal directory always means its complete subtree.
+Operands are relative to the current directory within the project. HLS expands
+quoted wildcards against the current local tree before recording exact paths,
+so `hls exc *.md` and `hls exc '*.md'` have the same effect. A literal or
+expanded directory means its complete subtree.
+
+Use `--pattern` only when the rule itself should remain a reusable wildcard:
+
+```console
+hls exc --pattern '*.md'
+hls exc --pattern '**/*.log'
+```
+
+In pattern mode, `*` matches within one directory level and `**` crosses
+directory levels. Quoting is still necessary so the shell passes the wildcard
+to HLS rather than expanding it first.
 
 Each rule receives a stable numeric ID. Omit patterns to inspect the rules
 recorded by each command:
@@ -194,31 +205,28 @@ mapped root. Excluded files remain visible as gray diagnostics in `hls diff`.
 Re-include narrower paths later by appending an ordered override:
 
 ```console
-hls include 'node_modules/required-package/dist/**'
-hls inc 'var/generated/index.html'
+hls include node_modules/required-package/dist
+hls inc var/generated/index.html
 ```
 
-Use a quoted recursive wildcard to include every file under a directory:
+Use pattern mode for a reusable recursive inclusion:
 
 ```console
-hls inc 'vendor/**'
+hls inc --pattern 'vendor/**'
 ```
 
-With an unquoted `hls inc vendor/*`, the shell expands the operand into vendor's
-visible immediate children. HLS detects child directories and records them as
-recursive `/**` rules, while direct child files become exact paths. Use the
-quoted `vendor/**` form when hidden entries must be included too.
-
-An unquoted wildcard expanded by the shell becomes multiple literal paths. HLS
-records exactly those paths. Multiple arguments and comma-separated groups can
-be combined in one command. A literal filename containing a comma cannot be
+Whether the shell or HLS expands a normal wildcard operand, HLS records the
+matching visible paths. Child directories become recursive `/**` rules, while
+files become exact paths. Multiple arguments and comma-separated groups can be
+combined in one command. A literal filename containing a comma cannot be
 addressed because commas delimit pattern groups.
 
 The project is inferred from the current directory; use `--project <name>`
 elsewhere. Excluded paths stay outside tree listings, push, pull, and remote
-pruning, but diff displays excluded files as neutral gray diagnostic
-entries. Empty patterns, absolute paths, parent traversal, `?`, bracket
-patterns, and partial-segment `**` are rejected.
+pruning, but diff displays excluded files as neutral gray diagnostic entries.
+Empty patterns, absolute paths, parent traversal, and partial-segment `**` are
+rejected. A quoted wildcard operand that matches nothing is rejected unless
+`--pattern` is used.
 
 Rules are stored as explicit `id`, `action`, and `pattern` records. HLS does not
 store Gitignore lines, and `!` or a leading `/` has no special rule meaning.
