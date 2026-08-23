@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.23.4';
+$version = '0.8.23.5';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 
@@ -108,9 +108,9 @@ function h(string $value): string
 
         <section class="ticker" aria-label="Product attributes">
             <div>
-                <span>MAP THE PROJECT</span><i>◆</i><span>PREVIEW THE DIFF</span><i>◆</i>
-                <span>PUSH THE FILES</span><i>◆</i><span>PRUNE EXPLICITLY</span><i>◆</i>
-                <span>MAP THE PROJECT</span><i>◆</i><span>PREVIEW THE DIFF</span><i>◆</i>
+                <span>MAP ONCE</span><i>◆</i><span>DIFF FIRST</span><i>◆</i>
+                <span>PUSH FILES</span><i>◆</i><span>PRUNE EXPLICITLY</span><i>◆</i>
+                <span>MAP ONCE</span><i>◆</i><span>DIFF FIRST</span><i>◆</i>
             </div>
         </section>
 
@@ -132,7 +132,7 @@ function h(string $value): string
                 <li>
                     <span class="step-number">02</span>
                     <div class="step-icon" aria-hidden="true">⌁</div>
-                    <h3>Shape the boundary</h3>
+                    <h3>Exclude what doesn’t belong</h3>
                     <p>Exclude files that should never leave your machine. Use an explicit pattern when future matching files should stay excluded too.</p>
                     <code>hls exc --pattern '*.map'</code>
                 </li>
@@ -146,7 +146,7 @@ function h(string $value): string
                 <li>
                     <span class="step-number">04</span>
                     <div class="step-icon" aria-hidden="true">↥</div>
-                    <h3>Push deliberately</h3>
+                    <h3>Push the changes</h3>
                     <p>Upload new and modified files. Remote-only files stay untouched unless you explicitly enable pruning.</p>
                     <code>hls push</code>
                 </li>
@@ -187,7 +187,7 @@ function h(string $value): string
                 </article>
                 <article class="principle principle-accent">
                     <span class="principle-index">D</span>
-                    <h3>FTPS is verified</h3>
+                    <h3>Verified FTPS connections</h3>
                     <p>HLS verifies certificates, protects the data channel, and uses structured server listings over explicit TLS.</p>
                     <svg viewBox="0 0 160 80" aria-hidden="true"><path d="M4 60h34l15-36 28 46 19-30 14 20h42" /></svg>
                 </article>

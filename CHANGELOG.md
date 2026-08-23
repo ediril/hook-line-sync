@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.23.5 — 2026-08-23
+
+### Changed
+
+- Tightened four project-website labels to use plainer descriptions of
+  exclusion, pushing, FTPS verification, and the core workflow.
+
 ## 0.8.23.4 — 2026-08-23
 
 ### Changed
