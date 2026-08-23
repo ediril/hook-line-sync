@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.23.12';
+$version = '0.8.23.13';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 
@@ -172,7 +172,8 @@ function h(string $value): string
                     <div class="mini-diff" aria-hidden="true">
                         <span class="added">+</span><i></i><b>new</b>
                         <span class="changed">~</span><i></i><b>changed</b>
-                        <span class="removed">-</span><i></i><b>remote-only</b>
+                        <span class="excluded">·</span><i></i><b>remote-only / kept</b>
+                        <span class="removed">-</span><i></i><b>pruned with -p</b>
                     </div>
                 </article>
                 <article class="principle">

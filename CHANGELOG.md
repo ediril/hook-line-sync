@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.23.13 — 2026-08-23
+
+### Changed
+
+- Updated the homepage mini-diff to distinguish a preserved remote-only path
+  (`·`) from an explicitly pruned path (`-`).
+
 ## 0.8.23.12 — 2026-08-23
 
 ### Changed

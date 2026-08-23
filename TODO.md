@@ -1,5 +1,6 @@
 # Work Queue
 
+- [x] Align the homepage mini-diff with the push-only pruning markers.
 - [x] Simplify inspection commands and make remote comparison interruptible:
   - [x] Use `profiles` for configured entries and `list` for the complete local
     tree with exclusion status; remove `tracked`, `lsl`, and `lsr`.
