@@ -213,25 +213,29 @@ any other unwanted rule by its stable ID:
 hls rules remove 3
 ```
 
-List the complete mapped local tree and its exclusion status with:
+List the current local directory and its exclusion status with:
 
 ```console
 hls list
 hls list *
 hls list .
-hls list 'vendor/**'
+hls list --recursive
 ```
 
-`hls list` inspects only the mapped local root and does not connect to FTPS.
-Directories use a `d` type marker and excluded paths use `x`; included files
-leave both columns blank. Use `--project <name>` when outside a mapped root.
-Path operands use the same current-directory-relative selector syntax as diff:
-`*` selects one level, `.` selects the current subtree, and `**` is recursive.
-Quoted and shell-expanded wildcards both work, and unrelated directories are
-not traversed. On terminals, included directories are bright blue, excluded
-directories are darker blue, and excluded files are gray. Use
-`--color auto|always|never` to control coloring. `hls ls` remains an
-unadvertised compatibility spelling.
+With no operands, `hls list` performs its own one-level selection, so dotfiles
+are included without relying on shell wildcard behavior. `.` has the same
+one-level meaning. Add `-r` or `--recursive` to include every descendant under
+the current directory. Explicit path and wildcard operands retain the shared
+selector syntax; selected directories become recursive when `-r` is supplied.
+Bare `*` continues to be expanded by the shell, while quoted patterns are
+interpreted by HLS.
+
+The command does not connect to FTPS. Directories use a `d` type marker and
+excluded paths use `x`; included files leave both columns blank. Use
+`--project <name>` outside a mapped root, where selection starts at the mapped
+root. On terminals, included directories are bright blue, excluded directories
+are darker blue, and excluded files are gray. Use `--color auto|always|never`
+to control coloring. `hls ls` remains an unadvertised compatibility spelling.
 
 Re-include narrower paths later by appending an ordered override:
 

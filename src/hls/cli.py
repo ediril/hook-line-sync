@@ -227,10 +227,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     list_parser = subparsers.add_parser(
         "list",
-        help="list the mapped local tree and exclusion status",
+        help="list the current local directory and exclusion status",
         description=(
-            "List selected paths in the mapped local tree, including exclusion "
-            "status, without connecting to FTPS."
+            "List selected paths in the current mapped local directory, "
+            "including dotfiles and exclusion status, without connecting to FTPS."
         ),
     )
     add_pattern_operands(
@@ -250,6 +250,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("auto", "always", "never"),
         default="auto",
         help="color paths; defaults to auto detection",
+    )
+    list_parser.add_argument(
+        "-r",
+        "--recursive",
+        action="store_true",
+        help="include descendants of the selected directories",
     )
 
     diff_parser = subparsers.add_parser(
@@ -622,7 +628,7 @@ def _list_local(
 ) -> str:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
-    selector = _file_selection(arguments, root)
+    selector = _list_selection(arguments, root)
     snapshot = snapshot_local(
         root,
         RuleSet(project.rules),
@@ -752,6 +758,16 @@ def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection 
         "**" if value == "." else value
         for value in normalize_pattern_operands(arguments)
     ]
+    if not values:
+        return None
+    return _selection_from_values(values, root, current_directory)
+
+
+def _selection_from_values(
+    values: Sequence[str],
+    root: Path,
+    current_directory: Path,
+) -> FileSelection:
     selectors = tuple(
         FileSelector.from_argument(
             value,
@@ -760,11 +776,24 @@ def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection 
         )
         for value in values
     )
-    if not selectors:
-        return None
     if len(selectors) == 1:
         return selectors[0]
     return FileSelectorSet(selectors)
+
+
+def _list_selection(
+    arguments: argparse.Namespace,
+    root: Path,
+) -> FileSelection:
+    values = list(normalize_pattern_operands(arguments)) or ["*"]
+    if arguments.recursive:
+        values = [
+            "**" if value == "." else f"{value.rstrip('/')}/**"
+            for value in values
+        ]
+    else:
+        values = ["*" if value == "." else value for value in values]
+    return _selection_from_values(values, root, Path.cwd().resolve(strict=True))
 
 
 def _filtered_listing(

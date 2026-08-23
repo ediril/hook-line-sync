@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Make `hls list` current-directory-scoped by default, including dotfiles,
+  with explicit `-r`/`--recursive` subtree traversal.
 - [x] Use `x` and diff-consistent terminal coloring for excluded paths in
   `hls list`.
 - [x] Align the homepage mini-diff with the push-only pruning markers.

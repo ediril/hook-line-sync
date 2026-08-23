@@ -90,7 +90,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert "[{remove}] [rule_id]" not in rules_help
     assert "profile             show details for one profile" in help_output
     assert "profiles            list configured profiles" in help_output
-    assert "list                list the mapped local tree" in help_output
+    assert "list                list the current local directory" in help_output
     for command in ("exclude", "include"):
         rule_help = invoke(["help", command], store)[1]
         assert f"hls {command} [PATH ...]" in rule_help
@@ -321,7 +321,7 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         "node_modules/package",
         "node_modules/package/nested.js",
     ]
-    local_view = invoke(["list"], store)
+    local_view = invoke(["list", "--recursive"], store)
     assert local_view[0] == 0 and local_view[2] == ""
     assert "    node_modules/keep.js\n" in local_view[1]
     assert "x   composer.json\n" in local_view[1]
@@ -383,6 +383,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     same = workspace / "same.txt"
     same.write_text("same", encoding="utf-8")
     (source / "main.py").write_text("print('hello')", encoding="utf-8")
+    (source / ".env.example").write_text("KEY=value", encoding="utf-8")
     (source / "debug.log").write_text("ignored", encoding="utf-8")
     (ignored / "package.js").write_text("ignored", encoding="utf-8")
     (outside / "secret.txt").write_text("outside", encoding="utf-8")
@@ -498,12 +499,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     local_listing = (
         0,
         "Local tree for project 'prod':\n"
-        "    README.md\n"
-        "    linked\n"
-        "x d node_modules\n"
-        "x   node_modules/package.js\n"
-        "    same.txt\n"
-        "  d src\n"
+        "    src/.env.example\n"
         "x   src/debug.log\n"
         "    src/main.py\n",
         "",
@@ -513,14 +509,22 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert invoke(["list", "*"], store) == (
         0,
         "Local tree for project 'prod':\n"
+        "    src/.env.example\n"
         "x   src/debug.log\n"
         "    src/main.py\n",
         "",
     )
-    colored_list = invoke(["list", "--color", "always"], store)
+    monkeypatch.chdir(workspace)
+    recursive_list = invoke(["list", "--recursive"], store)
+    assert "x   node_modules/package.js\n" in recursive_list[1]
+    assert "    src/.env.example\n" in recursive_list[1]
+    colored_list = invoke(
+        ["list", "--recursive", "--color", "always"], store
+    )
     assert "\033[90mx   src/debug.log\033[0m" in colored_list[1]
     assert "  \033[94md src\033[0m" in colored_list[1]
     assert "\033[90mx\033[0m \033[34md node_modules\033[0m" in colored_list[1]
+    monkeypatch.chdir(source)
     push_comparison = invoke(["diff"], store)
     push_progress = (
         "Checking differences for project 'prod'...\n"

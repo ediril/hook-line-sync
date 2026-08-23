@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.23.15 — 2026-08-23
+
+### Changed
+
+- Made `hls list` default to the current directory's immediate children,
+  including dotfiles, and added `-r`/`--recursive` for subtree listings.
+- Kept explicit list selectors compatible while making `.` follow the new
+  one-level default unless recursion is requested.
+
 ## 0.8.23.14 — 2026-08-23
 
 ### Changed
