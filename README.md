@@ -60,9 +60,10 @@ Add a project with its FTPS endpoint and absolute remote root:
 hls add prod --host ftp.example.com --remote-root /public_html/site
 ```
 
-`hls add` proposes the current directory as the project's local root. Confirm
-the prompt to map it immediately, or decline to save the project without a
-mapping. The project is not saved if that local root overlaps another project.
+`hls add` proposes the current directory as the project's local root. Yes is
+the default: press Enter to map it immediately, or decline to save the project
+without a mapping. The project is not saved if that local root overlaps another
+project.
 
 FTPS is the default and currently the only implemented protocol. The explicit
 form is `--protocol ftps`; unsupported protocols are rejected.

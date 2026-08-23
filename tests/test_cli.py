@@ -45,7 +45,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert (add_status, add_stdout, add_stderr) == (
         0,
         f"Map current directory '{tmp_path}' to "
-        "'client-site:/public_html/site'? [y/N] "
+        "'client-site:/public_html/site'? [Y/n] "
         "Added FTPS project 'client-site' without a local mapping.\n",
         "",
     )
@@ -108,12 +108,12 @@ def test_add_maps_the_current_directory_after_confirmation(
             "/public_html",
         ],
         store,
-        stdin="yes\n",
+        stdin="\n",
     )
 
     assert result == (
         0,
-        f"Map current directory '{workspace}' to 'prod:/public_html'? [y/N] "
+        f"Map current directory '{workspace}' to 'prod:/public_html'? [Y/n] "
         "Added FTPS project 'prod'.\n"
         f"Mapped '{workspace}' to 'prod:/public_html'.\n",
         "",

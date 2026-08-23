@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.22.21 — 2026-08-22
+
+### Changed
+
+- The current-directory mapping prompt during `hls add` now defaults to yes;
+  the existing-mapping replacement prompt continues to default to no.
+
 ## 0.8.22.20 — 2026-08-22
 
 ### Changed

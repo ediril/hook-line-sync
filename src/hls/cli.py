@@ -266,7 +266,13 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _confirm(prompt: str, stdin: TextIO, stdout: TextIO) -> bool:
+def _confirm(
+    prompt: str,
+    stdin: TextIO,
+    stdout: TextIO,
+    *,
+    default: bool,
+) -> bool:
     while True:
         print(prompt, end="", file=stdout, flush=True)
         answer = stdin.readline()
@@ -275,8 +281,10 @@ def _confirm(prompt: str, stdin: TextIO, stdout: TextIO) -> bool:
         normalized = answer.strip().lower()
         if normalized in {"y", "yes"}:
             return True
-        if normalized in {"", "n", "no"}:
+        if normalized in {"n", "no"}:
             return False
+        if normalized == "":
+            return default
         print("Please answer yes or no.", file=stdout)
 
 
@@ -310,9 +318,9 @@ def _save_project(
     local_root = canonical_local_root(Path.cwd())
     prompt = (
         f"Map current directory '{local_root}' to "
-        f"'{name}:{project.remote_root}'? [y/N] "
+        f"'{name}:{project.remote_root}'? [Y/n] "
     )
-    if _confirm(prompt, stdin, stdout):
+    if _confirm(prompt, stdin, stdout, default=True):
         configuration.map_project(name, local_root)
         message = (
             f"Added FTPS project '{name}'.\n"
@@ -365,7 +373,7 @@ def _map(
             f"Project '{name}' is mapped to '{project.local_root}'. Change it "
             f"to '{local_root}'? [y/N] "
         )
-        if not _confirm(prompt, stdin, stdout):
+        if not _confirm(prompt, stdin, stdout, default=False):
             return f"Kept existing mapping '{project.local_root}' for '{name}'."
         configuration.remap_project(name, local_root)
         store.save(configuration)
