@@ -19,7 +19,7 @@
     connections, bytes transferred, and elapsed time before selecting
     optimizations.
   - Measure shallow wide trees, deeply nested trees, many-small-file transfers,
-    selector-pruned operations, and compare diagnostics that expose exclusions.
+    selector-pruned operations, and diff diagnostics that expose exclusions.
   - Add a way to omit excluded-file diagnostics when their remote traversal cost
     is unwanted.
   - Evaluate bounded, configurable concurrency using independent FTPS sessions,

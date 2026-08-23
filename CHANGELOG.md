@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.22.24 — 2026-08-22
+
+### Changed
+
+- Renamed the remote-aware `hls compare` command to `hls diff`; removed the
+  former `compare` and `cmp` spellings.
+
+## 0.8.22.23 — 2026-08-22
+
+### Changed
+
+- Renamed `hls files` to `hls tracked` to distinguish the local eligible-file
+  inventory from the remote-aware `hls compare` change plan.
+
 ## 0.8.22.22 — 2026-08-22
 
 ### Removed

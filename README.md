@@ -105,10 +105,10 @@ hls remove prod
 Removal does not connect to the server or delete remote files.
 
 Command names may be shortened to any unique prefix. For example, `hls con`
-means `hls connect`, while `hls comp` means `hls compare`. An ambiguous prefix
-is rejected and lists its candidates. The established `ls` and `cmp`
-compatibility spellings remain available but are intentionally omitted from the
-help menu; `lsl` and `lsr` remain documented commands.
+means `hls connect`, while `hls d` means `hls diff`. An ambiguous prefix is
+rejected and lists its candidates. The established `ls` compatibility spelling
+remains available but is intentionally omitted from the help menu; `lsl` and
+`lsr` remain documented commands.
 
 Every path-pattern command uses the same operand grammar. Compare, push, and
 pull use no operands for the whole project; exclude and include use no operands
@@ -181,16 +181,15 @@ any other unwanted rule by its stable ID:
 hls rules remove 3
 ```
 
-List the unified effective set of local files currently included in
-synchronization with:
+List the local files currently eligible for synchronization with:
 
 ```console
-hls files
+hls tracked
 ```
 
-The command prints one regular-file path per line, inspects only the mapped
+`hls tracked` prints one regular-file path per line, inspects only the mapped
 local root, and does not connect to FTPS. Use `--project <name>` when outside its
-mapped root. Excluded files remain visible as gray diagnostics in `hls compare`.
+mapped root. Excluded files remain visible as gray diagnostics in `hls diff`.
 
 Re-include narrower paths later by appending an ordered override:
 
@@ -217,7 +216,7 @@ addressed because commas delimit pattern groups.
 
 The project is inferred from the current directory; use `--project <name>`
 elsewhere. Excluded paths stay outside tree listings, push, pull, and remote
-pruning, but compare displays excluded files as neutral gray diagnostic
+pruning, but diff displays excluded files as neutral gray diagnostic
 entries. Empty patterns, absolute paths, parent traversal, `?`, bracket
 patterns, and partial-segment `**` are rejected.
 
@@ -254,31 +253,30 @@ symlinks are listed but never followed. Remote traversal uses MLSD over the
 protected FTPS data connection and fails if the server cannot provide a
 structured listing.
 
-## Compare
+## Diff
 
 Preview what a full-project push would do without changing either side:
 
 ```console
-hls compare
-hls cmp
+hls diff
 ```
 
 Use the pull projection when needed:
 
 ```console
-hls compare --pull
+hls diff --pull
 ```
 
 Limit the projection to one or more paths or wildcard patterns relative to the
 current directory:
 
 ```console
-hls compare index.html
-hls compare index.html app.js styles.css
-hls compare 'index.html,app.js,styles.css'
-hls compare *
-hls compare 'src/*.js'
-hls compare '**/*.css'
+hls diff index.html
+hls diff index.html app.js styles.css
+hls diff 'index.html,app.js,styles.css'
+hls diff *
+hls diff 'src/*.js'
+hls diff '**/*.css'
 ```
 
 An unquoted wildcard may be expanded by the shell into multiple arguments; HLS
@@ -294,7 +292,7 @@ Selectors are applied before local and remote snapshots are built. HLS descends
 only into directories that can contain a match: `*` scans the corresponding
 directory without recursion, while `**` permits recursive traversal.
 
-Compare uses a compact, perspective-relative status column:
+Diff uses a compact, perspective-relative status column:
 
 ```text
 +  present only on the selected side
@@ -310,7 +308,7 @@ is redirected or `NO_COLOR` is set; excluded entries are gray. Color can be
 controlled explicitly with
 `--color auto|always|never`.
 
-Compare uses diagnostic snapshots that inspect excluded directories so their
+Diff uses diagnostic snapshots that inspect excluded directories so their
 files can be shown. Push and pull continue to omit excluded paths entirely.
 Selectors are still applied before traversal, so a path-limited comparison does
 not scan unrelated excluded branches.
@@ -320,8 +318,8 @@ remote-only path is skipped rather than restored or deleted by default. Include
 its remote deletion in the projected plan explicitly with:
 
 ```console
-hls compare --prune-remote
-hls cmp --pull -p
+hls diff --prune-remote
+hls diff --pull -p
 ```
 
 When a selector is present, pruning is strictly limited to matching remote-only
@@ -331,7 +329,7 @@ File identity uses size and modification timestamps normalized to the coarser
 precision reported by the local filesystem and remote MLSD facts. Identical
 paths are omitted from the output.
 
-Compare prints immediately flushed progress milestones to stderr while it
+Diff prints immediately flushed progress milestones to stderr while it
 connects and scans. The final status view is written to stdout, so it can be
 redirected without mixing status messages into the result.
 
@@ -345,7 +343,7 @@ hls push
 hls pull
 ```
 
-Limit execution with the same selection syntax used by compare:
+Limit execution with the same selection syntax used by diff:
 
 ```console
 hls push index.html

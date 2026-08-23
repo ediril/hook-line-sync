@@ -62,10 +62,10 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.password_env == "PROD_FTPS_PASSWORD"
 
     help_output = invoke(["help"], store)[1]
-    assert "compare             preview file changes without modifying anything" in (
+    assert "diff                preview file changes without modifying anything" in (
         help_output
     )
-    assert "compare (cmp)" not in help_output
+    assert "compare" not in help_output
     assert "list (ls)" not in help_output
     assert "explain" not in help_output
     assert "push                upload local changes to the remote project" in (
@@ -75,7 +75,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
         "pull                replace changed local files from the remote project"
     )
     assert pull_help in help_output
-    assert "usage: hls compare" in invoke(["help", "comp"], store)[1]
+    assert "usage: hls diff" in invoke(["help", "d"], store)[1]
 
     list_status, list_stdout, list_stderr = invoke(["list"], store)
     assert (list_status, list_stderr) == (0, "")
@@ -142,7 +142,7 @@ def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
     with pytest.raises(SystemExit):
         run(["add", "unsafe", "--host", "ftp.example.com"], store=store)
     with pytest.raises(SystemExit):
-        run(["co"], store=store)
+        run(["l"], store=store)
 
 
 def test_add_supports_explicit_protocol_port_and_environment_names(tmp_path) -> None:
@@ -284,12 +284,12 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     ]
     included_view = (
         0,
-        "Included local files for project 'prod':\n"
+        "Tracked local files for project 'prod':\n"
         "  node_modules/keep.js\n"
         "  node_modules/package/nested.js\n",
         "",
     )
-    assert invoke(["files"], store) == included_view
+    assert invoke(["tracked"], store) == included_view
     assert invoke(["exc"], store) == (
         0,
         "Exclusion rules for project 'prod':\n"
@@ -447,9 +447,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert invoke(["lsl"], store) == local_listing
     assert invoke(["list", "remote"], store) == remote_listing
     assert invoke(["lsr"], store) == remote_listing
-    push_comparison = invoke(["compare"], store)
+    push_comparison = invoke(["diff"], store)
     push_progress = (
-        "Comparing project 'prod'...\n"
+        "Checking differences for project 'prod'...\n"
         "Connecting securely over FTPS...\n"
         "Scanning local files...\n"
         "Reading remote files over FTPS...\n"
@@ -462,9 +462,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "!  linked\n" in push_comparison[1]
     assert "·  node_modules/package.js\n" in push_comparison[1]
     assert "·  src/debug.log\n" in push_comparison[1]
-    assert invoke(["cmp"], store) == push_comparison
-
-    selected_comparison = invoke(["compare", "main.py"], store)
+    selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
     assert selected_comparison[2] == push_progress
     assert "src/main.py" in selected_comparison[1]
@@ -473,7 +471,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
 
     monkeypatch.chdir(workspace)
     expanded_comparison = invoke(
-        ["compare", "README.md,src/main.py", "src"], store
+        ["diff", "README.md,src/main.py", "src"], store
     )
     assert expanded_comparison[0] == 0
     assert "+  README.md\n" in expanded_comparison[1]
@@ -481,11 +479,11 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "+  src\n" not in expanded_comparison[1]
     monkeypatch.chdir(source)
 
-    colored_comparison = invoke(["compare", "*", "--color", "always"], store)
+    colored_comparison = invoke(["diff", "*", "--color", "always"], store)
     assert "\033[32m+  src/main.py\033[0m" in colored_comparison[1]
     assert "\033[90m·  src/debug.log\033[0m" in colored_comparison[1]
 
-    pull_comparison = invoke(["compare", "--pull", "-p"], store)
+    pull_comparison = invoke(["diff", "--pull", "-p"], store)
     assert pull_comparison[0] == 0
     assert pull_comparison[2].endswith("Building pull plan...\n")
     assert "Remote -> Local for project 'prod':\n" in pull_comparison[1]
@@ -508,7 +506,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
-    assert len(transports) == 11
+    assert len(transports) == 10
 
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(

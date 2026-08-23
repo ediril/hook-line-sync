@@ -38,17 +38,17 @@ CANONICAL_COMMANDS = (
     "list",
     "lsl",
     "lsr",
-    "compare",
+    "diff",
     "push",
     "pull",
     "exclude",
     "include",
-    "files",
+    "tracked",
     "rules",
     "help",
     "version",
 )
-COMMAND_ALIASES = {"ls": "list", "cmp": "compare"}
+COMMAND_ALIASES = {"ls": "list"}
 
 
 def _resolve_command_name(value: str) -> str:
@@ -127,10 +127,10 @@ def build_parser() -> argparse.ArgumentParser:
             help="project name; inferred from the current directory when omitted",
         )
 
-    files_parser = subparsers.add_parser(
-        "files", help="list local files included in synchronization"
+    tracked_parser = subparsers.add_parser(
+        "tracked", help="list local files eligible for synchronization"
     )
-    files_parser.add_argument(
+    tracked_parser.add_argument(
         "--project",
         dest="project_name",
         help="project name; inferred from the current directory when omitted",
@@ -169,8 +169,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     remote_list_parser.add_argument("project_name", nargs="?")
 
-    compare_parser = subparsers.add_parser(
-        "compare",
+    diff_parser = subparsers.add_parser(
+        "diff",
         help="preview file changes without modifying anything",
         description=(
             "Preview file changes without modifying local or remote files. "
@@ -179,29 +179,29 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     add_pattern_operands(
-        compare_parser,
+        diff_parser,
         required=False,
         help_text=(
             "relative file paths or wildcard patterns; defaults to the whole project"
         ),
     )
-    compare_parser.add_argument(
+    diff_parser.add_argument(
         "--project",
         dest="project_name",
         help="project name; inferred from the current directory when omitted",
     )
-    compare_parser.add_argument(
+    diff_parser.add_argument(
         "--pull",
         action="store_true",
         help="show changes from the remote perspective",
     )
-    compare_parser.add_argument(
+    diff_parser.add_argument(
         "-p",
         "--prune-remote",
         action="store_true",
         help="project deletion of remote-only paths",
     )
-    compare_parser.add_argument(
+    diff_parser.add_argument(
         "--color",
         choices=("auto", "always", "never"),
         default="auto",
@@ -428,7 +428,7 @@ def _change_rules(
     )
 
 
-def _list_included_files(
+def _list_tracked_files(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
 ) -> str:
@@ -445,10 +445,10 @@ def _list_included_files(
         if entry.kind == "file" and not entry.excluded
     )
     if not paths:
-        return f"No included local files for project '{name}'."
+        return f"No tracked local files for project '{name}'."
     return "\n".join(
         (
-            f"Included local files for project '{name}':",
+            f"Tracked local files for project '{name}':",
             *(f"  {path}" for path in paths),
         )
     )
@@ -644,7 +644,7 @@ def _build_plan(
     return local, remote, plan
 
 
-def _compare(
+def _diff(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
     progress: TextIO,
@@ -652,7 +652,7 @@ def _compare(
 ) -> str:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
-    print(f"Comparing project '{name}'...", file=progress, flush=True)
+    print(f"Checking differences for project '{name}'...", file=progress, flush=True)
     print("Connecting securely over FTPS...", file=progress, flush=True)
     with ExplicitFTPSTransport(project) as transport:
         _, _, plan = _build_plan(
@@ -760,8 +760,8 @@ def run(
             )
         elif arguments.command == "include":
             message = _change_rules(arguments, configuration_store, include=True)
-        elif arguments.command == "files":
-            message = _list_included_files(arguments, configuration_store)
+        elif arguments.command == "tracked":
+            message = _list_tracked_files(arguments, configuration_store)
         elif arguments.command == "rules":
             message = _manage_rules(arguments, configuration_store)
         elif arguments.command == "remove":
@@ -781,8 +781,8 @@ def run(
             message = _list_local(arguments, configuration_store)
         elif arguments.command == "lsr":
             message = _list_remote(arguments, configuration_store)
-        elif arguments.command == "compare":
-            message = _compare(arguments, configuration_store, stderr, stdout)
+        elif arguments.command == "diff":
+            message = _diff(arguments, configuration_store, stderr, stdout)
         elif arguments.command in {"push", "pull"}:
             message = _transfer(arguments, configuration_store, stderr)
         elif arguments.command == "help":
