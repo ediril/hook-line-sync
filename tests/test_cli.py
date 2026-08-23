@@ -457,11 +457,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert "Local -> Remote for project 'prod':\n" in push_comparison[1]
-    assert "+  README.md\n" in push_comparison[1]
-    assert "-  deployed.html\n" in push_comparison[1]
-    assert "!  linked\n" in push_comparison[1]
-    assert "·  node_modules/package.js\n" in push_comparison[1]
-    assert "·  src/debug.log\n" in push_comparison[1]
+    assert "+   README.md\n" in push_comparison[1]
+    assert "-   deployed.html\n" in push_comparison[1]
+    assert "!   linked\n" in push_comparison[1]
+    assert "· d node_modules\n" in push_comparison[1]
+    assert "·   node_modules/package.js\n" in push_comparison[1]
+    assert "·   src/debug.log\n" in push_comparison[1]
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
     assert selected_comparison[2] == push_progress
@@ -474,21 +475,24 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["diff", "README.md,src/main.py", "src"], store
     )
     assert expanded_comparison[0] == 0
-    assert "+  README.md\n" in expanded_comparison[1]
-    assert "+  src/main.py\n" in expanded_comparison[1]
-    assert "+  src\n" in expanded_comparison[1]
-    monkeypatch.chdir(source)
+    assert "+   README.md\n" in expanded_comparison[1]
+    assert "+   src/main.py\n" in expanded_comparison[1]
+    assert "+ d src\n" in expanded_comparison[1]
 
-    colored_comparison = invoke(["diff", "*", "--color", "always"], store)
-    assert "\033[32m+  src/main.py\033[0m" in colored_comparison[1]
-    assert "\033[90m·  src/debug.log\033[0m" in colored_comparison[1]
+    colored_comparison = invoke(["diff", "**", "--color", "always"], store)
+    assert "\033[32m+\033[0m \033[94md src\033[0m" in colored_comparison[1]
+    assert "\033[90m·\033[0m \033[34md node_modules\033[0m" in (
+        colored_comparison[1]
+    )
+    assert "\033[90m·   src/debug.log\033[0m" in colored_comparison[1]
+    monkeypatch.chdir(source)
 
     pull_comparison = invoke(["diff", "--pull", "-p"], store)
     assert pull_comparison[0] == 0
     assert pull_comparison[2].endswith("Building pull plan...\n")
     assert "Remote -> Local for project 'prod':\n" in pull_comparison[1]
-    assert "+  deployed.html\n" in pull_comparison[1]
-    assert "-  README.md\n" in pull_comparison[1]
+    assert "+   deployed.html\n" in pull_comparison[1]
+    assert "-   README.md\n" in pull_comparison[1]
 
     push_result = invoke(["push", "main.py"], store)
     assert push_result[0] == 0

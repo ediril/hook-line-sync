@@ -292,24 +292,26 @@ Selectors are applied before local and remote snapshots are built. HLS descends
 only into directories that can contain a match: `*` scans the corresponding
 directory without recursion, while `**` permits recursive traversal.
 
-Diff uses a compact, perspective-relative status column:
+Diff uses compact, perspective-relative status and type columns. Directories
+receive `d`; files and symlinks leave the type column blank:
 
 ```text
-+  present only on the selected side
-~  present on both sides but modified
--  missing from the selected side
-!  type or symlink conflict
-·  excluded from synchronization
++ d new-directory
++   new-file
+~   modified on the selected side
+-   missing from the selected side
+!   type or symlink conflict
+·   excluded from synchronization
 ```
 
 The default selected side is local; `--pull` reverses it to remote. Status lines
 are green, yellow, red, and magenta on terminals. Color is disabled when output
-is redirected or `NO_COLOR` is set; excluded entries are gray. Color can be
-controlled explicitly with
-`--color auto|always|never`.
+is redirected or `NO_COLOR` is set. Directory paths are bright blue, excluded
+directory paths are darker blue, and excluded non-directories are gray. Color
+can be controlled explicitly with `--color auto|always|never`.
 
-Diff uses diagnostic snapshots that inspect excluded directories so their
-files can be shown. Push and pull continue to omit excluded paths entirely.
+Diff uses diagnostic snapshots that show excluded directories and inspect them
+so their contents can be shown. Push and pull continue to omit excluded paths entirely.
 Selectors are still applied before traversal, so a path-limited comparison does
 not scan unrelated excluded branches.
 

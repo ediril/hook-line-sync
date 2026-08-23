@@ -157,6 +157,7 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
         } == {
             "assets": False,
             "assets/logo.svg": False,
+            "cache": True,
             "cache/index.bin": True,
             "cache/keep.bin": False,
             "debug.log": True,

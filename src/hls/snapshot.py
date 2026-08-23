@@ -107,7 +107,7 @@ def snapshot_local(
                 relative_path,
                 is_directory=kind == "directory",
             )
-            visible = not excluded or (include_excluded and kind != "directory")
+            visible = not excluded or include_excluded
             selected = visible and (
                 selector is None or selector.matches(relative_path)
             )

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.23.1 — 2026-08-23
+
+### Changed
+
+- Diff output now uses a `d` type column for directories, distinct directory
+  coloring, and a darker directory color for excluded entries.
+- Excluded directory entries are now included in diff diagnostics alongside
+  their excluded contents.
+
 ## 0.8.22.25 — 2026-08-22
 
 ### Fixed

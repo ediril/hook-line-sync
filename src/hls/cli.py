@@ -559,6 +559,11 @@ def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
     return "+" if entry.state == "remote-only" else "-"
 
 
+def _comparison_entry_kind(entry: ComparisonEntry, direction: str) -> str:
+    selected = entry.local_kind if direction == "push" else entry.remote_kind
+    return selected or entry.remote_kind or entry.local_kind or "unknown"
+
+
 def _use_color(mode: str, output: TextIO) -> bool:
     if mode == "always":
         return True
@@ -587,8 +592,19 @@ def _format_comparison(
     }
     for entry in plan.differences:
         marker = _comparison_marker(entry, plan.direction)
-        line = f"{marker}  {entry.path}"
-        lines.append(f"{colors[marker]}{line}\033[0m" if color else line)
+        directory = _comparison_entry_kind(entry, plan.direction) == "directory"
+        kind = "d" if directory else " "
+        line = f"{marker} {kind} {entry.path}"
+        if not color:
+            lines.append(line)
+        elif directory:
+            directory_color = "\033[34m" if entry.action == "excluded" else "\033[94m"
+            lines.append(
+                f"{colors[marker]}{marker}\033[0m "
+                f"{directory_color}d {entry.path}\033[0m"
+            )
+        else:
+            lines.append(f"{colors[marker]}{line}\033[0m")
     return "\n".join(lines)
 
 
