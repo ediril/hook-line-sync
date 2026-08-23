@@ -182,7 +182,9 @@ hls inc
 ```
 
 `hls exc` lists exclusion rules and `hls inc` lists inclusion rules, one per
-line. Display the complete ordered policy with:
+line. Exact project-relative paths display with a `./` prefix, while reusable
+wildcard patterns display as their stored expressions. Display the complete
+ordered policy with:
 
 ```console
 hls rules

@@ -250,7 +250,7 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert include_result == (
         0,
         "Recorded inclusion rules for project 'prod':\n"
-        "  7  include node_modules/keep.js\n",
+        "  7  include ./node_modules/keep.js\n",
         "",
     )
     assert directory_include_result == (
@@ -262,8 +262,8 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert expanded_exclude_result == (
         0,
         "Recorded exclusion rules for project 'prod':\n"
-        "  5  exclude composer.json\n"
-        "  6  exclude composer.lock\n",
+        "  5  exclude ./composer.json\n"
+        "  6  exclude ./composer.lock\n",
         "",
     )
     project = store.load().projects["prod"]
@@ -310,15 +310,15 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         "  2  exclude node_modules/**\n"
         "  3  exclude *.log\n"
         "  4  exclude **/.cache/**\n"
-        "  5  exclude composer.json\n"
-        "  6  exclude composer.lock\n"
-        "  9  exclude docs/note.txt\n",
+        "  5  exclude ./composer.json\n"
+        "  6  exclude ./composer.lock\n"
+        "  9  exclude ./docs/note.txt\n",
         "",
     )
     assert invoke(["inc"], store) == (
         0,
         "Inclusion rules for project 'prod':\n"
-        "  7  include node_modules/keep.js\n"
+        "  7  include ./node_modules/keep.js\n"
         "  8  include node_modules/package/**\n",
         "",
     )
@@ -328,7 +328,7 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert "  Rules:\n" in list_stdout
     assert "    1  exclude .git/**\n" in list_stdout
     assert "    8  include node_modules/package/**\n" in list_stdout
-    assert "    9  exclude docs/note.txt\n" in list_stdout
+    assert "    9  exclude ./docs/note.txt\n" in list_stdout
     assert invoke(["rules", "remove", "8"], store) == (
         0,
         "Removed rule 8 from project 'prod': include node_modules/package/**\n",
@@ -338,7 +338,7 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert invoke(["inc", "composer.json"], store) == (
         0,
         "Recorded inclusion rules for project 'prod':\n"
-        "  10  include composer.json\n",
+        "  10  include ./composer.json\n",
         "",
     )
     updated = store.load().projects["prod"]

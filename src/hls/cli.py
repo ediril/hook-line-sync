@@ -446,11 +446,16 @@ def _format_rules(
         (
             f"{heading} for project '{name}':",
             *(
-                f"  {rule.id:>{width}}  {rule.action:<7} {rule.pattern}"
+                f"  {rule.id:>{width}}  {rule.action:<7} "
+                f"{_format_rule_expression(rule)}"
                 for rule in rules
             ),
         )
     )
+
+
+def _format_rule_expression(rule: SyncRule) -> str:
+    return rule.pattern if "*" in rule.pattern else f"./{rule.pattern}"
 
 
 def _change_rules(
@@ -539,7 +544,7 @@ def _manage_rules(
     store.save(configuration)
     return (
         f"Removed rule {removed.id} from project '{name}': "
-        f"{removed.action} {removed.pattern}"
+        f"{removed.action} {_format_rule_expression(removed)}"
     )
 
 
@@ -568,7 +573,8 @@ def _list_projects(store: ConfigurationStore) -> str:
             lines.append("  Rules:")
             width = len(str(project.rules[-1].id))
             lines.extend(
-                f"    {rule.id:>{width}}  {rule.action:<7} {rule.pattern}"
+                f"    {rule.id:>{width}}  {rule.action:<7} "
+                f"{_format_rule_expression(rule)}"
                 for rule in project.rules
             )
         else:

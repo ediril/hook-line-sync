@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.23.9 — 2026-08-23
+
+### Changed
+
+- Simplified rule displays by removing the `path`/`pattern` column: exact paths
+  now use a display-only `./` prefix, while wildcard expressions remain
+  unchanged.
+
+## 0.8.23.8 — 2026-08-23
+
+### Changed
+
+- Rule listings and removal confirmations now label each rule as an exact
+  `path` or reusable `pattern`, derived from its stored semantics without
+  changing configuration schema 7.
+
 ## 0.8.23.7 — 2026-08-23
 
 ### Changed
