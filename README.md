@@ -217,12 +217,18 @@ List the complete mapped local tree and its exclusion status with:
 
 ```console
 hls list
+hls list *
+hls list .
+hls list 'vendor/**'
 ```
 
 `hls list` inspects only the mapped local root and does not connect to FTPS.
 Directories use a `d` type marker and excluded paths use `!`; included files
 leave both columns blank. Use `--project <name>` when outside a mapped root.
-`hls ls` remains an unadvertised compatibility spelling.
+Path operands use the same current-directory-relative selector syntax as diff:
+`*` selects one level, `.` selects the current subtree, and `**` is recursive.
+Quoted and shell-expanded wildcards both work, and unrelated directories are
+not traversed. `hls ls` remains an unadvertised compatibility spelling.
 
 Re-include narrower paths later by appending an ordered override:
 
@@ -305,14 +311,16 @@ receive `d`; files and symlinks leave the type column blank:
 +   new-file
 ~   modified on the selected side
 -   missing from the selected side
+·   present on only one side but left untouched
 ?   type or symlink conflict
 =   unchanged
 !   excluded from synchronization
 ```
 
 The default selected side is local; `--pull` reverses it to remote. By default,
-diff prints only synchronization actions and conflicts. Use `hls diff --all` to
-also show unchanged and excluded paths. Status lines use distinct terminal
+diff prints synchronization actions, conflicts, and one-sided paths that will
+be kept. Use `hls diff --all` to also show unchanged and excluded paths. Status
+lines use distinct terminal
 colors; unchanged and excluded paths are dimmed. Color is disabled when output
 is redirected or `NO_COLOR` is set. Directory paths are bright blue, excluded
 directory paths are darker blue, and color can be controlled explicitly with
@@ -337,16 +345,16 @@ no paging session, though it must list the cursor's ancestor directories again
 to reconstruct the remaining walk safely.
 
 Local path existence remains authoritative for transfer behavior, so a
-remote-only path is skipped rather than restored or deleted by default. Include
-its remote deletion in the projected plan explicitly with:
+remote-only path is shown with `·` and skipped rather than restored or deleted
+by default. Preview its deletion with `-` explicitly using:
 
 ```console
 hls diff --prune-remote
-hls diff --pull -p
 ```
 
 When a selector is present, pruning is strictly limited to matching remote-only
-files.
+files. Remote pruning belongs exclusively to the push direction, so
+`hls diff --pull --prune-remote` is rejected.
 
 File identity uses size and modification timestamps normalized to the coarser
 precision reported by the local filesystem and remote MLSD facts. Identical
@@ -382,19 +390,19 @@ does not restore remote-only files because missing local paths are treated as
 intentional deletions.
 
 Remote-only paths are reported and left untouched unless pruning is explicitly
-authorized:
+authorized on a push:
 
 ```console
 hls push --prune-remote
-hls pull -p 'generated/*.html'
+hls push -p 'generated/*.html'
 ```
 
-Pruning is limited by the selector and occurs only after all uploads or
-downloads succeed. Remote uploads use temporary files and recoverable backups;
-local downloads use atomic replacement. Type conflicts and symlinks abort the
-entire plan before mutation. Each file replacement is atomic, but FTPS cannot
-provide a transaction across the complete project, so an operation that fails
-later does not roll back earlier completed files.
+Pruning is limited by the selector and occurs only after all uploads succeed.
+Pull never deletes remote paths. Remote uploads use temporary files and
+recoverable backups; local downloads use atomic replacement. Type conflicts and
+symlinks abort the entire plan before mutation. Each file replacement is atomic,
+but FTPS cannot provide a transaction across the complete project, so an
+operation that fails later does not roll back earlier completed files.
 
 ## Versioning
 

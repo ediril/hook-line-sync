@@ -228,6 +228,17 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser = subparsers.add_parser(
         "list",
         help="list the mapped local tree and exclusion status",
+        description=(
+            "List selected paths in the mapped local tree, including exclusion "
+            "status, without connecting to FTPS."
+        ),
+    )
+    add_pattern_operands(
+        list_parser,
+        required=False,
+        help_text=(
+            "relative file paths or wildcard patterns; defaults to the whole project"
+        ),
     )
     list_parser.add_argument(
         "--project",
@@ -238,6 +249,11 @@ def build_parser() -> argparse.ArgumentParser:
     diff_parser = subparsers.add_parser(
         "diff",
         help="preview file changes without modifying anything",
+        usage=(
+            "hls diff [PATH ...] [--project PROFILE]\n"
+            "       [--pull | --prune-remote] [--all] [--paged]\n"
+            "       [--resume DIRECTORY] [--color auto|always|never]"
+        ),
         description=(
             "Preview file changes without modifying local or remote files. "
             "Shows the local perspective by default; use --pull for the remote "
@@ -256,10 +272,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="project_name",
         help="project name; inferred from the current directory when omitted",
     )
-    diff_parser.add_argument(
+    diff_direction = diff_parser.add_mutually_exclusive_group()
+    diff_direction.add_argument(
         "--pull",
         action="store_true",
-        help="show changes from the remote perspective",
+        help="show changes from the remote perspective; cannot prune",
     )
     diff_parser.add_argument(
         "--all",
@@ -276,11 +293,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="DIRECTORY",
         help="resume a paged diff at a project-relative directory",
     )
-    diff_parser.add_argument(
+    diff_direction.add_argument(
         "-p",
         "--prune-remote",
         action="store_true",
-        help="project deletion of remote-only paths",
+        help="project deletion of remote-only paths in the push view",
     )
     diff_parser.add_argument(
         "--color",
@@ -322,12 +339,14 @@ def build_parser() -> argparse.ArgumentParser:
             dest="project_name",
             help="project name; inferred from the current directory when omitted",
         )
-        transfer_parser.add_argument(
-            "-p",
-            "--prune-remote",
-            action="store_true",
-            help="delete selected remote-only paths",
-        )
+        transfer_parser.set_defaults(prune_remote=False)
+        if command == "push":
+            transfer_parser.add_argument(
+                "-p",
+                "--prune-remote",
+                action="store_true",
+                help="delete selected remote-only paths",
+            )
 
     help_parser = subparsers.add_parser("help", help="show command help")
     help_parser.add_argument("topic", nargs="?")
@@ -593,11 +612,15 @@ def _require_local_root(name: str, project: ProjectConfiguration) -> Path:
 def _list_local(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
+    selector = _file_selection(arguments, root)
     snapshot = snapshot_local(
         root,
         RuleSet(project.rules),
+        selector,
         include_excluded=True,
     )
+    if selector is not None and not snapshot.entries:
+        raise SelectionError(f"file selector '{selector.pattern}' matched no paths")
     if not snapshot.entries:
         return f"Local tree for project '{name}' is empty."
     lines = [f"Local tree for project '{name}':"]
@@ -625,6 +648,8 @@ def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
         return "?"
     if entry.action == "unchanged":
         return "="
+    if entry.action == "skip":
+        return "·"
     if entry.state == "changed":
         return "~"
     if direction == "push":
@@ -660,6 +685,7 @@ def _format_comparison_entries(
         "?": "\033[35m",
         "=": "\033[90m",
         "!": "\033[90m",
+        "·": "\033[90m",
     }
     for entry in entries:
         marker = _comparison_marker(entry, direction)

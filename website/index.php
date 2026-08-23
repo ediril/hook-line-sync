@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.23.11';
+$version = '0.8.23.12';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 
@@ -95,7 +95,7 @@ function h(string $value): string
                         <p><span class="changed">~</span> &nbsp; assets/site.css</p>
                         <p><span class="added">+</span> <span class="directory">d assets/icons</span></p>
                         <p class="excluded"><span>!</span> <span class="directory-dark">d vendor</span></p>
-                        <p><span class="removed">-</span> &nbsp; legacy.php</p>
+                        <p class="excluded"><span>·</span> &nbsp; legacy.php</p>
                         <p class="terminal-gap"><span class="prompt">❯</span> <b>hls push</b></p>
                         <p><span class="success">✓</span> Push completed: 3 changes.</p>
                         <span class="cursor" aria-hidden="true"></span>

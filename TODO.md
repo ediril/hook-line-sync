@@ -9,6 +9,8 @@
 - [x] Split profile inspection into a minimal `profiles` list and detailed
   `profile [PROFILE]` view, and interactively resolve ambiguous command prefixes
   without guessing in noninteractive use.
+- [x] Give `list` the shared path-selector model and make remote pruning an
+  explicitly push-only action with unambiguous diff markers.
 - [x] Complete packaging documentation, release checks, and PyPI publication
   preparation:
   - [x] Define the concrete support and service benefits of the voluntary

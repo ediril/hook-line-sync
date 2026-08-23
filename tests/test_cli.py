@@ -510,6 +510,13 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
     assert invoke(["list"], store) == local_listing
     assert invoke(["ls"], store) == local_listing
+    assert invoke(["list", "*"], store) == (
+        0,
+        "Local tree for project 'prod':\n"
+        "!   src/debug.log\n"
+        "    src/main.py\n",
+        "",
+    )
     push_comparison = invoke(["diff"], store)
     push_progress = (
         "Checking differences for project 'prod'...\n"
@@ -520,11 +527,13 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert "Local -> Remote for project 'prod':\n" in push_comparison[1]
     assert "+   README.md\n" in push_comparison[1]
-    assert "-   deployed.html\n" in push_comparison[1]
+    assert "·   deployed.html\n" in push_comparison[1]
     assert "?   linked\n" in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
     assert "src/debug.log" not in push_comparison[1]
+    pruned_comparison = invoke(["diff", "--prune-remote"], store)
+    assert "-   deployed.html\n" in pruned_comparison[1]
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
     assert selected_comparison[2] == push_progress
@@ -558,12 +567,16 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "Resume:" not in resumed[1]
     monkeypatch.chdir(source)
 
-    pull_comparison = invoke(["diff", "--pull", "-p"], store)
+    pull_comparison = invoke(["diff", "--pull"], store)
     assert pull_comparison[0] == 0
     assert pull_comparison[2].endswith("Comparing directory 'src'...\n")
     assert "Remote -> Local for project 'prod':\n" in pull_comparison[1]
-    assert "+   deployed.html\n" in pull_comparison[1]
-    assert "-   README.md\n" in pull_comparison[1]
+    assert "·   deployed.html\n" in pull_comparison[1]
+    assert "·   README.md\n" in pull_comparison[1]
+    with pytest.raises(SystemExit):
+        run(["diff", "--pull", "-p"], store=store)
+    with pytest.raises(SystemExit):
+        run(["pull", "-p"], store=store)
 
     push_result = invoke(["push", "main.py"], store)
     assert push_result[0] == 0
@@ -581,7 +594,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
-    assert len(transports) == 10
+    assert len(transports) == 11
 
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(

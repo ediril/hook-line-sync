@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.23.12 — 2026-08-23
+
+### Changed
+
+- Added diff-style, current-directory-aware path selectors to the local
+  `hls list` command.
+- Made remote pruning exclusive to push and its default diff projection;
+  pull now rejects `--prune-remote`.
+- Distinguished one-sided paths that will be kept (`·`) from projected remote
+  deletions (`-`) in diff output.
+
 ## 0.8.23.11 — 2026-08-23
 
 ### Added
