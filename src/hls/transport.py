@@ -58,6 +58,12 @@ class RemoteTransport(Protocol):
         include_excluded: bool = False,
     ) -> TreeSnapshot: ...
 
+    def list_directory(
+        self,
+        relative_directory: PurePosixPath,
+        rules: RuleSet,
+    ) -> TreeSnapshot: ...
+
     def make_directory(self, relative_path: str) -> None: ...
 
     def upload_file(
@@ -144,88 +150,18 @@ class ExplicitFTPSTransport:
         entries: list[TreeEntry] = []
 
         def walk(relative_directory: PurePosixPath) -> None:
-            remote_directory = relative_directory.as_posix()
-            if remote_directory == ".":
-                remote_directory = ""
-            try:
-                children = sorted(
-                    self._client.mlsd(
-                        remote_directory,
-                        facts=["type", "size", "modify"],
-                    ),
-                    key=lambda item: item[0],
-                )
-            except (OSError, ftplib.Error, ssl.SSLError) as error:
-                display_path = remote_directory or "."
-                raise TransportError(
-                    f"could not list remote directory '{display_path}': {error}"
-                ) from error
-
-            for name, facts in children:
-                entry_type = facts.get("type", "").lower()
-                if entry_type in {"cdir", "pdir"}:
-                    continue
-                if not name or "/" in name or name in {".", ".."}:
-                    raise TransportError(f"invalid name in remote listing: {name!r}")
-                relative = relative_directory / name
-                relative_path = relative.as_posix()
-                if entry_type == "dir":
-                    kind: EntryKind = "directory"
-                elif entry_type == "file":
-                    kind = "file"
-                elif entry_type.startswith("os.unix=slink"):
-                    kind = "symlink"
-                else:
-                    raise TransportError(
-                        f"unsupported remote entry type {entry_type!r} "
-                        f"for '{relative_path}'"
-                    )
-                excluded = rules.excludes(
-                    relative_path,
-                    is_directory=kind == "directory",
-                )
+            listing = self.list_directory(relative_directory, rules)
+            for entry in listing.entries:
+                relative_path = entry.path
+                relative = PurePosixPath(relative_path)
+                kind = entry.kind
+                excluded = entry.excluded
                 visible = not excluded or include_excluded
                 selected = visible and (
                     selector is None or selector.matches(relative_path)
                 )
-                if selected and kind == "file":
-                    size_value = facts.get("size")
-                    modified_value = facts.get("modify")
-                    if size_value is None or modified_value is None:
-                        raise TransportError(
-                            f"remote file metadata is incomplete for "
-                            f"'{relative_path}'"
-                        )
-                    try:
-                        size = int(size_value)
-                    except ValueError as error:
-                        raise TransportError(
-                            f"invalid MLSD size {size_value!r} for "
-                            f"'{relative_path}'"
-                        ) from error
-                    modified_ns, precision_ns = _parse_mlsd_modify(
-                        modified_value,
-                        relative_path,
-                    )
-                    try:
-                        entry = TreeEntry(
-                            relative_path,
-                            kind,
-                            size=size,
-                            modified_ns=modified_ns,
-                            timestamp_precision_ns=precision_ns,
-                            excluded=excluded,
-                        )
-                    except SnapshotError as error:
-                        raise TransportError(
-                            f"invalid remote file metadata for "
-                            f"'{relative_path}': {error}"
-                        ) from error
+                if selected:
                     entries.append(entry)
-                elif selected:
-                    entries.append(
-                        TreeEntry(relative_path, kind, excluded=excluded)
-                    )
                 selection_may_descend = (
                     selector is None
                     or selector.may_match_descendant(relative_path)
@@ -243,6 +179,89 @@ class ExplicitFTPSTransport:
                     walk(relative)
 
         walk(PurePosixPath())
+        return TreeSnapshot(tuple(entries))
+
+    def list_directory(
+        self,
+        relative_directory: PurePosixPath,
+        rules: RuleSet,
+    ) -> TreeSnapshot:
+        """Read one remote directory using one structured MLSD listing."""
+        client = self._connected_client()
+        remote_directory = relative_directory.as_posix()
+        if remote_directory == ".":
+            remote_directory = ""
+        try:
+            children = sorted(
+                client.mlsd(
+                    remote_directory,
+                    facts=["type", "size", "modify"],
+                ),
+                key=lambda item: item[0],
+            )
+        except (OSError, ftplib.Error, ssl.SSLError) as error:
+            display_path = remote_directory or "."
+            raise TransportError(
+                f"could not list remote directory '{display_path}': {error}"
+            ) from error
+
+        entries: list[TreeEntry] = []
+        for name, facts in children:
+            entry_type = facts.get("type", "").lower()
+            if entry_type in {"cdir", "pdir"}:
+                continue
+            if not name or "/" in name or name in {".", ".."}:
+                raise TransportError(f"invalid name in remote listing: {name!r}")
+            relative_path = (relative_directory / name).as_posix()
+            if entry_type == "dir":
+                kind: EntryKind = "directory"
+            elif entry_type == "file":
+                kind = "file"
+            elif entry_type.startswith("os.unix=slink"):
+                kind = "symlink"
+            else:
+                raise TransportError(
+                    f"unsupported remote entry type {entry_type!r} "
+                    f"for '{relative_path}'"
+                )
+            excluded = rules.excludes(
+                relative_path,
+                is_directory=kind == "directory",
+            )
+            if kind != "file":
+                entries.append(TreeEntry(relative_path, kind, excluded=excluded))
+                continue
+            size_value = facts.get("size")
+            modified_value = facts.get("modify")
+            if size_value is None or modified_value is None:
+                raise TransportError(
+                    f"remote file metadata is incomplete for '{relative_path}'"
+                )
+            try:
+                size = int(size_value)
+            except ValueError as error:
+                raise TransportError(
+                    f"invalid MLSD size {size_value!r} for '{relative_path}'"
+                ) from error
+            modified_ns, precision_ns = _parse_mlsd_modify(
+                modified_value,
+                relative_path,
+            )
+            try:
+                entries.append(
+                    TreeEntry(
+                        relative_path,
+                        kind,
+                        size=size,
+                        modified_ns=modified_ns,
+                        timestamp_precision_ns=precision_ns,
+                        excluded=excluded,
+                    )
+                )
+            except SnapshotError as error:
+                raise TransportError(
+                    f"invalid remote file metadata for '{relative_path}': {error}"
+                ) from error
         return TreeSnapshot(tuple(entries))
 
     def _connected_client(self) -> ftplib.FTP_TLS:

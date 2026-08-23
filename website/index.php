@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.23.9';
+$version = '0.8.23.10';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 
@@ -87,14 +87,14 @@ function h(string $value): string
                         <span class="terminal-state">TLS:ON</span>
                     </div>
                     <div class="terminal-body">
-                        <p><span class="prompt">❯</span> <b>hls diff</b></p>
+                        <p><span class="prompt">❯</span> <b>hls diff --all</b></p>
                         <p class="muted">Checking differences for project 'discovery'...</p>
-                        <p class="muted">Reading remote files over FTPS...</p>
-                        <p class="terminal-heading">Local -&gt; Remote:</p>
+                        <p class="muted">Comparing directory '.'...</p>
+                        <p class="terminal-heading">Local -&gt; Remote for project 'discovery':</p>
                         <p><span class="added">+</span> &nbsp; index.php</p>
                         <p><span class="changed">~</span> &nbsp; assets/site.css</p>
                         <p><span class="added">+</span> <span class="directory">d assets/icons</span></p>
-                        <p class="excluded"><span>·</span> <span class="directory-dark">d vendor</span></p>
+                        <p class="excluded"><span>!</span> <span class="directory-dark">d vendor</span></p>
                         <p><span class="removed">-</span> &nbsp; legacy.php</p>
                         <p class="terminal-gap"><span class="prompt">❯</span> <b>hls push</b></p>
                         <p><span class="success">✓</span> Push completed: 3 changes.</p>
@@ -140,7 +140,7 @@ function h(string $value): string
                     <span class="step-number">03</span>
                     <div class="step-icon" aria-hidden="true">∆</div>
                     <h3>Read the diff</h3>
-                    <p>Compare local and remote files before changing either side. New, modified, missing, conflicting, and excluded paths are labeled.</p>
+                    <p>Compare local and remote files before changing either side. Add <code>--all</code> when you also want unchanged and excluded paths.</p>
                     <code>hls diff</code>
                 </li>
                 <li>

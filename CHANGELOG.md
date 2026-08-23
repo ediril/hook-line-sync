@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.23.10 — 2026-08-23
+
+### Added
+
+- Added progressive, directory-at-a-time diff output, an `--all` audit view,
+  and stateless `--paged`/`--resume` review commands.
+- Added `hls profiles` as the dedicated configured-profile listing.
+
+### Changed
+
+- Made `hls list` the local mapped-tree view with visible exclusion status.
+- Removed the overlapping `tracked`, `lsl`, and `lsr` commands.
+- Applied diff selectors and exclusions before descending into remote
+  directories, while leaving push and pull planning unchanged.
+
 ## 0.8.23.9 — 2026-08-23
 
 ### Changed

@@ -111,8 +111,7 @@ Removal does not connect to the server or delete remote files.
 Command names may be shortened to any unique prefix. For example, `hls con`
 means `hls connect`, while `hls d` means `hls diff`. An ambiguous prefix is
 rejected and lists its candidates. The established `ls` compatibility spelling
-remains available but is intentionally omitted from the help menu; `lsl` and
-`lsr` remain documented commands.
+for `list` remains available but is intentionally omitted from the help menu.
 
 Every path-accepting command supports multiple operands and comma-separated
 groups. Diff, push, and pull interpret wildcards as selectors and use no
@@ -120,15 +119,12 @@ operands for the whole project. Exclude and include resolve wildcard operands
 to current local paths by default, use `--pattern` to retain wildcards, and use
 no operands to list their rules.
 
-List everything currently configured and mark the project whose local root
+List every configured profile and mark the one whose local root
 contains the current directory:
 
 ```console
-hls list
-hls ls
+hls profiles
 ```
-
-`hls list projects` is the explicit form.
 
 ## Local roots
 
@@ -198,15 +194,16 @@ any other unwanted rule by its stable ID:
 hls rules remove 3
 ```
 
-List the local files currently eligible for synchronization with:
+List the complete mapped local tree and its exclusion status with:
 
 ```console
-hls tracked
+hls list
 ```
 
-`hls tracked` prints one regular-file path per line, inspects only the mapped
-local root, and does not connect to FTPS. Use `--project <name>` when outside its
-mapped root. Excluded files remain visible as gray diagnostics in `hls diff`.
+`hls list` inspects only the mapped local root and does not connect to FTPS.
+Directories use a `d` type marker and excluded paths use `!`; included files
+leave both columns blank. Use `--project <name>` when outside a mapped root.
+`hls ls` remains an unadvertised compatibility spelling.
 
 Re-include narrower paths later by appending an ordered override:
 
@@ -228,8 +225,8 @@ combined in one command. A literal filename containing a comma cannot be
 addressed because commas delimit pattern groups.
 
 The project is inferred from the current directory; use `--project <name>`
-elsewhere. Excluded paths stay outside tree listings, push, pull, and remote
-pruning, but diff displays excluded files as neutral gray diagnostic entries.
+elsewhere. Excluded paths stay outside push, pull, remote pruning, and the
+default diff; they remain visible in the local listing and in `hls diff --all`.
 Empty patterns, absolute paths, parent traversal, and partial-segment `**` are
 rejected. A quoted wildcard operand that matches nothing is rejected unless
 `--pattern` is used.
@@ -239,33 +236,6 @@ store Gitignore lines, and `!` or a leading `/` has no special rule meaning.
 Configuration schema version 7 is intentionally incompatible with the earlier
 raw `exclusions` array; recreate projects and rules rather than reusing that
 array.
-
-## Tree inventories
-
-From anywhere under a mapped local root, list the complete local or remote
-project tree:
-
-```console
-hls list local
-hls list remote
-hls lsl
-hls lsr
-```
-
-`hls lsl` and `hls lsr` are shorthands for the corresponding `list` commands.
-
-An explicit project may be supplied when running elsewhere:
-
-```console
-hls list local prod
-hls list remote prod
-```
-
-Both commands display deterministic project-relative paths and apply the same
-mapping exclusions. Directories, files, and symlinks are labeled separately;
-symlinks are listed but never followed. Remote traversal uses MLSD over the
-protected FTPS data connection and fails if the server cannot provide a
-structured listing.
 
 ## Diff
 
@@ -291,14 +261,16 @@ hls diff 'index.html,app.js,styles.css'
 hls diff *
 hls diff 'src/*.js'
 hls diff '**/*.css'
+hls diff .
 ```
 
 An unquoted wildcard may be expanded by the shell into multiple arguments; HLS
-treats them as one union. Selected directories appear as entries, but their
-contents are not scanned unless the selector is recursive. Quote a wildcard
-when HLS should interpret it itself. `*` stays within one path segment and `**`
-matches recursively. A selection whose entire union is unmatched or excluded,
-or that contains an absolute or parent-traversing path, is rejected. Use
+treats them as one union. `.` means the complete subtree under the current
+directory. Selected directories appear as entries, but their contents are not
+scanned unless the selector is recursive. Quote a wildcard when HLS should
+interpret it itself. `*` stays within one path segment and `**` matches
+recursively. A selection whose entire union is unmatched or excluded, or that
+contains an absolute or parent-traversing path, is rejected. Use
 `--project <name>` to select a project explicitly; outside that project's local
 root, its selectors are project-root-relative.
 
@@ -314,20 +286,36 @@ receive `d`; files and symlinks leave the type column blank:
 +   new-file
 ~   modified on the selected side
 -   missing from the selected side
-!   type or symlink conflict
-·   excluded from synchronization
+?   type or symlink conflict
+=   unchanged
+!   excluded from synchronization
 ```
 
-The default selected side is local; `--pull` reverses it to remote. Status lines
-are green, yellow, red, and magenta on terminals. Color is disabled when output
+The default selected side is local; `--pull` reverses it to remote. By default,
+diff prints only synchronization actions and conflicts. Use `hls diff --all` to
+also show unchanged and excluded paths. Status lines use distinct terminal
+colors; unchanged and excluded paths are dimmed. Color is disabled when output
 is redirected or `NO_COLOR` is set. Directory paths are bright blue, excluded
-directory paths are darker blue, and excluded non-directories are gray. Color
-can be controlled explicitly with `--color auto|always|never`.
+directory paths are darker blue, and color can be controlled explicitly with
+`--color auto|always|never`.
 
-Diff uses diagnostic snapshots that show excluded directories and inspect them
-so their contents can be shown. Push and pull continue to omit excluded paths entirely.
-Selectors are still applied before traversal, so a path-limited comparison does
-not scan unrelated excluded branches.
+Diff applies selectors before remote traversal and requests one MLSD listing per
+relevant directory. Results are printed and flushed after each directory rather
+than waiting for a complete remote snapshot. The default mode does not descend
+into wholly excluded branches; `--all` does so to produce its complete audit
+view. Push and pull continue to omit excluded paths entirely.
+
+For an interruptible directory-by-directory review, use:
+
+```console
+hls diff --paged
+```
+
+Paged mode compares one directory, prints the exact resume command, and exits
+to the shell. Running that command resumes at the printed project-relative
+directory. Traversal is deterministic and the cursor is stateless: HLS stores
+no paging session, though it must list the cursor's ancestor directories again
+to reconstruct the remaining walk safely.
 
 Local path existence remains authoritative for transfer behavior, so a
 remote-only path is skipped rather than restored or deleted by default. Include
@@ -343,11 +331,11 @@ files.
 
 File identity uses size and modification timestamps normalized to the coarser
 precision reported by the local filesystem and remote MLSD facts. Identical
-paths are omitted from the output.
+paths are omitted unless `--all` is supplied.
 
-Diff prints immediately flushed progress milestones to stderr while it
-connects and scans. The final status view is written to stdout, so it can be
-redirected without mixing status messages into the result.
+Diff prints immediately flushed progress to stderr while it connects and moves
+through directories. Diff entries are progressively written to stdout, so they
+can be redirected without mixing status messages into the result.
 
 ## Push and pull
 

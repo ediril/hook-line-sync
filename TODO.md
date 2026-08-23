@@ -1,5 +1,11 @@
 # Work Queue
 
+- [x] Simplify inspection commands and make remote comparison interruptible:
+  - [x] Use `profiles` for configured entries and `list` for the complete local
+    tree with exclusion status; remove `tracked`, `lsl`, and `lsr`.
+  - [x] Stream diff results one deterministic directory at a time.
+  - [x] Add `--all` for unchanged and excluded paths.
+  - [x] Add stateless `--paged` and `--resume` directory cursors.
 - [x] Complete packaging documentation, release checks, and PyPI publication
   preparation:
   - [x] Define the concrete support and service benefits of the voluntary

@@ -67,6 +67,9 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     )
     assert "compare" not in help_output
     assert "list (ls)" not in help_output
+    assert "tracked" not in help_output
+    assert "lsl" not in help_output
+    assert "lsr" not in help_output
     assert "explain" not in help_output
     assert "push                upload local changes to the remote project" in (
         help_output
@@ -80,28 +83,24 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert "hls rules [--project PROJECT_NAME]" in rules_help
     assert "hls rules remove RULE_ID [--project PROJECT_NAME]" in rules_help
     assert "[{remove}] [rule_id]" not in rules_help
-    list_help = invoke(["help", "list"], store)[1]
-    assert "hls list [projects]" in list_help
-    assert "hls list local [PROJECT]" in list_help
-    assert "hls list remote [PROJECT]" in list_help
-    assert "[{projects,local,remote}] [project_name]" not in list_help
+    assert "profiles            list configured profiles" in help_output
+    assert "list                list the mapped local tree" in help_output
     for command in ("exclude", "include"):
         rule_help = invoke(["help", command], store)[1]
         assert f"hls {command} [PATH ...]" in rule_help
         assert f"hls {command} --pattern PATTERN ..." in rule_help
 
-    list_status, list_stdout, list_stderr = invoke(["list"], store)
+    list_status, list_stdout, list_stderr = invoke(["profiles"], store)
     assert (list_status, list_stderr) == (0, "")
     assert "- client-site\n" in list_stdout
     assert "  Local root: not mapped\n" in list_stdout
-    assert invoke(["ls"], store)[1] == list_stdout
 
     assert invoke(["remove", "client-site"], store) == (
         0,
         "Removed project 'client-site'.\n",
         "",
     )
-    assert invoke(["list"], store)[1] == "No projects configured.\n"
+    assert invoke(["profiles"], store)[1] == "No profiles configured.\n"
 
 
 def test_add_maps_the_current_directory_after_confirmation(
@@ -155,7 +154,7 @@ def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
     with pytest.raises(SystemExit):
         run(["add", "unsafe", "--host", "ftp.example.com"], store=store)
     with pytest.raises(SystemExit):
-        run(["l"], store=store)
+        run(["p"], store=store)
 
 
 def test_add_supports_explicit_protocol_port_and_environment_names(tmp_path) -> None:
@@ -295,14 +294,11 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         "node_modules/package",
         "node_modules/package/nested.js",
     ]
-    included_view = (
-        0,
-        "Tracked local files for project 'prod':\n"
-        "  node_modules/keep.js\n"
-        "  node_modules/package/nested.js\n",
-        "",
-    )
-    assert invoke(["tracked"], store) == included_view
+    local_view = invoke(["list"], store)
+    assert local_view[0] == 0 and local_view[2] == ""
+    assert "    node_modules/keep.js\n" in local_view[1]
+    assert "!   composer.json\n" in local_view[1]
+    assert "!   docs/note.txt\n" in local_view[1]
     assert invoke(["exc"], store) == (
         0,
         "Exclusion rules for project 'prod':\n"
@@ -322,7 +318,7 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
         "  8  include node_modules/package/**\n",
         "",
     )
-    list_stdout = invoke(["list"], store)[1]
+    list_stdout = invoke(["profiles"], store)[1]
     assert "* prod\n" in list_stdout
     assert f"  Local root: {workspace}\n" in list_stdout
     assert "  Rules:\n" in list_stdout
@@ -359,6 +355,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     ignored.mkdir()
     outside.mkdir()
     (workspace / "README.md").write_text("read me", encoding="utf-8")
+    same = workspace / "same.txt"
+    same.write_text("same", encoding="utf-8")
     (source / "main.py").write_text("print('hello')", encoding="utf-8")
     (source / "debug.log").write_text("ignored", encoding="utf-8")
     (ignored / "package.js").write_text("ignored", encoding="utf-8")
@@ -383,6 +381,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
 
     transports = []
     operations = []
+    listed_directories = []
 
     class FakeTransport:
         def __init__(self, project) -> None:
@@ -413,6 +412,34 @@ def test_current_project_inference_drives_connect_and_tree_listings(
             if selector is None or selector.matches("deployed.html"):
                 return snapshot
             return TreeSnapshot()
+
+        def list_directory(self, relative_directory, rules):
+            listed_directories.append(relative_directory.as_posix())
+            assert rules.rules == (
+                SyncRule(1, "exclude", "node_modules/**"),
+                SyncRule(2, "exclude", "**/*.log"),
+            )
+            if relative_directory.as_posix() != ".":
+                return TreeSnapshot()
+            same_stat = same.stat()
+            return TreeSnapshot(
+                (
+                    TreeEntry(
+                        "deployed.html",
+                        "file",
+                        size=8,
+                        modified_ns=1_700_000_000_000_000_000,
+                        timestamp_precision_ns=1_000_000_000,
+                    ),
+                    TreeEntry(
+                        "same.txt",
+                        "file",
+                        size=same_stat.st_size,
+                        modified_ns=same_stat.st_mtime_ns,
+                        timestamp_precision_ns=1,
+                    ),
+                )
+            )
 
         def make_directory(self, path):
             operations.append(("mkdir", path))
@@ -446,38 +473,33 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     local_listing = (
         0,
         "Local tree for project 'prod':\n"
-        "  file      README.md\n"
-        "  symlink   linked\n"
-        "  directory src/\n"
-        "  file      src/main.py\n",
+        "    README.md\n"
+        "    linked\n"
+        "! d node_modules\n"
+        "!   node_modules/package.js\n"
+        "    same.txt\n"
+        "  d src\n"
+        "!   src/debug.log\n"
+        "    src/main.py\n",
         "",
     )
-    remote_listing = (
-        0,
-        "Remote tree for project 'prod':\n"
-        "  file      deployed.html\n",
-        "",
-    )
-    assert invoke(["list", "local"], store) == local_listing
-    assert invoke(["lsl"], store) == local_listing
-    assert invoke(["list", "remote"], store) == remote_listing
-    assert invoke(["lsr"], store) == remote_listing
+    assert invoke(["list"], store) == local_listing
+    assert invoke(["ls"], store) == local_listing
     push_comparison = invoke(["diff"], store)
     push_progress = (
         "Checking differences for project 'prod'...\n"
         "Connecting securely over FTPS...\n"
-        "Scanning local files...\n"
-        "Reading remote files over FTPS...\n"
-        "Building push plan...\n"
+        "Comparing directory '.'...\n"
+        "Comparing directory 'src'...\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert "Local -> Remote for project 'prod':\n" in push_comparison[1]
     assert "+   README.md\n" in push_comparison[1]
     assert "-   deployed.html\n" in push_comparison[1]
-    assert "!   linked\n" in push_comparison[1]
-    assert "· d node_modules\n" in push_comparison[1]
-    assert "·   node_modules/package.js\n" in push_comparison[1]
-    assert "·   src/debug.log\n" in push_comparison[1]
+    assert "?   linked\n" in push_comparison[1]
+    assert "node_modules" not in push_comparison[1]
+    assert "same.txt" not in push_comparison[1]
+    assert "src/debug.log" not in push_comparison[1]
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
     assert selected_comparison[2] == push_progress
@@ -494,17 +516,26 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "+   src/main.py\n" in expanded_comparison[1]
     assert "+ d src\n" in expanded_comparison[1]
 
-    colored_comparison = invoke(["diff", "**", "--color", "always"], store)
+    colored_comparison = invoke(
+        ["diff", "**", "--all", "--color", "always"], store
+    )
     assert "\033[32m+\033[0m \033[94md src\033[0m" in colored_comparison[1]
-    assert "\033[90m·\033[0m \033[34md node_modules\033[0m" in (
+    assert "\033[90m!\033[0m \033[34md node_modules\033[0m" in (
         colored_comparison[1]
     )
-    assert "\033[90m·   src/debug.log\033[0m" in colored_comparison[1]
+    assert "\033[90m!   src/debug.log\033[0m" in colored_comparison[1]
+    assert "\033[90m=   same.txt\033[0m" in colored_comparison[1]
+
+    paged = invoke(["diff", ".", "--paged"], store)
+    assert "Resume: hls diff . --paged --resume src\n" in paged[1]
+    resumed = invoke(["diff", ".", "--paged", "--resume", "src"], store)
+    assert "src/main.py" in resumed[1]
+    assert "Resume:" not in resumed[1]
     monkeypatch.chdir(source)
 
     pull_comparison = invoke(["diff", "--pull", "-p"], store)
     assert pull_comparison[0] == 0
-    assert pull_comparison[2].endswith("Building pull plan...\n")
+    assert pull_comparison[2].endswith("Comparing directory 'src'...\n")
     assert "Remote -> Local for project 'prod':\n" in pull_comparison[1]
     assert "+   deployed.html\n" in pull_comparison[1]
     assert "-   README.md\n" in pull_comparison[1]

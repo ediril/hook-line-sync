@@ -75,62 +75,19 @@ def snapshot_local(
         raise SnapshotError(f"local root is not an accessible directory: {root}")
     entries: list[TreeEntry] = []
 
-    def walk(directory: Path, relative_directory: PurePosixPath) -> None:
-        try:
-            with os.scandir(directory) as iterator:
-                children = sorted(iterator, key=lambda entry: entry.name)
-        except OSError as error:
-            raise SnapshotError(
-                f"could not read local directory '{directory}': {error}"
-            ) from error
-
-        for child in children:
-            relative = relative_directory / child.name
-            relative_path = relative.as_posix()
-            try:
-                if child.is_symlink():
-                    kind: EntryKind = "symlink"
-                elif child.is_dir(follow_symlinks=False):
-                    kind = "directory"
-                elif child.is_file(follow_symlinks=False):
-                    kind = "file"
-                else:
-                    raise SnapshotError(
-                        f"unsupported local entry type: {directory / child.name}"
-                    )
-            except OSError as error:
-                raise SnapshotError(
-                    f"could not inspect local path '{directory / child.name}': {error}"
-                ) from error
-
-            excluded = rules.excludes(
-                relative_path,
-                is_directory=kind == "directory",
-            )
+    def walk(relative_directory: PurePosixPath) -> None:
+        listing = list_local_directory(root, relative_directory, rules)
+        for entry in listing.entries:
+            relative_path = entry.path
+            relative = PurePosixPath(relative_path)
+            kind = entry.kind
+            excluded = entry.excluded
             visible = not excluded or include_excluded
             selected = visible and (
                 selector is None or selector.matches(relative_path)
             )
-            if selected and kind == "file":
-                try:
-                    stat = child.stat(follow_symlinks=False)
-                except OSError as error:
-                    raise SnapshotError(
-                        f"could not read local file metadata "
-                        f"'{directory / child.name}': {error}"
-                    ) from error
-                entries.append(
-                    TreeEntry(
-                        relative_path,
-                        kind,
-                        size=stat.st_size,
-                        modified_ns=stat.st_mtime_ns,
-                        timestamp_precision_ns=1,
-                        excluded=excluded,
-                    )
-                )
-            elif selected:
-                entries.append(TreeEntry(relative_path, kind, excluded=excluded))
+            if selected:
+                entries.append(entry)
             selection_may_descend = (
                 selector is None or selector.may_match_descendant(relative_path)
             )
@@ -140,7 +97,66 @@ def snapshot_local(
                 or rules.may_include_descendant(relative_path)
             )
             if kind == "directory" and selection_may_descend and exclusion_may_descend:
-                walk(directory / child.name, relative)
+                walk(relative)
 
-    walk(root, PurePosixPath())
+    walk(PurePosixPath())
+    return TreeSnapshot(tuple(entries))
+
+
+def list_local_directory(
+    root: Path,
+    relative_directory: PurePosixPath,
+    rules: RuleSet,
+) -> TreeSnapshot:
+    """Inspect one directory and return all immediate children."""
+    directory = root / relative_directory
+    try:
+        with os.scandir(directory) as iterator:
+            children = sorted(iterator, key=lambda entry: entry.name)
+    except OSError as error:
+        raise SnapshotError(
+            f"could not read local directory '{directory}': {error}"
+        ) from error
+
+    entries: list[TreeEntry] = []
+    for child in children:
+        relative = relative_directory / child.name
+        relative_path = relative.as_posix()
+        try:
+            if child.is_symlink():
+                kind: EntryKind = "symlink"
+            elif child.is_dir(follow_symlinks=False):
+                kind = "directory"
+            elif child.is_file(follow_symlinks=False):
+                kind = "file"
+            else:
+                raise SnapshotError(
+                    f"unsupported local entry type: {directory / child.name}"
+                )
+        except OSError as error:
+            raise SnapshotError(
+                f"could not inspect local path '{directory / child.name}': {error}"
+            ) from error
+
+        excluded = rules.excludes(relative_path, is_directory=kind == "directory")
+        if kind == "file":
+            try:
+                stat = child.stat(follow_symlinks=False)
+            except OSError as error:
+                raise SnapshotError(
+                    f"could not read local file metadata '{directory / child.name}': "
+                    f"{error}"
+                ) from error
+            entries.append(
+                TreeEntry(
+                    relative_path,
+                    kind,
+                    size=stat.st_size,
+                    modified_ns=stat.st_mtime_ns,
+                    timestamp_precision_ns=1,
+                    excluded=excluded,
+                )
+            )
+        else:
+            entries.append(TreeEntry(relative_path, kind, excluded=excluded))
     return TreeSnapshot(tuple(entries))

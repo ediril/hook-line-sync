@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import argparse
 import os
+import shlex
 import sys
 from collections.abc import Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TextIO
 
 from hls import __version__
@@ -32,7 +33,12 @@ from hls.rules import (
     patterns_from_operands,
 )
 from hls.selection import FileSelection, FileSelector, FileSelectorSet, SelectionError
-from hls.snapshot import SnapshotError, TreeSnapshot, snapshot_local
+from hls.snapshot import (
+    SnapshotError,
+    TreeSnapshot,
+    list_local_directory,
+    snapshot_local,
+)
 from hls.transfer import TransferError, TransferResult, execute_transfer
 from hls.transport import ExplicitFTPSTransport, TransportError
 
@@ -41,15 +47,13 @@ CANONICAL_COMMANDS = (
     "connect",
     "map",
     "remove",
+    "profiles",
     "list",
-    "lsl",
-    "lsr",
     "diff",
     "push",
     "pull",
     "exclude",
     "include",
-    "tracked",
     "rules",
     "help",
     "version",
@@ -147,15 +151,6 @@ def build_parser() -> argparse.ArgumentParser:
             help="project name; inferred from the current directory when omitted",
         )
 
-    tracked_parser = subparsers.add_parser(
-        "tracked", help="list local files eligible for synchronization"
-    )
-    tracked_parser.add_argument(
-        "--project",
-        dest="project_name",
-        help="project name; inferred from the current directory when omitted",
-    )
-
     rules_parser = subparsers.add_parser(
         "rules",
         help="list or remove synchronization rules",
@@ -190,42 +185,17 @@ def build_parser() -> argparse.ArgumentParser:
     remove_parser = subparsers.add_parser("remove", help="remove a project")
     remove_parser.add_argument("project_name")
 
+    subparsers.add_parser("profiles", help="list configured profiles")
+
     list_parser = subparsers.add_parser(
         "list",
-        help="list configured projects or a project's local or remote tree",
-        usage=(
-            "hls list [projects]\n"
-            "       hls list local [PROJECT]\n"
-            "       hls list remote [PROJECT]"
-        ),
-        description=(
-            "List configured projects, or list the local or remote tree for one "
-            "project."
-        ),
+        help="list the mapped local tree and exclusion status",
     )
     list_parser.add_argument(
-        "target",
-        nargs="?",
-        choices=("projects", "local", "remote"),
-        default="projects",
-        help="projects lists configurations; local or remote lists a tree",
+        "--project",
+        dest="project_name",
+        help="project name; inferred from the current directory when omitted",
     )
-    list_parser.add_argument(
-        "project_name",
-        nargs="?",
-        metavar="PROJECT",
-        help="optional with local or remote; inferred from the current directory",
-    )
-
-    local_list_parser = subparsers.add_parser(
-        "lsl", help="list the local tree for a mapped project"
-    )
-    local_list_parser.add_argument("project_name", nargs="?")
-
-    remote_list_parser = subparsers.add_parser(
-        "lsr", help="list the remote tree for a mapped project"
-    )
-    remote_list_parser.add_argument("project_name", nargs="?")
 
     diff_parser = subparsers.add_parser(
         "diff",
@@ -252,6 +222,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--pull",
         action="store_true",
         help="show changes from the remote perspective",
+    )
+    diff_parser.add_argument(
+        "--all",
+        action="store_true",
+        help="also show unchanged and excluded paths",
+    )
+    diff_parser.add_argument(
+        "--paged",
+        action="store_true",
+        help="show one directory, then exit with a resume command",
+    )
+    diff_parser.add_argument(
+        "--resume",
+        metavar="DIRECTORY",
+        help="resume a paged diff at a project-relative directory",
     )
     diff_parser.add_argument(
         "-p",
@@ -503,32 +488,6 @@ def _change_rules(
     )
 
 
-def _list_tracked_files(
-    arguments: argparse.Namespace,
-    store: ConfigurationStore,
-) -> str:
-    _, name, project = _resolve_project(arguments, store)
-    root = _require_local_root(name, project)
-    snapshot = snapshot_local(
-        root,
-        RuleSet(project.rules),
-        include_excluded=True,
-    )
-    paths = tuple(
-        entry.path
-        for entry in snapshot.entries
-        if entry.kind == "file" and not entry.excluded
-    )
-    if not paths:
-        return f"No tracked local files for project '{name}'."
-    return "\n".join(
-        (
-            f"Tracked local files for project '{name}':",
-            *(f"  {path}" for path in paths),
-        )
-    )
-
-
 def _manage_rules(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
@@ -555,10 +514,10 @@ def _remove(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     return f"Removed project '{name}'."
 
 
-def _list_projects(store: ConfigurationStore) -> str:
+def _list_profiles(store: ConfigurationStore) -> str:
     configuration = store.load()
     if not configuration.projects:
-        return "No projects configured."
+        return "No profiles configured."
 
     active = configuration.project_for_path(Path.cwd().resolve(strict=True))
     active_name = active[0] if active is not None else None
@@ -588,29 +547,22 @@ def _require_local_root(name: str, project: ProjectConfiguration) -> Path:
     return Path(project.local_root)
 
 
-def _format_snapshot(source: str, name: str, snapshot: TreeSnapshot) -> str:
-    if not snapshot.entries:
-        return f"{source} tree for project '{name}' is empty."
-    lines = [f"{source} tree for project '{name}':"]
-    for entry in snapshot.entries:
-        path = f"{entry.path}/" if entry.kind == "directory" else entry.path
-        lines.append(f"  {entry.kind:<9} {path}")
-    return "\n".join(lines)
-
-
 def _list_local(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
-    snapshot = snapshot_local(root, RuleSet(project.rules))
-    return _format_snapshot("Local", name, snapshot)
-
-
-def _list_remote(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
-    _, name, project = _resolve_project(arguments, store)
-    _require_local_root(name, project)
-    with ExplicitFTPSTransport(project) as transport:
-        snapshot = transport.snapshot(RuleSet(project.rules))
-    return _format_snapshot("Remote", name, snapshot)
+    snapshot = snapshot_local(
+        root,
+        RuleSet(project.rules),
+        include_excluded=True,
+    )
+    if not snapshot.entries:
+        return f"Local tree for project '{name}' is empty."
+    lines = [f"Local tree for project '{name}':"]
+    for entry in snapshot.entries:
+        marker = "!" if entry.excluded else " "
+        kind = "d" if entry.kind == "directory" else " "
+        lines.append(f"{marker} {kind} {entry.path}")
+    return "\n".join(lines)
 
 
 def _comparison_kind(entry: ComparisonEntry) -> str:
@@ -625,9 +577,11 @@ def _comparison_kind(entry: ComparisonEntry) -> str:
 
 def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
     if entry.action == "excluded":
-        return "·"
-    if entry.action == "conflict":
         return "!"
+    if entry.action == "conflict":
+        return "?"
+    if entry.action == "unchanged":
+        return "="
     if entry.state == "changed":
         return "~"
     if direction == "push":
@@ -649,26 +603,24 @@ def _use_color(mode: str, output: TextIO) -> bool:
     return bool(is_terminal and is_terminal())
 
 
-def _format_comparison(
-    name: str,
-    plan: ComparisonPlan,
+def _format_comparison_entries(
+    entries: Sequence[ComparisonEntry],
+    direction: str,
     *,
     color: bool,
-) -> str:
-    perspective = "Local -> Remote" if plan.direction == "push" else "Remote -> Local"
-    if not plan.differences:
-        return f"{perspective} for project '{name}': no differences."
-    lines = [f"{perspective} for project '{name}':"]
+) -> tuple[str, ...]:
+    lines: list[str] = []
     colors = {
         "+": "\033[32m",
         "~": "\033[33m",
         "-": "\033[31m",
-        "!": "\033[35m",
-        "·": "\033[90m",
+        "?": "\033[35m",
+        "=": "\033[90m",
+        "!": "\033[90m",
     }
-    for entry in plan.differences:
-        marker = _comparison_marker(entry, plan.direction)
-        directory = _comparison_entry_kind(entry, plan.direction) == "directory"
+    for entry in entries:
+        marker = _comparison_marker(entry, direction)
+        directory = _comparison_entry_kind(entry, direction) == "directory"
         kind = "d" if directory else " "
         line = f"{marker} {kind} {entry.path}"
         if not color:
@@ -681,23 +633,105 @@ def _format_comparison(
             )
         else:
             lines.append(f"{colors[marker]}{line}\033[0m")
-    return "\n".join(lines)
+    return tuple(lines)
 
 
 def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection | None:
+    current_directory = Path.cwd().resolve(strict=True)
+    values = [
+        "**" if value == "." else value
+        for value in normalize_pattern_operands(arguments)
+    ]
     selectors = tuple(
         FileSelector.from_argument(
             value,
             project_root=root,
-            current_directory=Path.cwd().resolve(strict=True),
+            current_directory=current_directory,
         )
-        for value in normalize_pattern_operands(arguments)
+        for value in values
     )
     if not selectors:
         return None
     if len(selectors) == 1:
         return selectors[0]
     return FileSelectorSet(selectors)
+
+
+def _filtered_listing(
+    listing: TreeSnapshot,
+    selector: FileSelection | None,
+    *,
+    include_all: bool,
+) -> TreeSnapshot:
+    return TreeSnapshot(
+        tuple(
+            entry
+            for entry in listing.entries
+            if (include_all or not entry.excluded)
+            and (selector is None or selector.matches(entry.path))
+        )
+    )
+
+
+def _descendant_directories(
+    local: TreeSnapshot,
+    remote: TreeSnapshot,
+    rules: RuleSet,
+    selector: FileSelection | None,
+    *,
+    include_all: bool,
+) -> tuple[tuple[PurePosixPath, bool, bool], ...]:
+    local_directories = {
+        entry.path: entry for entry in local.entries if entry.kind == "directory"
+    }
+    remote_directories = {
+        entry.path: entry for entry in remote.entries if entry.kind == "directory"
+    }
+    paths = sorted(local_directories.keys() | remote_directories.keys())
+    return tuple(
+        (
+            PurePosixPath(path),
+            path in local_directories,
+            path in remote_directories,
+        )
+        for path in paths
+        for entry in (local_directories.get(path) or remote_directories[path],)
+        if (selector is None or selector.may_match_descendant(path))
+        and (
+            include_all
+            or not entry.excluded
+            or rules.may_include_descendant(path)
+        )
+    )
+
+
+def _resume_directory(value: str | None) -> PurePosixPath | None:
+    if value is None:
+        return None
+    path = PurePosixPath(value)
+    if path.is_absolute() or not path.parts or ".." in path.parts:
+        raise SelectionError(
+            "resume directory must be a project-relative directory"
+        )
+    if any(character in value for character in "*?["):
+        raise SelectionError("resume directory cannot contain wildcards")
+    return path
+
+
+def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> str:
+    command = ["hls", "diff", *arguments.pattern_operands]
+    if arguments.project_name is not None:
+        command.extend(("--project", arguments.project_name))
+    if arguments.pull:
+        command.append("--pull")
+    if arguments.prune_remote:
+        command.append("--prune-remote")
+    if arguments.all:
+        command.append("--all")
+    if arguments.color != "auto":
+        command.extend(("--color", arguments.color))
+    command.extend(("--paged", "--resume", directory.as_posix()))
+    return shlex.join(command)
 
 
 def _build_plan(
@@ -741,26 +775,131 @@ def _diff(
     store: ConfigurationStore,
     progress: TextIO,
     output: TextIO,
-) -> str:
+) -> None:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
+    if arguments.resume is not None and not arguments.paged:
+        raise ConfigurationError("--resume requires --paged")
+    resume = _resume_directory(arguments.resume)
+    selector = _file_selection(arguments, root)
+    rules = RuleSet(project.rules)
+    direction = "pull" if arguments.pull else "push"
+    perspective = "Local -> Remote" if direction == "push" else "Remote -> Local"
+    color = _use_color(arguments.color, output)
     print(f"Checking differences for project '{name}'...", file=progress, flush=True)
     print("Connecting securely over FTPS...", file=progress, flush=True)
+    pending = [(PurePosixPath(), True, True)]
+    seeking = resume is not None
+    selected_count = 0
+    displayed_count = 0
     with ExplicitFTPSTransport(project) as transport:
-        _, _, plan = _build_plan(
-            arguments,
-            project,
-            root,
-            transport,
-            direction="pull" if arguments.pull else "push",
-            progress=progress,
-            include_excluded=True,
-        )
-    return _format_comparison(
-        name,
-        plan,
-        color=_use_color(arguments.color, output),
-    )
+        print(f"{perspective} for project '{name}':", file=output, flush=True)
+        while pending:
+            directory, has_local, has_remote = pending.pop()
+            display_directory = directory.as_posix()
+            print(
+                f"Comparing directory '{display_directory}'...",
+                file=progress,
+                flush=True,
+            )
+            local_listing = (
+                list_local_directory(root, directory, rules)
+                if has_local
+                else TreeSnapshot()
+            )
+            remote_listing = (
+                transport.list_directory(directory, rules)
+                if has_remote
+                else TreeSnapshot()
+            )
+            descendants = _descendant_directories(
+                local_listing,
+                remote_listing,
+                rules,
+                selector,
+                include_all=arguments.all,
+            )
+
+            if seeking and directory != resume:
+                assert resume is not None
+                current_parts = directory.parts
+                if resume.parts[: len(current_parts)] != current_parts:
+                    raise SelectionError(
+                        f"resume directory '{resume}' is not reachable"
+                    )
+                branch_length = len(current_parts) + 1
+                branch = PurePosixPath(*resume.parts[:branch_length])
+                matching_branch = next(
+                    (candidate for candidate in descendants if candidate[0] == branch),
+                    None,
+                )
+                if matching_branch is None:
+                    raise SelectionError(
+                        f"resume directory '{resume}' is not reachable"
+                    )
+                later = tuple(
+                    candidate for candidate in descendants if candidate[0] > branch
+                )
+                pending.extend(reversed(later))
+                pending.append(matching_branch)
+                continue
+
+            seeking = False
+            pending.extend(reversed(descendants))
+            local = _filtered_listing(
+                local_listing,
+                selector,
+                include_all=arguments.all,
+            )
+            remote = _filtered_listing(
+                remote_listing,
+                selector,
+                include_all=arguments.all,
+            )
+            selected_count += len(local.entries) + len(remote.entries)
+            plan = build_comparison(
+                local,
+                remote,
+                direction=direction,
+                prune_remote=arguments.prune_remote,
+            )
+            shown = (
+                plan.entries
+                if arguments.all
+                else tuple(
+                    entry
+                    for entry in plan.entries
+                    if entry.action not in {"unchanged", "excluded"}
+                )
+            )
+            lines = _format_comparison_entries(shown, direction, color=color)
+            for line in lines:
+                print(line, file=output, flush=True)
+            displayed_count += len(lines)
+
+            if arguments.paged:
+                if not lines:
+                    label = "entries" if arguments.all else "changes"
+                    print(
+                        f"  no {label} in {display_directory}",
+                        file=output,
+                        flush=True,
+                    )
+                if pending:
+                    print(
+                        f"Resume: {_resume_command(arguments, pending[-1][0])}",
+                        file=output,
+                        flush=True,
+                    )
+                return
+
+    if seeking:
+        assert resume is not None
+        raise SelectionError(f"resume directory '{resume}' is not reachable")
+    if selector is not None and selected_count == 0:
+        raise SelectionError(f"file selector '{selector.pattern}' matched no paths")
+    if displayed_count == 0:
+        print("  no differences", file=output, flush=True)
 
 
 def _format_transfer(name: str, result: TransferResult) -> str:
@@ -852,29 +991,17 @@ def run(
             )
         elif arguments.command == "include":
             message = _change_rules(arguments, configuration_store, include=True)
-        elif arguments.command == "tracked":
-            message = _list_tracked_files(arguments, configuration_store)
         elif arguments.command == "rules":
             message = _manage_rules(arguments, configuration_store)
         elif arguments.command == "remove":
             message = _remove(arguments, configuration_store)
+        elif arguments.command == "profiles":
+            message = _list_profiles(configuration_store)
         elif arguments.command == "list":
-            if arguments.target == "projects":
-                if arguments.project_name is not None:
-                    raise ConfigurationError(
-                        "list projects does not accept a project name"
-                    )
-                message = _list_projects(configuration_store)
-            elif arguments.target == "local":
-                message = _list_local(arguments, configuration_store)
-            else:
-                message = _list_remote(arguments, configuration_store)
-        elif arguments.command == "lsl":
             message = _list_local(arguments, configuration_store)
-        elif arguments.command == "lsr":
-            message = _list_remote(arguments, configuration_store)
         elif arguments.command == "diff":
-            message = _diff(arguments, configuration_store, stderr, stdout)
+            _diff(arguments, configuration_store, stderr, stdout)
+            message = None
         elif arguments.command in {"push", "pull"}:
             message = _transfer(arguments, configuration_store, stderr)
         elif arguments.command == "help":
@@ -895,7 +1022,8 @@ def run(
     ) as error:
         print(f"hls: error: {error}", file=stderr)
         return 1
-    print(message, file=stdout)
+    if message is not None:
+        print(message, file=stdout)
     return 0
 
 
