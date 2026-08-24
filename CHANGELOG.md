@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.24.3 — 2026-08-24
+
+### Changed
+
+- Made no-argument diff, push, and pull inspect only the current directory's
+  immediate contents; `-r`/`--recursive` explicitly includes the current
+  subtree.
+- Kept explicit directory operands on the same shallow-by-default contract so
+  preview and transfer scopes remain identical.
+
 ## 0.8.24.2 — 2026-08-24
 
 ### Changed

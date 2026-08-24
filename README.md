@@ -114,10 +114,11 @@ rejected and lists its candidates. The established `ls` compatibility spelling
 for `list` remains available but is intentionally omitted from the help menu.
 
 Every path-accepting command supports multiple operands and comma-separated
-groups. Diff, push, and pull interpret wildcards as selectors and use no
-operands for the whole project. Exclude and include resolve wildcard operands
-to current local paths by default, use `--pattern` to retain wildcards, and use
-no operands to list their rules.
+groups. List, diff, push, and pull interpret wildcards as selectors and use no
+operands for the current directory's immediate contents; add `-r` to include
+the current subtree. Exclude and include resolve wildcard operands to current
+local paths by default, use `--pattern` to retain wildcards, and use no operands
+to list their rules.
 
 List every configured profile and mark the one whose local root
 contains the current directory:
@@ -274,10 +275,17 @@ array.
 
 ## Diff
 
-Preview what a full-project push would do without changing either side:
+Preview what a push of the current directory's immediate contents would do
+without changing either side:
 
 ```console
 hls diff
+```
+
+Preview the complete current subtree explicitly:
+
+```console
+hls diff -r
 ```
 
 Use the pull projection when needed:
@@ -302,14 +310,14 @@ hls diff templates -r
 ```
 
 An unquoted wildcard may be expanded by the shell into multiple arguments; HLS
-treats them as one union. With no operands, diff retains its full-project
-recursive scope. An explicitly selected directory acts as a synchronization
-container: its immediate contents are included, and `-r` or `--recursive`
-extends through all descendants. `.` selects the current directory using the
-same container rule. Quote a wildcard when HLS should interpret it itself. `*`
-stays within one path segment and `**` matches recursively. A selection whose
-entire union is unmatched or excluded, or that contains an absolute or
-parent-traversing path, is rejected. Use
+treats them as one union. With no operands, diff selects the current directory's
+immediate contents. An explicitly selected directory acts as a synchronization
+container with the same one-level default. `-r` or `--recursive` extends either
+scope through all descendants. `.` selects the current directory using the same
+container rule. Quote a wildcard when HLS should interpret it itself. `*` stays
+within one path segment and `**` matches recursively. A selection whose entire
+union is unmatched or excluded, or that contains an absolute or parent-traversing
+path, is rejected. Use
 `--project <name>` to select a project explicitly; outside that project's local
 root, its selectors are project-root-relative.
 
@@ -380,12 +388,19 @@ can be redirected without mixing status messages into the result.
 
 ## Push and pull
 
-Apply the complete push or pull projection from anywhere inside a mapped
-project:
+Apply the push or pull projection for the current directory's immediate
+contents:
 
 ```console
 hls push
 hls pull
+```
+
+Apply the complete current subtree projection explicitly:
+
+```console
+hls push -r
+hls pull -r
 ```
 
 Limit execution with the same selection syntax used by diff:
@@ -400,10 +415,10 @@ hls push templates
 hls push templates -r
 ```
 
-No-argument push and pull remain full-project recursive operations. Explicit
-directory operands use the same container scope as diff: immediate contents by
-default and the complete subtree with `-r`. This keeps every scoped diff equal
-to the corresponding transfer plan.
+No-argument push and pull use the same current-directory scope as diff:
+immediate contents by default and the complete current subtree with `-r`.
+Explicit directory operands follow the same container rule. This keeps every
+scoped diff equal to the corresponding transfer plan.
 
 Use `--project <name>` outside a mapped project. Push uploads local-only files
 and replaces changed remote files. Pull replaces changed local files, but it

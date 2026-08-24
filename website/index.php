@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.24.2';
+$version = '0.8.24.3';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 
@@ -87,7 +87,7 @@ function h(string $value): string
                         <span class="terminal-state">TLS:ON</span>
                     </div>
                     <div class="terminal-body">
-                        <p><span class="prompt">❯</span> <b>hls diff --all</b></p>
+                        <p><span class="prompt">❯</span> <b>hls diff -r --all</b></p>
                         <p class="muted">Checking differences for project 'discovery'...</p>
                         <p class="muted">Comparing directory '.'...</p>
                         <p class="terminal-heading">Local -&gt; Remote for project 'discovery':</p>
@@ -96,7 +96,7 @@ function h(string $value): string
                         <p><span class="added">+</span> <span class="directory">d assets/icons</span></p>
                         <p class="excluded"><span>x</span> <span class="directory-dark">d vendor</span></p>
                         <p class="excluded"><span>·</span> &nbsp; legacy.php</p>
-                        <p class="terminal-gap"><span class="prompt">❯</span> <b>hls push</b></p>
+                        <p class="terminal-gap"><span class="prompt">❯</span> <b>hls push -r</b></p>
                         <p><span class="success">✓</span> Push completed: 3 changes.</p>
                         <span class="cursor" aria-hidden="true"></span>
                     </div>
@@ -141,14 +141,14 @@ function h(string $value): string
                     <div class="step-icon" aria-hidden="true">∆</div>
                     <h3>Read the diff</h3>
                     <p>Compare local and remote files before changing either side. Add <code>--all</code> when you also want unchanged and excluded paths.</p>
-                    <code>hls diff</code>
+                    <code>hls diff -r</code>
                 </li>
                 <li>
                     <span class="step-number">04</span>
                     <div class="step-icon" aria-hidden="true">↥</div>
                     <h3>Push the changes</h3>
                     <p>Upload new and modified files. Remote-only files stay untouched unless you explicitly enable pruning.</p>
-                    <code>hls push</code>
+                    <code>hls push -r</code>
                 </li>
             </ol>
         </section>

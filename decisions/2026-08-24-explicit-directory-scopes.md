@@ -1,12 +1,11 @@
-# Explicit directory scopes
+# Current and explicit directory scopes
 
 ## Decision
 
-No-argument `diff`, `push`, and `pull` retain full-project recursive scope.
-When one of those commands receives an explicit directory operand, the
-directory is a synchronization container: the directory and its immediate
-contents enter the plan. `-r` or `--recursive` additionally selects every
-descendant.
+No-argument `diff`, `push`, and `pull` select the current directory's immediate
+contents. `-r` or `--recursive` additionally selects every descendant. When one
+of those commands receives an explicit directory operand, the directory is a
+synchronization container with the same shallow-by-default behavior.
 
 `list` uses the same operand expansion but omits the selected container from
 display, matching normal directory-listing expectations. Its no-argument scope
@@ -15,8 +14,10 @@ remains the current directory's immediate contents.
 ## Rationale
 
 Directory operands should not require spelling `directory/*`, and a scoped diff
-must describe the corresponding push or pull exactly. Keeping the no-argument
-transfer scope unchanged preserves the established full-project workflow.
+must describe the corresponding push or pull exactly. Making no-argument
+commands current-directory-scoped keeps accidental transfers bounded; a full
+project operation remains explicit as `hls diff -r`, `hls push -r`, or
+`hls pull -r` from the mapped root.
 
 Wildcard operands use the same rule: any matched directory acts as a container.
 This keeps quoted patterns and shell-expanded directory arguments consistent.

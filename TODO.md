@@ -18,9 +18,9 @@
   without guessing in noninteractive use.
 - [x] Give `list` the shared path-selector model and make remote pruning an
   explicitly push-only action with unambiguous diff markers.
-- [x] Implement one shared explicit-directory scope contract for `diff`, `push`,
-  and `pull`: immediate contents by default and descendants with `-r`, while
-  preserving full-project recursion when no operands are supplied.
+- [x] Implement one shared current-directory scope contract for `diff`, `push`,
+  and `pull`: immediate contents by default and descendants only with explicit
+  `-r`/`--recursive`, including when no operands are supplied.
 - [x] Complete packaging documentation, release checks, and PyPI publication
   preparation:
   - [x] Define the concrete support and service benefits of the voluntary

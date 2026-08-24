@@ -545,18 +545,27 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "Connecting securely over FTPS...\n"
         "Comparing directory '.'...\n"
         "Comparing directory 'src'...\n"
-        "Comparing directory 'src/nested'...\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert "Local -> Remote for project 'prod':\n" in push_comparison[1]
-    assert "+   README.md\n" in push_comparison[1]
-    assert "·   deployed.html\n" in push_comparison[1]
-    assert "?   linked\n" in push_comparison[1]
+    assert "+   src/main.py\n" in push_comparison[1]
+    assert "+ d src/nested\n" in push_comparison[1]
+    assert "src/nested/child.py" not in push_comparison[1]
+    assert "README.md" not in push_comparison[1]
+    assert "deployed.html" not in push_comparison[1]
+    assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
     assert "src/debug.log" not in push_comparison[1]
+
+    recursive_comparison = invoke(["diff", "-r"], store)
+    assert "Comparing directory 'src/nested'...\n" in recursive_comparison[2]
+    assert "+   src/nested/child.py\n" in recursive_comparison[1]
+
+    monkeypatch.chdir(workspace)
     pruned_comparison = invoke(["diff", "--prune-remote"], store)
     assert "-   deployed.html\n" in pruned_comparison[1]
+    monkeypatch.chdir(source)
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
     assert selected_comparison[2].endswith("Comparing directory 'src'...\n")
@@ -596,9 +605,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
     assert "src/main.py" in resumed[1]
     assert "--resume src/nested" in resumed[1]
-    monkeypatch.chdir(source)
+    monkeypatch.chdir(workspace)
 
-    pull_comparison = invoke(["diff", "--pull"], store)
+    pull_comparison = invoke(["diff", "--pull", "-r"], store)
     assert pull_comparison[0] == 0
     assert pull_comparison[2].endswith("Comparing directory 'src/nested'...\n")
     assert "Remote -> Local for project 'prod':\n" in pull_comparison[1]
@@ -627,7 +636,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
-    assert len(transports) == 13
+    assert len(transports) == 14
 
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(

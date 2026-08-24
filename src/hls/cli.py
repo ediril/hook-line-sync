@@ -243,7 +243,8 @@ def build_parser() -> argparse.ArgumentParser:
         list_parser,
         required=False,
         help_text=(
-            "relative file paths or wildcard patterns; defaults to the whole project"
+            "relative file paths or wildcard patterns; defaults to immediate "
+            "contents of the current directory"
         ),
     )
     list_parser.add_argument(
@@ -282,7 +283,8 @@ def build_parser() -> argparse.ArgumentParser:
         diff_parser,
         required=False,
         help_text=(
-            "relative file paths or wildcard patterns; defaults to the whole project"
+            "relative file paths or wildcard patterns; defaults to immediate "
+            "contents of the current directory"
         ),
     )
     diff_parser.add_argument(
@@ -354,8 +356,8 @@ def build_parser() -> argparse.ArgumentParser:
             transfer_parser,
             required=False,
             help_text=(
-                "relative file paths or wildcard patterns; defaults to the whole "
-                "project"
+                "relative file paths or wildcard patterns; defaults to immediate "
+                "contents of the current directory"
             ),
         )
         transfer_parser.add_argument(
@@ -780,10 +782,10 @@ def _format_comparison_entries(
     return tuple(lines)
 
 
-def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection | None:
+def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection:
     operands = list(normalize_pattern_operands(arguments))
     if not operands:
-        return None
+        return _current_directory_selection(root, recursive=arguments.recursive)
     return _directory_contents_selection(
         operands,
         root,
@@ -815,18 +817,26 @@ def _list_selection(
 ) -> DirectoryContentsSelection:
     operands = list(normalize_pattern_operands(arguments))
     if not operands:
-        pattern = "**" if arguments.recursive else "*"
-        return DirectoryContentsSelection(
-            _selection_from_values(
-                (pattern,),
-                root,
-                Path.cwd().resolve(strict=True),
-            )
-        )
+        return _current_directory_selection(root, recursive=arguments.recursive)
     return _directory_contents_selection(
         operands,
         root,
         recursive=arguments.recursive,
+    )
+
+
+def _current_directory_selection(
+    root: Path,
+    *,
+    recursive: bool,
+) -> DirectoryContentsSelection:
+    pattern = "**" if recursive else "*"
+    return DirectoryContentsSelection(
+        _selection_from_values(
+            (pattern,),
+            root,
+            Path.cwd().resolve(strict=True),
+        )
     )
 
 
@@ -975,7 +985,7 @@ def _build_plan(
         remote,
         direction=direction,
         prune_remote=arguments.prune_remote,
-        selector=selector,
+        selector=selector if arguments.pattern_operands else None,
     )
     return local, remote, plan
 
@@ -1106,7 +1116,7 @@ def _diff(
     if seeking:
         assert resume is not None
         raise SelectionError(f"resume directory '{resume}' is not reachable")
-    if selector is not None and selected_count == 0:
+    if arguments.pattern_operands and selected_count == 0:
         raise SelectionError(f"file selector '{selector.pattern}' matched no paths")
     if displayed_count == 0:
         print("  no differences", file=output, flush=True)
