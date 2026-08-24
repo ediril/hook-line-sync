@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.24.2 — 2026-08-24
+
+### Changed
+
+- Applied one explicit-directory scope across diff, push, and pull: immediate
+  contents by default and all descendants with `-r`/`--recursive`.
+- Preserved full-project recursive behavior for no-argument diff and transfers,
+  keeping scoped previews identical to their corresponding transfer plans.
+
+## 0.8.24.1 — 2026-08-24
+
+### Changed
+
+- Made explicit directory operands in `hls list` display their immediate
+  contents, with `-r`/`--recursive` extending through their descendants.
+- Standardized the excluded-path marker as gray `x` in both list and diff.
+
 ## 0.8.23.15 — 2026-08-23
 
 ### Changed

@@ -129,3 +129,31 @@ class FileSelectorSet:
 
 
 FileSelection = FileSelector | FileSelectorSet
+
+
+@dataclass(frozen=True)
+class DirectoryContentsSelection:
+    """Select operands while treating matched directories as containers."""
+
+    traversal: FileSelection
+    containers: FileSelection | None = None
+
+    @property
+    def pattern(self) -> str:
+        return self.traversal.pattern
+
+    def matches(self, project_relative_path: str) -> bool:
+        return self.traversal.matches(project_relative_path)
+
+    def may_match_descendant(self, project_relative_directory: str) -> bool:
+        return self.traversal.may_match_descendant(project_relative_directory)
+
+    def includes_result(self, project_relative_path: str, *, directory: bool) -> bool:
+        return not (
+            directory
+            and self.containers is not None
+            and self.containers.matches(project_relative_path)
+        )
+
+
+FileSelection = FileSelector | FileSelectorSet | DirectoryContentsSelection

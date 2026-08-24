@@ -219,6 +219,7 @@ List the current local directory and its exclusion status with:
 hls list
 hls list *
 hls list .
+hls list templates
 hls list --recursive
 ```
 
@@ -226,9 +227,11 @@ With no operands, `hls list` performs its own one-level selection, so dotfiles
 are included without relying on shell wildcard behavior. `.` has the same
 one-level meaning. Add `-r` or `--recursive` to include every descendant under
 the current directory. Explicit path and wildcard operands retain the shared
-selector syntax; selected directories become recursive when `-r` is supplied.
-Bare `*` continues to be expanded by the shell, while quoted patterns are
-interpreted by HLS.
+selector syntax. A selected file is listed directly; a selected directory acts
+as a container, so `hls list templates` lists the immediate children of
+`templates` without requiring `templates/*`. Add `-r` to include all descendants
+of selected directories. Bare `*` continues to be expanded by the shell, while
+quoted patterns are interpreted by HLS.
 
 The command does not connect to FTPS. Directories use a `d` type marker and
 excluded paths use `x`; included files leave both columns blank. Use
@@ -294,21 +297,25 @@ hls diff *
 hls diff 'src/*.js'
 hls diff '**/*.css'
 hls diff .
+hls diff templates
+hls diff templates -r
 ```
 
 An unquoted wildcard may be expanded by the shell into multiple arguments; HLS
-treats them as one union. `.` means the complete subtree under the current
-directory. Selected directories appear as entries, but their contents are not
-scanned unless the selector is recursive. Quote a wildcard when HLS should
-interpret it itself. `*` stays within one path segment and `**` matches
-recursively. A selection whose entire union is unmatched or excluded, or that
-contains an absolute or parent-traversing path, is rejected. Use
+treats them as one union. With no operands, diff retains its full-project
+recursive scope. An explicitly selected directory acts as a synchronization
+container: its immediate contents are included, and `-r` or `--recursive`
+extends through all descendants. `.` selects the current directory using the
+same container rule. Quote a wildcard when HLS should interpret it itself. `*`
+stays within one path segment and `**` matches recursively. A selection whose
+entire union is unmatched or excluded, or that contains an absolute or
+parent-traversing path, is rejected. Use
 `--project <name>` to select a project explicitly; outside that project's local
 root, its selectors are project-root-relative.
 
 Selectors are applied before local and remote snapshots are built. HLS descends
-only into directories that can contain a match: `*` scans the corresponding
-directory without recursion, while `**` permits recursive traversal.
+only into selected directory containers and directories that can contain a
+pattern match.
 
 Diff uses compact, perspective-relative status and type columns. Directories
 receive `d`; files and symlinks leave the type column blank:
@@ -321,7 +328,7 @@ receive `d`; files and symlinks leave the type column blank:
 ·   present on only one side but left untouched
 ?   type or symlink conflict
 =   unchanged
-!   excluded from synchronization
+x   excluded from synchronization
 ```
 
 The default selected side is local; `--pull` reverses it to remote. By default,
@@ -389,7 +396,14 @@ hls push index.html app.js styles.css
 hls push *
 hls push 'src/*.js'
 hls pull '**/*.css'
+hls push templates
+hls push templates -r
 ```
+
+No-argument push and pull remain full-project recursive operations. Explicit
+directory operands use the same container scope as diff: immediate contents by
+default and the complete subtree with `-r`. This keeps every scoped diff equal
+to the corresponding transfer plan.
 
 Use `--project <name>` outside a mapped project. Push uploads local-only files
 and replaces changed remote files. Pull replaces changed local files, but it

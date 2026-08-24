@@ -326,6 +326,16 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert "    node_modules/keep.js\n" in local_view[1]
     assert "x   composer.json\n" in local_view[1]
     assert "x   docs/note.txt\n" in local_view[1]
+    directory_view = invoke(["list", "node_modules"], store)
+    assert "x   node_modules/drop.js\n" in directory_view[1]
+    assert "    node_modules/keep.js\n" in directory_view[1]
+    assert "  d node_modules/package\n" in directory_view[1]
+    assert "node_modules/package/nested.js" not in directory_view[1]
+    assert "x d node_modules\n" not in directory_view[1]
+    recursive_directory_view = invoke(
+        ["list", "node_modules", "--recursive"], store
+    )
+    assert "    node_modules/package/nested.js\n" in recursive_directory_view[1]
     assert invoke(["exc"], store) == (
         0,
         "Exclusion rules for project 'prod':\n"
@@ -374,9 +384,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     store = ConfigurationStore(tmp_path / "configs.json")
     workspace = tmp_path / "workspace"
     source = workspace / "src"
+    nested_source = source / "nested"
     ignored = workspace / "node_modules"
     outside = tmp_path / "outside"
-    source.mkdir(parents=True)
+    nested_source.mkdir(parents=True)
     ignored.mkdir()
     outside.mkdir()
     (workspace / "README.md").write_text("read me", encoding="utf-8")
@@ -385,6 +396,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     (source / "main.py").write_text("print('hello')", encoding="utf-8")
     (source / ".env.example").write_text("KEY=value", encoding="utf-8")
     (source / "debug.log").write_text("ignored", encoding="utf-8")
+    (nested_source / "child.py").write_text("child", encoding="utf-8")
     (ignored / "package.js").write_text("ignored", encoding="utf-8")
     (outside / "secret.txt").write_text("outside", encoding="utf-8")
     (workspace / "linked").symlink_to(outside, target_is_directory=True)
@@ -501,7 +513,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "Local tree for project 'prod':\n"
         "    src/.env.example\n"
         "x   src/debug.log\n"
-        "    src/main.py\n",
+        "    src/main.py\n"
+        "  d src/nested\n",
         "",
     )
     assert invoke(["list"], store) == local_listing
@@ -511,7 +524,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "Local tree for project 'prod':\n"
         "    src/.env.example\n"
         "x   src/debug.log\n"
-        "    src/main.py\n",
+        "    src/main.py\n"
+        "    src/nested/child.py\n",
         "",
     )
     monkeypatch.chdir(workspace)
@@ -531,6 +545,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "Connecting securely over FTPS...\n"
         "Comparing directory '.'...\n"
         "Comparing directory 'src'...\n"
+        "Comparing directory 'src/nested'...\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert "Local -> Remote for project 'prod':\n" in push_comparison[1]
@@ -544,12 +559,18 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "-   deployed.html\n" in pruned_comparison[1]
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
-    assert selected_comparison[2] == push_progress
+    assert selected_comparison[2].endswith("Comparing directory 'src'...\n")
+    assert "src/nested" not in selected_comparison[2]
     assert "src/main.py" in selected_comparison[1]
     assert "README.md" not in selected_comparison[1]
     assert "deployed.html" not in selected_comparison[1]
 
     monkeypatch.chdir(workspace)
+    directory_comparison = invoke(["diff", "src"], store)
+    assert "+ d src/nested\n" in directory_comparison[1]
+    assert "src/nested/child.py" not in directory_comparison[1]
+    recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
+    assert "+   src/nested/child.py\n" in recursive_directory_comparison[1]
     expanded_comparison = invoke(
         ["diff", "README.md,src/main.py", "src"], store
     )
@@ -562,22 +583,24 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["diff", "**", "--all", "--color", "always"], store
     )
     assert "\033[32m+\033[0m \033[94md src\033[0m" in colored_comparison[1]
-    assert "\033[90m!\033[0m \033[34md node_modules\033[0m" in (
+    assert "\033[90mx\033[0m \033[34md node_modules\033[0m" in (
         colored_comparison[1]
     )
-    assert "\033[90m!   src/debug.log\033[0m" in colored_comparison[1]
+    assert "\033[90mx   src/debug.log\033[0m" in colored_comparison[1]
     assert "\033[90m=   same.txt\033[0m" in colored_comparison[1]
 
-    paged = invoke(["diff", ".", "--paged"], store)
-    assert "Resume: hls diff . --paged --resume src\n" in paged[1]
-    resumed = invoke(["diff", ".", "--paged", "--resume", "src"], store)
+    paged = invoke(["diff", ".", "--recursive", "--paged"], store)
+    assert "Resume: hls diff . --recursive --paged --resume src\n" in paged[1]
+    resumed = invoke(
+        ["diff", ".", "--recursive", "--paged", "--resume", "src"], store
+    )
     assert "src/main.py" in resumed[1]
-    assert "Resume:" not in resumed[1]
+    assert "--resume src/nested" in resumed[1]
     monkeypatch.chdir(source)
 
     pull_comparison = invoke(["diff", "--pull"], store)
     assert pull_comparison[0] == 0
-    assert pull_comparison[2].endswith("Comparing directory 'src'...\n")
+    assert pull_comparison[2].endswith("Comparing directory 'src/nested'...\n")
     assert "Remote -> Local for project 'prod':\n" in pull_comparison[1]
     assert "·   deployed.html\n" in pull_comparison[1]
     assert "·   README.md\n" in pull_comparison[1]
@@ -586,23 +609,25 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     with pytest.raises(SystemExit):
         run(["pull", "-p"], store=store)
 
-    push_result = invoke(["push", "main.py"], store)
+    monkeypatch.chdir(workspace)
+    push_result = invoke(["push", "src"], store)
     assert push_result[0] == 0
     assert push_result[2].startswith("Preparing push for project 'prod'...\n")
     assert push_result[2].endswith("Executing push plan...\n")
-    assert "Push completed for project 'prod': 1 change(s)." in push_result[1]
+    assert "Push completed for project 'prod': 4 change(s)." in push_result[1]
     assert operations == [
         ("mkdir", "src"),
+        ("mkdir", "src/nested"),
+        ("upload", "src/.env.example", b"KEY=value", 9, False),
         ("upload", "src/main.py", b"print('hello')", 14, False),
     ]
-    monkeypatch.chdir(workspace)
     pull_result = invoke(["pull", "deployed.html"], store)
     assert pull_result[0] == 0
     assert pull_result[2].startswith("Preparing pull for project 'prod'...\n")
     assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
-    assert len(transports) == 11
+    assert len(transports) == 13
 
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(

@@ -32,7 +32,13 @@ from hls.rules import (
     expand_path_operands,
     patterns_from_operands,
 )
-from hls.selection import FileSelection, FileSelector, FileSelectorSet, SelectionError
+from hls.selection import (
+    DirectoryContentsSelection,
+    FileSelection,
+    FileSelector,
+    FileSelectorSet,
+    SelectionError,
+)
 from hls.snapshot import (
     SnapshotError,
     TreeSnapshot,
@@ -263,7 +269,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="preview file changes without modifying anything",
         usage=(
             "hls diff [PATH ...] [--project PROFILE]\n"
-            "       [--pull | --prune-remote] [--all] [--paged]\n"
+            "       [--pull | --prune-remote] [-r] [--all] [--paged]\n"
             "       [--resume DIRECTORY] [--color auto|always|never]"
         ),
         description=(
@@ -289,6 +295,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--pull",
         action="store_true",
         help="show changes from the remote perspective; cannot prune",
+    )
+    diff_parser.add_argument(
+        "-r",
+        "--recursive",
+        action="store_true",
+        help="include descendants of selected directories",
     )
     diff_parser.add_argument(
         "--all",
@@ -350,6 +362,12 @@ def build_parser() -> argparse.ArgumentParser:
             "--project",
             dest="project_name",
             help="project name; inferred from the current directory when omitted",
+        )
+        transfer_parser.add_argument(
+            "-r",
+            "--recursive",
+            action="store_true",
+            help="include descendants of selected directories",
         )
         transfer_parser.set_defaults(prune_remote=False)
         if command == "push":
@@ -629,14 +647,24 @@ def _list_local(
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
     selector = _list_selection(arguments, root)
-    snapshot = snapshot_local(
+    raw_snapshot = snapshot_local(
         root,
         RuleSet(project.rules),
         selector,
         include_excluded=True,
     )
-    if selector is not None and not snapshot.entries:
+    if not raw_snapshot.entries:
         raise SelectionError(f"file selector '{selector.pattern}' matched no paths")
+    snapshot = TreeSnapshot(
+        tuple(
+            entry
+            for entry in raw_snapshot.entries
+            if selector.includes_result(
+                entry.path,
+                directory=entry.kind == "directory",
+            )
+        )
+    )
     if not snapshot.entries:
         return f"Local tree for project '{name}' is empty."
     lines = [f"Local tree for project '{name}':"]
@@ -668,7 +696,7 @@ def _comparison_kind(entry: ComparisonEntry) -> str:
 
 def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
     if entry.action == "excluded":
-        return "!"
+        return "x"
     if entry.action == "conflict":
         return "?"
     if entry.action == "unchanged":
@@ -733,7 +761,7 @@ def _format_comparison_entries(
         "-": "\033[31m",
         "?": "\033[35m",
         "=": "\033[90m",
-        "!": "\033[90m",
+        "x": "\033[90m",
         "·": "\033[90m",
     }
     for entry in entries:
@@ -753,14 +781,14 @@ def _format_comparison_entries(
 
 
 def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection | None:
-    current_directory = Path.cwd().resolve(strict=True)
-    values = [
-        "**" if value == "." else value
-        for value in normalize_pattern_operands(arguments)
-    ]
-    if not values:
+    operands = list(normalize_pattern_operands(arguments))
+    if not operands:
         return None
-    return _selection_from_values(values, root, current_directory)
+    return _directory_contents_selection(
+        operands,
+        root,
+        recursive=arguments.recursive,
+    )
 
 
 def _selection_from_values(
@@ -784,16 +812,57 @@ def _selection_from_values(
 def _list_selection(
     arguments: argparse.Namespace,
     root: Path,
-) -> FileSelection:
-    values = list(normalize_pattern_operands(arguments)) or ["*"]
-    if arguments.recursive:
-        values = [
-            "**" if value == "." else f"{value.rstrip('/')}/**"
-            for value in values
-        ]
-    else:
-        values = ["*" if value == "." else value for value in values]
-    return _selection_from_values(values, root, Path.cwd().resolve(strict=True))
+) -> DirectoryContentsSelection:
+    operands = list(normalize_pattern_operands(arguments))
+    if not operands:
+        pattern = "**" if arguments.recursive else "*"
+        return DirectoryContentsSelection(
+            _selection_from_values(
+                (pattern,),
+                root,
+                Path.cwd().resolve(strict=True),
+            )
+        )
+    return _directory_contents_selection(
+        operands,
+        root,
+        recursive=arguments.recursive,
+    )
+
+
+def _directory_contents_selection(
+    operands: Sequence[str],
+    root: Path,
+    *,
+    recursive: bool,
+) -> DirectoryContentsSelection:
+    current_directory = Path.cwd().resolve(strict=True)
+
+    traversal_patterns: list[str] = []
+    container_patterns: list[str] = []
+    for operand in operands:
+        if operand == ".":
+            traversal_patterns.append("**" if recursive else "*")
+            continue
+        normalized = operand.rstrip("/")
+        container_patterns.append(normalized)
+        traversal_patterns.extend(
+            (
+                normalized,
+                f"{normalized}/{'**' if recursive else '*'}",
+            )
+        )
+    traversal = _selection_from_values(
+        traversal_patterns,
+        root,
+        current_directory,
+    )
+    containers = (
+        _selection_from_values(container_patterns, root, current_directory)
+        if container_patterns
+        else None
+    )
+    return DirectoryContentsSelection(traversal, containers)
 
 
 def _filtered_listing(
@@ -865,6 +934,8 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
         command.append("--pull")
     if arguments.prune_remote:
         command.append("--prune-remote")
+    if arguments.recursive:
+        command.append("--recursive")
     if arguments.all:
         command.append("--all")
     if arguments.color != "auto":
