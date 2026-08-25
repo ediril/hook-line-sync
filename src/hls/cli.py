@@ -829,11 +829,14 @@ def _format_path_line(
     color: bool,
     marker_color: str | None,
     excluded: bool,
+    collapsed: bool = False,
 ) -> str:
     kind = "d" if directory else " "
     line = f"{marker} {kind} {path}"
     if not color:
         return line
+    if collapsed:
+        return f"\033[90;3m{line}\033[0m"
     if directory:
         directory_color = "\033[34m" if excluded else "\033[94m"
         colored_marker = (
@@ -877,6 +880,7 @@ def _format_comparison_entries(
     direction: str,
     *,
     color: bool,
+    collapsed_paths: frozenset[str] = frozenset(),
 ) -> tuple[str, ...]:
     lines: list[str] = []
     colors = {
@@ -887,6 +891,7 @@ def _format_comparison_entries(
         "=": "\033[90m",
         "x": "\033[90m",
         "·": "\033[90m",
+        "…": "\033[90m",
     }
     for entry in _file_browser_order(
         entries,
@@ -894,7 +899,8 @@ def _format_comparison_entries(
         directory_of=lambda item: _comparison_entry_kind(item, direction)
         == "directory",
     ):
-        marker = _comparison_marker(entry, direction)
+        collapsed = entry.path in collapsed_paths
+        marker = "…" if collapsed else _comparison_marker(entry, direction)
         directory = _comparison_entry_kind(entry, direction) == "directory"
         lines.append(
             _format_path_line(
@@ -904,6 +910,7 @@ def _format_comparison_entries(
                 color=color,
                 marker_color=colors[marker],
                 excluded=entry.action == "excluded",
+                collapsed=collapsed,
             )
         )
     return tuple(lines)
@@ -1210,6 +1217,16 @@ def _diff(
                 direction=direction,
                 prune_remote=arguments.prune_remote,
             )
+            descended_paths = frozenset(
+                path.as_posix() for path, _, _ in descendants
+            )
+            collapsed_paths = frozenset(
+                entry.path
+                for entry in plan.entries
+                if entry.action == "unchanged"
+                and _comparison_entry_kind(entry, direction) == "directory"
+                and entry.path not in descended_paths
+            )
             shown = (
                 plan.entries
                 if arguments.all
@@ -1217,9 +1234,15 @@ def _diff(
                     entry
                     for entry in plan.entries
                     if entry.action not in {"unchanged", "excluded"}
+                    or entry.path in collapsed_paths
                 )
             )
-            lines = _format_comparison_entries(shown, direction, color=color)
+            lines = _format_comparison_entries(
+                shown,
+                direction,
+                color=color,
+                collapsed_paths=collapsed_paths,
+            )
             for line in lines:
                 print(line, file=output, flush=True)
             displayed_count += len(lines)

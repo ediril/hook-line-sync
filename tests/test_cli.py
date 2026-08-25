@@ -500,6 +500,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
                         modified_ns=same_stat.st_mtime_ns,
                         timestamp_precision_ns=1,
                     ),
+                    TreeEntry("src", "directory"),
                 )
             )
 
@@ -596,8 +597,11 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "+   src/nested/child.py\n" in recursive_comparison[1]
 
     monkeypatch.chdir(workspace)
-    pruned_comparison = invoke(["diff", "--prune-remote"], store)
-    assert "-   deployed.html\n" in pruned_comparison[1]
+    pruned_comparison = invoke(
+        ["diff", "--prune-remote", "--color", "always"], store
+    )
+    assert "\033[31m-   deployed.html\033[0m\n" in pruned_comparison[1]
+    assert "\033[90;3m… d src\033[0m\n" in pruned_comparison[1]
     monkeypatch.chdir(source)
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
@@ -619,12 +623,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert expanded_comparison[0] == 0
     assert "+   README.md\n" in expanded_comparison[1]
     assert "+   src/main.py\n" in expanded_comparison[1]
-    assert "+ d src\n" in expanded_comparison[1]
+    assert "… d src\n" not in expanded_comparison[1]
 
     colored_comparison = invoke(
         ["diff", "**", "--all", "--color", "always"], store
     )
-    assert "\033[32m+\033[0m \033[94md src\033[0m" in colored_comparison[1]
+    assert "\033[90m=\033[0m \033[94md src\033[0m" in colored_comparison[1]
     assert "\033[90mx\033[0m \033[34md node_modules\033[0m" in (
         colored_comparison[1]
     )

@@ -343,13 +343,15 @@ receive `d`; files and symlinks leave the type column blank:
 ?   type or symlink conflict
 =   unchanged
 x   excluded from synchronization
+… d directory exists on both sides; contents were not compared
 ```
 
 The default selected side is local; `--pull` reverses it to remote. By default,
-diff prints synchronization actions, conflicts, and one-sided paths that will
-be kept. Use `hls diff --all` to also show unchanged and excluded paths. Status
-lines use distinct terminal
-colors; unchanged and excluded paths are dimmed. Color is disabled when output
+diff prints synchronization actions, conflicts, one-sided paths that will be
+kept, and collapsed directories whose contents fall outside the selected
+depth. Use `hls diff --all` to also show unchanged and excluded paths. Status
+lines use distinct terminal colors; unchanged and excluded paths are dimmed,
+while collapsed directories are gray and italic. Color is disabled when output
 is redirected or `NO_COLOR` is set. Directory paths are bright blue, excluded
 directory paths are darker blue, and color can be controlled explicitly with
 `--color auto|always|never`.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.25.2 — 2026-08-25
+
+### Changed
+
+- Made shallow diffs display existing directories whose contents were not
+  compared using a gray italic `… d` collapsed-directory state.
+- Kept collapsed directories visible without `--all`, avoiding a false
+  impression that their contents were checked and unchanged.
+
 ## 0.8.25.1 — 2026-08-25
 
 ### Changed

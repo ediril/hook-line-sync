@@ -7,6 +7,12 @@ contents. `-r` or `--recursive` additionally selects every descendant. When one
 of those commands receives an explicit directory operand, the directory is a
 synchronization container with the same shallow-by-default behavior.
 
+An existing directory that is selected but not traversed is always emitted by
+`diff` with a collapsed `… d` state, even without `--all`. This state means only
+that the directory entry exists on both sides; HLS makes no claim about its
+contents. Terminal output renders it gray and italic. Recursive traversal
+replaces the collapsed state with comparisons from inside that directory.
+
 `list` uses the same operand expansion but omits the selected container from
 display, matching normal directory-listing expectations. Its no-argument scope
 remains the current directory's immediate contents.
