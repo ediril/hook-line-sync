@@ -21,16 +21,21 @@ HLS pattern semantics are independent of Gitignore:
 
 Rules remain deterministic and ordered; the last rule matching a path wins and
 unmatched paths are included by default. Adding an identical normalized pattern
-removes its earlier rule before appending the new action, which is provably
-semantics-preserving. Other rules are never removed automatically.
+removes its earlier rule before appending the new action. If the remaining
+policy already produces the requested state, HLS omits the replacement instead.
+This cleanup is limited to cases HLS can prove: concrete paths, or an inclusion
+when no exclusions remain. Other overlaps are preserved rather than simplified
+symbolically.
 
 ## Management and diagnostics
 
-`hls rules` displays the complete policy in evaluation order. `hls rules remove
-<id>` removes a specific persisted rule. `hls include` and `hls exclude` without
-operands provide filtered views while retaining the same IDs. `hls explain
-<path>` displays every matching rule and identifies the effective winner. `hls
-files` remains the materialized view of effectively included local files.
+`hls rules` groups the complete policy by its nearest literal folder and sorts
+expressions by name. Patterns without a fixed folder appear under `Everywhere`.
+Stable IDs remain visible because higher matching IDs still take precedence,
+even though the inspection view is organized for readability rather than
+evaluation order. `hls rules remove <id>` removes a specific persisted rule.
+`hls include` and `hls exclude` without operands provide filtered grouped views
+with the same IDs. `hls list` is the materialized local-tree view of the policy.
 
 ## Consequences
 

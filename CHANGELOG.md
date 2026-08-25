@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.25.1 — 2026-08-25
+
+### Changed
+
+- Grouped synchronization-rule inspection by folder and sorted expressions by
+  name while retaining stable precedence IDs.
+- Made include and exclude updates remove an exact existing rule without adding
+  a replacement when the remaining policy already produces the requested state.
+- Sorted list and progressive diff entries like a file browser: directories
+  first by name, followed by files by name at each level.
+
 ## 0.8.24.3 — 2026-08-24
 
 ### Changed

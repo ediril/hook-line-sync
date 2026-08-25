@@ -4,9 +4,9 @@ import argparse
 import os
 import shlex
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path, PurePosixPath
-from typing import TextIO
+from typing import TextIO, TypeVar
 
 from hls import __version__
 from hls.comparison import ComparisonEntry, ComparisonPlan, build_comparison
@@ -17,6 +17,7 @@ from hls.config import (
     ConfigurationError,
     ConfigurationStore,
     ProjectConfiguration,
+    RuleUpdate,
     canonical_local_root,
     validate_project_name,
 )
@@ -47,6 +48,8 @@ from hls.snapshot import (
 )
 from hls.transfer import TransferError, TransferResult, execute_transfer
 from hls.transport import ExplicitFTPSTransport, TransportError
+
+_EntryT = TypeVar("_EntryT")
 
 CANONICAL_COMMANDS = (
     "add",
@@ -512,10 +515,29 @@ def _format_rules(
     rules: tuple[SyncRule, ...],
     *,
     heading: str,
+    grouped: bool = False,
 ) -> str:
     if not rules:
         return f"No {heading.lower()} for project '{name}'."
-    width = len(str(rules[-1].id))
+    width = len(str(max(rule.id for rule in rules)))
+    if grouped:
+        groups: dict[str, list[tuple[SyncRule, str]]] = {}
+        for rule in rules:
+            group, expression = _rule_display_location(rule)
+            groups.setdefault(group, []).append((rule, expression))
+        lines = [f"{heading} for project '{name}':"]
+        for group in sorted(groups, key=_rule_group_key):
+            lines.extend(("", group))
+            for rule, expression in sorted(
+                groups[group],
+                key=lambda item: (item[1].casefold(), item[1], item[0].id),
+            ):
+                lines.append(
+                    f"  {rule.id:>{width}}  {rule.action:<7} {expression}"
+                )
+        if _rules_need_precedence_note(rules):
+            lines.extend(("", "Higher rule IDs take precedence when rules overlap."))
+        return "\n".join(lines)
     return "\n".join(
         (
             f"{heading} for project '{name}':",
@@ -526,6 +548,41 @@ def _format_rules(
             ),
         )
     )
+
+
+def _rule_display_location(rule: SyncRule) -> tuple[str, str]:
+    parts = PurePosixPath(rule.pattern).parts
+    wildcard_index = next(
+        (index for index, part in enumerate(parts) if "*" in part),
+        None,
+    )
+    if wildcard_index is None:
+        parent = parts[:-1]
+        return _rule_group_label(parent), parts[-1]
+    if wildcard_index == 0 and parts[0] == "**":
+        expression = "/".join(parts[1:]) or "all contents"
+        return "Everywhere", expression
+    parent = parts[:wildcard_index]
+    expression = "/".join(parts[wildcard_index:])
+    if expression == "**":
+        expression = "all contents"
+    return _rule_group_label(parent), expression
+
+
+def _rule_group_label(parts: tuple[str, ...]) -> str:
+    return "./" if not parts else f"{PurePosixPath(*parts).as_posix()}/"
+
+
+def _rule_group_key(group: str) -> tuple[int, str, str]:
+    if group == "./":
+        return (0, "", "")
+    if group == "Everywhere":
+        return (2, "", "")
+    return (1, group.casefold(), group)
+
+
+def _rules_need_precedence_note(rules: tuple[SyncRule, ...]) -> bool:
+    return len({rule.action for rule in rules}) > 1
 
 
 def _format_rule_expression(rule: SyncRule) -> str:
@@ -546,7 +603,7 @@ def _change_rules(
         action = "include" if include else "exclude"
         rules = tuple(rule for rule in project.rules if rule.action == action)
         kind = "Inclusion" if include else "Exclusion"
-        return _format_rules(name, rules, heading=f"{kind} rules")
+        return _format_rules(name, rules, heading=f"{kind} rules", grouped=True)
     root = _require_local_root(name, project)
     current_directory = Path.cwd().resolve(strict=True)
     operands = (
@@ -563,18 +620,47 @@ def _change_rules(
         project_root=root,
         current_directory=current_directory,
     )
-    added = configuration.append_rules(
+    update = configuration.append_rules(
         name,
         "include" if include else "exclude",
         normalized,
     )
     store.save(configuration)
-    action = "Inclusion" if include else "Exclusion"
-    return _format_rules(
-        name,
-        added,
-        heading=f"Recorded {action.lower()} rules",
-    )
+    return _format_rule_update(name, update, include=include)
+
+
+def _format_rule_update(name: str, update: RuleUpdate, *, include: bool) -> str:
+    if update.added and update.removed:
+        lines = [f"Updated synchronization rules for project '{name}':"]
+        lines.extend(
+            f"  added    {rule.id}  {rule.action:<7} {_format_rule_expression(rule)}"
+            for rule in update.added
+        )
+        lines.extend(
+            f"  removed  {rule.id}  {rule.action:<7} {_format_rule_expression(rule)}"
+            for rule in update.removed
+        )
+        return "\n".join(lines)
+    if update.added:
+        action = "Inclusion" if include else "Exclusion"
+        return _format_rules(
+            name,
+            update.added,
+            heading=f"Recorded {action.lower()} rules",
+        )
+    if update.removed:
+        result = "included" if include else "excluded"
+        lines = [
+            f"Paths are {result} by the remaining policy for project '{name}';",
+            "removed the unnecessary rules:",
+        ]
+        width = len(str(max(rule.id for rule in update.removed)))
+        lines.extend(
+            f"  {rule.id:>{width}}  {rule.action:<7} {_format_rule_expression(rule)}"
+            for rule in update.removed
+        )
+        return "\n".join(lines)
+    return f"Synchronization rules for project '{name}' are unchanged."
 
 
 def _manage_rules(
@@ -585,7 +671,12 @@ def _manage_rules(
     if arguments.operation is None:
         if arguments.rule_id is not None:
             raise ConfigurationError("a rule id requires the remove operation")
-        return _format_rules(name, project.rules, heading="Synchronization rules")
+        return _format_rules(
+            name,
+            project.rules,
+            heading="Synchronization rules",
+            grouped=True,
+        )
     if arguments.rule_id is None:
         raise ConfigurationError("rules remove requires a rule id")
     removed = configuration.remove_rule(name, arguments.rule_id)
@@ -671,7 +762,11 @@ def _list_local(
         return f"Local tree for project '{name}' is empty."
     lines = [f"Local tree for project '{name}':"]
     color = _use_color(arguments.color, output)
-    for entry in snapshot.entries:
+    for entry in _file_browser_order(
+        snapshot.entries,
+        path_of=lambda item: item.path,
+        directory_of=lambda item: item.kind == "directory",
+    ):
         marker = "x" if entry.excluded else " "
         lines.append(
             _format_path_line(
@@ -750,6 +845,33 @@ def _format_path_line(
     return line
 
 
+def _file_browser_order(
+    entries: Sequence[_EntryT],
+    *,
+    path_of: Callable[[_EntryT], str],
+    directory_of: Callable[[_EntryT], bool],
+) -> tuple[_EntryT, ...]:
+    directory_paths = {
+        path_of(entry) for entry in entries if directory_of(entry)
+    }
+
+    def order_key(entry: _EntryT) -> tuple[tuple[int, str, str], ...]:
+        parts = PurePosixPath(path_of(entry)).parts
+        return tuple(
+            (
+                0
+                if PurePosixPath(*parts[: index + 1]).as_posix()
+                in directory_paths
+                else 1,
+                part.casefold(),
+                part,
+            )
+            for index, part in enumerate(parts)
+        )
+
+    return tuple(sorted(entries, key=order_key))
+
+
 def _format_comparison_entries(
     entries: Sequence[ComparisonEntry],
     direction: str,
@@ -766,7 +888,12 @@ def _format_comparison_entries(
         "x": "\033[90m",
         "·": "\033[90m",
     }
-    for entry in entries:
+    for entry in _file_browser_order(
+        entries,
+        path_of=lambda item: item.path,
+        directory_of=lambda item: _comparison_entry_kind(item, direction)
+        == "directory",
+    ):
         marker = _comparison_marker(entry, direction)
         directory = _comparison_entry_kind(entry, direction) == "directory"
         lines.append(

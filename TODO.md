@@ -1,5 +1,8 @@
 # Work Queue
 
+- [x] Group synchronization-rule inspection by folder while preserving visible
+  precedence IDs, remove provably unnecessary exact rules during include or
+  exclude updates, and use file-browser ordering in list and diff output.
 - [x] Treat explicit `hls list` directory operands as containers and standardize
   the gray excluded-path marker as `x` across list and diff.
 - [x] Make `hls list` current-directory-scoped by default, including dotfiles,

@@ -197,18 +197,21 @@ hls exc
 hls inc
 ```
 
-`hls exc` lists exclusion rules and `hls inc` lists inclusion rules, one per
-line. Exact project-relative paths display with a `./` prefix, while reusable
-wildcard patterns display as their stored expressions. Display the complete
-ordered policy with:
+`hls exc` lists exclusion rules and `hls inc` lists inclusion rules. Rules are
+grouped beneath the nearest literal folder and sorted by name. Patterns that can
+apply beneath any folder appear under `Everywhere`. Display the complete policy
+with:
 
 ```console
 hls rules
 ```
 
-A later matching rule wins. Adding the exact same normalized pattern again
-automatically replaces its earlier rule, even when its action changes. Remove
-any other unwanted rule by its stable ID:
+A higher matching rule ID wins. Adding the exact same normalized pattern again
+removes its earlier rule. If the remaining policy already includes or excludes
+the path as requested, HLS does not add a redundant replacement; otherwise the
+new action receives a new ID. HLS leaves more complex wildcard overlaps intact
+rather than guessing that they are equivalent. Remove any unwanted rule by its
+stable ID:
 
 ```console
 hls rules remove 3
@@ -233,6 +236,9 @@ as a container, so `hls list templates` lists the immediate children of
 `templates` without requiring `templates/*`. Add `-r` to include all descendants
 of selected directories. Bare `*` continues to be expanded by the shell, while
 quoted patterns are interpreted by HLS.
+
+Listings use file-browser order at every displayed level: directories first by
+name, followed by files by name.
 
 The command does not connect to FTPS. Directories use a `d` type marker and
 excluded paths use `x`; included files leave both columns blank. Use
@@ -385,6 +391,8 @@ paths are omitted unless `--all` is supplied.
 Diff prints immediately flushed progress to stderr while it connects and moves
 through directories. Diff entries are progressively written to stdout, so they
 can be redirected without mixing status messages into the result.
+Within each displayed directory, subdirectories are sorted first by name and
+files follow by name, matching `hls list`.
 
 ## Push and pull
 

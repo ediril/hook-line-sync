@@ -339,21 +339,43 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert invoke(["exc"], store) == (
         0,
         "Exclusion rules for project 'prod':\n"
-        "  1  exclude .git/**\n"
-        "  2  exclude node_modules/**\n"
+        "\n"
+        "./\n"
         "  3  exclude *.log\n"
-        "  4  exclude **/.cache/**\n"
-        "  5  exclude ./composer.json\n"
-        "  6  exclude ./composer.lock\n"
-        "  9  exclude ./docs/note.txt\n",
+        "  5  exclude composer.json\n"
+        "  6  exclude composer.lock\n"
+        "\n"
+        ".git/\n"
+        "  1  exclude all contents\n"
+        "\n"
+        "docs/\n"
+        "  9  exclude note.txt\n"
+        "\n"
+        "node_modules/\n"
+        "  2  exclude all contents\n"
+        "\n"
+        "Everywhere\n"
+        "  4  exclude .cache/**\n",
         "",
     )
     assert invoke(["inc"], store) == (
         0,
         "Inclusion rules for project 'prod':\n"
-        "  7  include ./node_modules/keep.js\n"
-        "  8  include node_modules/package/**\n",
+        "\n"
+        "node_modules/\n"
+        "  7  include keep.js\n"
+        "\n"
+        "node_modules/package/\n"
+        "  8  include all contents\n",
         "",
+    )
+    rules_view = invoke(["rules"], store)
+    assert rules_view[0] == 0
+    assert rules_view[1].index("./\n") < rules_view[1].index(".git/\n")
+    assert rules_view[1].index(".git/\n") < rules_view[1].index("docs/\n")
+    assert "  2  exclude all contents\n  7  include keep.js\n" in rules_view[1]
+    assert rules_view[1].endswith(
+        "Higher rule IDs take precedence when rules overlap.\n"
     )
     list_stdout = invoke(["profiles"], store)[1]
     assert "* prod\n" in list_stdout
@@ -368,13 +390,15 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert store.load().projects["prod"].next_rule_id == 10
     assert invoke(["inc", "composer.json"], store) == (
         0,
-        "Recorded inclusion rules for project 'prod':\n"
-        "  10  include ./composer.json\n",
+        "Paths are included by the remaining policy for project 'prod';\n"
+        "removed the unnecessary rules:\n"
+        "  5  exclude ./composer.json\n",
         "",
     )
     updated = store.load().projects["prod"]
     assert 5 not in {rule.id for rule in updated.rules}
-    assert updated.next_rule_id == 11
+    assert not any(rule.pattern == "composer.json" for rule in updated.rules)
+    assert updated.next_rule_id == 10
     assert "project mapped to the current directory" not in profile_stdout
 
 
@@ -511,10 +535,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     local_listing = (
         0,
         "Local tree for project 'prod':\n"
+        "  d src/nested\n"
         "    src/.env.example\n"
         "x   src/debug.log\n"
-        "    src/main.py\n"
-        "  d src/nested\n",
+        "    src/main.py\n",
         "",
     )
     assert invoke(["list"], store) == local_listing
@@ -532,6 +556,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     recursive_list = invoke(["list", "--recursive"], store)
     assert "x   node_modules/package.js\n" in recursive_list[1]
     assert "    src/.env.example\n" in recursive_list[1]
+    assert recursive_list[1].index("x d node_modules\n") < (
+        recursive_list[1].index("  d src\n")
+    )
+    assert recursive_list[1].index("  d src\n") < (
+        recursive_list[1].index("    README.md\n")
+    )
     colored_list = invoke(
         ["list", "--recursive", "--color", "always"], store
     )
@@ -550,6 +580,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "Local -> Remote for project 'prod':\n" in push_comparison[1]
     assert "+   src/main.py\n" in push_comparison[1]
     assert "+ d src/nested\n" in push_comparison[1]
+    assert push_comparison[1].index("+ d src/nested\n") < (
+        push_comparison[1].index("+   src/.env.example\n")
+    )
     assert "src/nested/child.py" not in push_comparison[1]
     assert "README.md" not in push_comparison[1]
     assert "deployed.html" not in push_comparison[1]
@@ -597,6 +630,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
     assert "\033[90mx   src/debug.log\033[0m" in colored_comparison[1]
     assert "\033[90m=   same.txt\033[0m" in colored_comparison[1]
+    assert colored_comparison[1].index("d node_modules") < (
+        colored_comparison[1].index("d src")
+    )
+    assert colored_comparison[1].index("d src") < (
+        colored_comparison[1].index("README.md")
+    )
 
     paged = invoke(["diff", ".", "--recursive", "--paged"], store)
     assert "Resume: hls diff . --recursive --paged --resume src\n" in paged[1]

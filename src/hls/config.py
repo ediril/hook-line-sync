@@ -21,6 +21,12 @@ class ConfigurationError(ValueError):
     """Raised when configuration is invalid or cannot be decoded."""
 
 
+@dataclass(frozen=True)
+class RuleUpdate:
+    added: tuple[SyncRule, ...] = ()
+    removed: tuple[SyncRule, ...] = ()
+
+
 def validate_project_name(name: str) -> str:
     if not PROJECT_NAME_PATTERN.fullmatch(name):
         raise ConfigurationError(
@@ -85,6 +91,21 @@ def _validate_stored_local_root(value: Any) -> str | None:
 
 def _paths_overlap(first: Path, second: Path) -> bool:
     return first == second or first in second.parents or second in first.parents
+
+
+def _rule_action_already_applies(
+    rules: tuple[SyncRule, ...],
+    action: RuleAction,
+    pattern: str,
+) -> bool:
+    if action == "include" and not any(
+        rule.action == "exclude" for rule in rules
+    ):
+        return True
+    if "*" in pattern:
+        return False
+    excluded = RuleSet(rules).excludes(pattern)
+    return excluded if action == "exclude" else not excluded
 
 
 @dataclass(frozen=True)
@@ -324,17 +345,25 @@ class ApplicationConfiguration:
         project_name: str,
         action: RuleAction,
         patterns: tuple[str, ...],
-    ) -> tuple[SyncRule, ...]:
+    ) -> RuleUpdate:
         project = self.projects[project_name]
         ordered = list(project.rules)
         added: list[SyncRule] = []
+        removed: list[SyncRule] = []
         next_rule_id = project.next_rule_id
         unique_patterns: list[str] = []
         for pattern in patterns:
             unique_patterns = [item for item in unique_patterns if item != pattern]
             unique_patterns.append(pattern)
         for pattern in unique_patterns:
+            replaced = tuple(rule for rule in ordered if rule.pattern == pattern)
             ordered = [rule for rule in ordered if rule.pattern != pattern]
+            if (
+                replaced
+                and _rule_action_already_applies(tuple(ordered), action, pattern)
+            ):
+                removed.extend(replaced)
+                continue
             rule = SyncRule(next_rule_id, action, pattern)
             ordered.append(rule)
             added.append(rule)
@@ -343,7 +372,7 @@ class ApplicationConfiguration:
             tuple(ordered),
             next_rule_id=next_rule_id,
         )
-        return tuple(added)
+        return RuleUpdate(tuple(added), tuple(removed))
 
     def remove_rule(self, project_name: str, rule_id: int) -> SyncRule:
         project = self.projects[project_name]
