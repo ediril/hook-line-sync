@@ -15,8 +15,8 @@ creation, modification, deletion, and conflict. A skipped remote-only path uses
 under either perspective. Exclusions use `x`, unchanged files use `=`, and
 directories that exist on both sides leave the status column blank because
 entry equality does not establish content equality. A directory outside the
-traversed depth adds a `d ▸` indicator without replacing its synchronization
-status. Exclusions can be hidden from the presentation with
+traversed depth adds a trailing `▸` indicator without replacing its
+synchronization status. Exclusions can be hidden from the presentation with
 `-i`/`--included-only`; they remain excluded from the synchronization plan.
 
 Status lines use green, yellow, red, and magenta for actions and conflicts when

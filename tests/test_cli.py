@@ -577,13 +577,11 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     push_progress = (
         "Checking differences for project 'prod'...\n"
         "Connecting securely over FTPS...\n"
-        "Comparing directory 'src'\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
-    assert "Local -> Remote for project 'prod':\n" in push_comparison[1]
     assert "+   main.py\n" in push_comparison[1]
-    assert "+ d ▸ nested\n" in push_comparison[1]
-    assert push_comparison[1].index("+ d ▸ nested\n") < (
+    assert "+ d nested ▸\n" in push_comparison[1]
+    assert push_comparison[1].index("+ d nested ▸\n") < (
         push_comparison[1].index("+   .env.example\n")
     )
     assert "src/nested/child.py" not in push_comparison[1]
@@ -597,7 +595,6 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "debug.log" not in hidden_exclusions[1]
 
     recursive_comparison = invoke(["diff", "-r"], store)
-    assert "Comparing directory 'src/nested'\n" in recursive_comparison[2]
     assert "  +   child.py\n" in recursive_comparison[1]
 
     monkeypatch.chdir(workspace)
@@ -605,25 +602,21 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["diff", "--prune-remote", "--color", "always"], store
     )
     assert "\033[31m-   deployed.html\033[0m\n" in pruned_comparison[1]
-    assert "  \033[3;38;5;24md ▸ src\033[0m\n" in (
+    assert "  \033[3;38;5;24md src ▸\033[0m\n" in (
         pruned_comparison[1]
     )
     monkeypatch.chdir(source)
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
-    assert selected_comparison[2].endswith("Comparing directory 'src'\n")
-    assert "src/nested" not in selected_comparison[2]
     assert "main.py" in selected_comparison[1]
     assert "README.md" not in selected_comparison[1]
     assert "deployed.html" not in selected_comparison[1]
 
     monkeypatch.chdir(workspace)
     directory_comparison = invoke(["diff", "src"], store)
-    assert directory_comparison[2].endswith("Comparing directory 'src'\n")
-    assert "Comparing directory '.'" not in directory_comparison[2]
     assert "= d src\n" not in directory_comparison[1]
     assert "  d src\n" in directory_comparison[1]
-    assert "  + d ▸ nested\n" in directory_comparison[1]
+    assert "  + d nested ▸\n" in directory_comparison[1]
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
     assert "    +   child.py\n" in recursive_directory_comparison[1]
@@ -633,7 +626,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert expanded_comparison[0] == 0
     assert "+   README.md\n" in expanded_comparison[1]
     assert "  +   main.py\n" in expanded_comparison[1]
-    assert "d ▸ src\n" not in expanded_comparison[1]
+    assert "d src ▸\n" not in expanded_comparison[1]
 
     colored_comparison = invoke(
         ["diff", "**", "--color", "always"], store
@@ -664,8 +657,6 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["diff", "--pull", "-r", "--color", "always"], store
     )
     assert pull_comparison[0] == 0
-    assert pull_comparison[2].endswith("Comparing directory 'src/nested'\n")
-    assert "Remote -> Local for project 'prod':\n" in pull_comparison[1]
     assert "\033[38;5;30mr   deployed.html\033[0m\n" in pull_comparison[1]
     assert "\033[38;5;51ml   README.md\033[0m\n" in pull_comparison[1]
     with pytest.raises(SystemExit):

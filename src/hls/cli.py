@@ -857,7 +857,7 @@ def _format_path_line(
     indent = "  " * depth
     kind = "d" if directory else " "
     traversal = " ▸" if collapsed else ""
-    body = f"{marker} {kind}{traversal} {path}"
+    body = f"{marker} {kind} {path}{traversal}"
     line = f"{indent}{body}"
     if not color:
         return line
@@ -868,7 +868,7 @@ def _format_path_line(
             )
             return (
                 f"{indent}{colored_marker} "
-                f"\033[3;38;5;24md ▸ {path}\033[0m"
+                f"\033[3;38;5;24md {path} ▸\033[0m"
             )
         directory_color = "\033[38;5;24m" if excluded else "\033[38;5;75m"
         colored_marker = (
@@ -1261,7 +1261,6 @@ def _diff(
     selector = _file_selection(arguments, root)
     rules = RuleSet(project.rules)
     direction = "pull" if arguments.pull else "push"
-    perspective = "Local -> Remote" if direction == "push" else "Remote -> Local"
     color = _use_color(arguments.color, output)
     print(f"Checking differences for project '{name}'...", file=progress, flush=True)
     print("Connecting securely over FTPS...", file=progress, flush=True)
@@ -1297,16 +1296,10 @@ def _diff(
     selected_count = 0
     displayed_count = 0
     with ExplicitFTPSTransport(project) as transport:
-        print(f"{perspective} for project '{name}':", file=output, flush=True)
         while pending:
             current = pending.pop()
             directory = current.path
             display_directory = directory.as_posix()
-            print(
-                f"Comparing directory '{display_directory}'",
-                file=progress,
-                flush=True,
-            )
             local_listing = (
                 list_local_directory(root, directory, rules)
                 if current.has_local

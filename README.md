@@ -345,14 +345,14 @@ l   local-only and retained
 =   unchanged file
   d directory exists on both sides
 x   excluded from synchronization
-d ▸ directory contents were not compared (follows any status above)
+d directory ▸ contents were not compared (follows any status above)
 ```
 
 The default selected side is local; `--pull` reverses it to remote. By default,
 diff prints synchronization actions, conflicts, one-sided paths that will be
-kept, and directories whose contents fall outside the selected depth. A `d ▸`
-suffix is a traversal indicator, not a replacement for the directory's status:
-`+ d ▸ cache` is new locally, while `r d ▸ cache` exists only remotely and will
+kept, and directories whose contents fall outside the selected depth. A trailing
+`▸` is a traversal indicator, not a replacement for the directory's status:
+`+ d cache ▸` is new locally, while `r d cache ▸` exists only remotely and will
 be retained. Diff shows unchanged and excluded paths by default; use `-i`,
 `--inc`, or `--included-only` to show included paths only. Status lines use
 distinct terminal colors. Remote-only retained paths are dark cyan, local-only
@@ -410,9 +410,9 @@ File identity uses size and modification timestamps normalized to the coarser
 precision reported by the local filesystem and remote MLSD facts. Identical
 paths are shown with `=`.
 
-Diff prints immediately flushed progress to stderr while it connects and moves
-through directories. Diff entries are progressively written to stdout, so they
-can be redirected without mixing status messages into the result.
+Diff prints immediately flushed connection progress to stderr. Diff entries are
+progressively written to stdout as directories are read, so they can be
+redirected without mixing status messages into the result.
 Within each displayed directory, subdirectories are sorted first by name and
 files follow by name, matching `hls list`.
 

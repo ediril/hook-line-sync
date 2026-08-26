@@ -8,9 +8,10 @@ of those commands receives an explicit directory operand, the directory is a
 synchronization container with the same shallow-by-default behavior.
 
 A directory that is selected but not traversed is always emitted by `diff`.
-Its synchronization status remains independent: for example, `+ d ▸` is a new
-local directory and `r d ▸` is a retained remote-only directory. The dark-blue
-italic `d ▸` suffix means HLS makes no claim about the directory's contents.
+Its synchronization status remains independent: for example, `+ d cache ▸` is
+a new local directory and `r d cache ▸` is a retained remote-only directory.
+The dark-blue italic trailing `▸` means HLS makes no claim about the directory's
+contents.
 Recursive traversal removes that suffix and prints the comparisons from inside
 the directory.
 

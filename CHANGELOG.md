@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.26.12 — 2026-08-26
+
+### Changed
+
+- Removed the redundant diff direction heading and per-directory comparison
+  messages; command options establish direction and tree anchors establish
+  directory scope.
+
+## 0.8.26.11 — 2026-08-26
+
+### Changed
+
+- Moved the untraversed-directory `▸` indicator after the directory name so
+  sibling directory and file names align at the same tree depth.
+
 ## 0.8.26.10 — 2026-08-26
 
 ### Changed
