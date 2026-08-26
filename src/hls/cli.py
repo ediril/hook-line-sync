@@ -966,20 +966,44 @@ def _scoped_display_path(
     path: str,
     *,
     display_root: PurePosixPath | None,
-    anchored: bool,
 ) -> tuple[int, str]:
     project_path = PurePosixPath(path)
     if display_root is None:
         return 0, project_path.as_posix()
     if project_path == display_root and display_root.parts:
-        return 0, display_root.name
+        return 0, display_root.as_posix()
     relative = (
         project_path.relative_to(display_root)
         if display_root.parts
         else project_path
     )
-    depth = len(relative.parts) if anchored else max(len(relative.parts) - 1, 0)
+    depth = len(relative.parts) if display_root.parts else max(
+        len(relative.parts) - 1,
+        0,
+    )
     return depth, relative.name
+
+
+def _scope_header_lines(
+    display_root: PurePosixPath | None,
+    *,
+    anchored: bool,
+    color: bool,
+) -> tuple[str, ...]:
+    if display_root is None:
+        return ()
+    if anchored or not display_root.parts:
+        return ()
+    return (
+        _format_path_line(
+            " ",
+            directory=True,
+            path=display_root.as_posix(),
+            color=color,
+            marker_color=None,
+            excluded=False,
+        ),
+    )
 
 
 def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection:
@@ -1305,6 +1329,13 @@ def _diff(
     selected_count = 0
     displayed_count = 0
     with ExplicitFTPSTransport(project) as transport:
+        if pending:
+            for line in _scope_header_lines(
+                pending[-1].display_root,
+                anchored=pending[-1].display_anchor,
+                color=color,
+            ):
+                print(line, file=output, flush=True)
         while pending:
             current = pending.pop()
             directory = current.path
@@ -1442,7 +1473,6 @@ def _diff(
                 display_path=lambda path: _scoped_display_path(
                     path,
                     display_root=current.display_root,
-                    anchored=current.display_anchor,
                 ),
             )
             for line in lines:

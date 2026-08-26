@@ -374,10 +374,10 @@ visible boundaries but their excluded subtrees are not traversed; a narrower
 include rule can still make HLS enter the relevant branch. Push and pull
 continue to omit excluded paths entirely.
 
-Diff renders paths as a tree relative to the selected scope. An explicit
-directory remains as the anchor row, immediate children show only their names,
-and deeper descendants are indented beneath their parent instead of repeating
-the complete project-relative prefix. Disjoint multi-root selections retain
+Diff renders one full project-relative scope anchor rather than printing each
+ancestor as a separate row. Immediate entries show only their names beneath
+that anchor, and recursive descendants gain one indentation level per directory
+instead of repeating the complete path. Disjoint multi-root selections retain
 full paths so identical basenames remain distinguishable. Selection,
 comparison, and transfer plans continue to use full project-relative paths
 internally.

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.26.17 — 2026-08-26
+
+### Changed
+
+- Compacted nested diff scopes into one full project-relative anchor such as
+  `templates/partials/`, rather than printing every ancestor as a separate row.
+- Indented entries relative to that anchor at any folder depth while continuing
+  to start traversal directly at the selected directory.
+
+## 0.8.26.16 — 2026-08-26
+
+### Changed
+
+- Preserved the complete project-relative ancestor chain when rendering a
+  nested diff scope, so `hls diff templates/partials` displays `templates/` as
+  the parent of `partials/` and indents its files beneath both.
+- Kept reconstructed ancestors presentation-only; traversal still begins
+  directly at the selected directory without listing its parents.
+
 ## 0.8.26.15 — 2026-08-26
 
 ### Changed

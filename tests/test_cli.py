@@ -620,6 +620,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
     assert "    + child.py\n" in recursive_directory_comparison[1]
+    nested_directory_comparison = invoke(["diff", "src/nested"], store)
+    assert "  src/nested/\n" in nested_directory_comparison[1]
+    assert "  + child.py\n" in nested_directory_comparison[1]
     expanded_comparison = invoke(
         ["diff", "README.md,src/main.py", "src"], store
     )
@@ -690,7 +693,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
-    assert len(transports) == 16
+    assert len(transports) == 17
 
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
