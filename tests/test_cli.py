@@ -7,6 +7,7 @@ from hls.cli import run
 from hls.config import ConfigurationStore
 from hls.rules import RuleSet, SyncRule
 from hls.snapshot import TreeEntry, TreeSnapshot, snapshot_local
+from hls.transport import PathOperationError
 
 
 class TerminalInput(io.StringIO):
@@ -734,3 +735,72 @@ def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
     assert remapped_project.local_root == str(separate)
     assert remapped_project.rules == (SyncRule(1, "exclude", "*.log"),)
     assert store.load().projects["staging"].local_root is None
+
+
+def test_push_reports_partial_failure_after_continuing_independent_paths(
+    tmp_path, monkeypatch
+) -> None:
+    store = ConfigurationStore(tmp_path / "configs.json")
+    workspace = tmp_path / "workspace"
+    blocked = workspace / "blocked"
+    blocked.mkdir(parents=True)
+    (blocked / "child.txt").write_text("blocked", encoding="utf-8")
+    (workspace / "good.txt").write_text("good", encoding="utf-8")
+    monkeypatch.chdir(workspace)
+    invoke(
+        [
+            "add",
+            "prod",
+            "--host",
+            "ftp.example.com",
+            "--remote-root",
+            "/public_html",
+        ],
+        store,
+        stdin="yes\n",
+    )
+
+    uploads = []
+
+    class PartiallyWritableTransport:
+        def __init__(self, project):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def snapshot(self, rules, selector=None, *, include_excluded=False):
+            return TreeSnapshot()
+
+        def make_directory(self, path):
+            if path == "blocked":
+                raise PathOperationError("550 Permission denied")
+
+        def upload_file(
+            self,
+            source,
+            path,
+            *,
+            size,
+            modified_ns,
+            replace,
+        ):
+            uploads.append((path, source.read()))
+
+        def delete_path(self, path, *, is_directory):
+            raise AssertionError("pruning was not requested")
+
+    monkeypatch.setattr("hls.cli.ExplicitFTPSTransport", PartiallyWritableTransport)
+    result = invoke(["push", "-r"], store)
+
+    assert result[0] == 1
+    assert uploads == [("good.txt", b"good")]
+    assert result[1] == (
+        "Push finished with errors for project 'prod': "
+        "1 completed, 1 failed, 1 skipped.\n"
+        "  failed  blocked: 550 Permission denied\n"
+        "  skipped blocked/child.txt: parent directory 'blocked' is unavailable\n"
+    )

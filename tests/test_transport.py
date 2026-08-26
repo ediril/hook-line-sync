@@ -14,9 +14,13 @@ from hls.comparison import build_comparison
 from hls.config import ProjectConfiguration
 from hls.rules import RuleSet, SyncRule
 from hls.selection import FileSelector
-from hls.snapshot import snapshot_local
+from hls.snapshot import TreeEntry, TreeSnapshot, snapshot_local
 from hls.transfer import execute_transfer
-from hls.transport import ExplicitFTPSTransport, TransportError
+from hls.transport import (
+    ExplicitFTPSTransport,
+    PathOperationError,
+    TransportError,
+)
 
 
 def test_missing_credentials_are_reported(monkeypatch) -> None:
@@ -320,3 +324,64 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             transport=transport,
         )
         assert not orphan.exists()
+
+
+def test_push_skips_an_unwritable_subtree_and_continues_independent_files(
+    tmp_path,
+) -> None:
+    local_root = tmp_path / "local"
+    blocked = local_root / "blocked"
+    blocked.mkdir(parents=True)
+    (blocked / "child.txt").write_text("blocked", encoding="utf-8")
+    (local_root / "good.txt").write_text("good", encoding="utf-8")
+    local = snapshot_local(local_root, RuleSet())
+    remote = TreeSnapshot(
+        (
+            TreeEntry(
+                "orphan.txt",
+                "file",
+                size=6,
+                modified_ns=1_700_000_000_000_000_000,
+                timestamp_precision_ns=1_000_000_000,
+            ),
+        )
+    )
+    plan = build_comparison(local, remote, prune_remote=True)
+    uploads = []
+    deletions = []
+
+    class PartiallyWritableTransport:
+        def make_directory(self, path):
+            if path == "blocked":
+                raise PathOperationError("550 Permission denied")
+
+        def upload_file(
+            self,
+            source,
+            path,
+            *,
+            size,
+            modified_ns,
+            replace,
+        ):
+            uploads.append((path, source.read()))
+
+        def delete_path(self, path, *, is_directory):
+            deletions.append(path)
+
+    result = execute_transfer(
+        plan,
+        local_root=local_root,
+        local=local,
+        remote=remote,
+        transport=PartiallyWritableTransport(),
+    )
+
+    assert uploads == [("good.txt", b"good")]
+    assert deletions == []
+    assert result.changed_count == 1
+    assert [(issue.status, issue.path) for issue in result.issues] == [
+        ("failed", "blocked"),
+        ("skipped", "blocked/child.txt"),
+        ("skipped", "orphan.txt"),
+    ]

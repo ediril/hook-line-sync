@@ -446,6 +446,15 @@ hls push --prune-remote
 hls push -p 'generated/*.html'
 ```
 
+A path-scoped FTPS permission failure does not stop unrelated uploads. HLS
+records the failed path, skips descendants when their parent directory could
+not be created, continues independent files, and exits with a nonzero status.
+If any upload fails, the entire pruning phase is suppressed so an incomplete
+deployment cannot proceed into remote deletion. HLS does not persist failures
+as exclusion rules. Connection failures and replacement failures whose prior
+remote file cannot be restored still stop the command because continued remote
+state is not trustworthy.
+
 Pruning is limited by the selector and occurs only after all uploads succeed.
 Pull never deletes remote paths. Remote uploads use temporary files and
 recoverable backups; local downloads use atomic replacement. Type conflicts and

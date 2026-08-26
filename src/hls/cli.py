@@ -1275,6 +1275,17 @@ def _diff(
 
 def _format_transfer(name: str, result: TransferResult) -> str:
     direction = result.plan.direction.capitalize()
+    if not result.succeeded:
+        lines = [
+            f"{direction} finished with errors for project '{name}': "
+            f"{result.changed_count} completed, {result.failed_count} failed, "
+            f"{result.skipped_count} skipped."
+        ]
+        lines.extend(
+            f"  {issue.status:<7} {issue.path}: {issue.reason}"
+            for issue in result.issues
+        )
+        return "\n".join(lines)
     lines = [
         f"{direction} completed for project '{name}': "
         f"{result.changed_count} change(s)."
@@ -1291,7 +1302,7 @@ def _transfer(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
     progress: TextIO,
-) -> str:
+) -> tuple[str, TransferResult]:
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
     print(
@@ -1317,7 +1328,7 @@ def _transfer(
             remote=remote,
             transport=transport,
         )
-    return _format_transfer(name, result)
+    return name, result
 
 
 def _show_help(
@@ -1358,6 +1369,7 @@ def run(
             parser.error(str(error))
     arguments = parser.parse_args(raw_arguments)
     configuration_store = store or ConfigurationStore()
+    exit_status = 0
     try:
         if arguments.command == "add":
             message = _save_project(arguments, configuration_store, stdin, stdout)
@@ -1385,7 +1397,10 @@ def run(
             _diff(arguments, configuration_store, stderr, stdout)
             message = None
         elif arguments.command in {"push", "pull"}:
-            message = _transfer(arguments, configuration_store, stderr)
+            name, result = _transfer(arguments, configuration_store, stderr)
+            message = _format_transfer(name, result)
+            if not result.succeeded:
+                exit_status = 1
         elif arguments.command == "help":
             message = _show_help(parser, arguments.topic, stdin, stdout)
         elif arguments.command == "version":
@@ -1406,7 +1421,7 @@ def run(
         return 1
     if message is not None:
         print(message, file=stdout)
-    return 0
+    return exit_status
 
 
 def main(argv: Sequence[str] | None = None) -> int:

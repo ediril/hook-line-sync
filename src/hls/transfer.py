@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 
 from hls.comparison import ComparisonEntry, ComparisonPlan
 from hls.snapshot import TreeEntry, TreeSnapshot
-from hls.transport import RemoteTransport
+from hls.transport import PathOperationError, RemoteTransport
 
 
 class TransferError(RuntimeError):
@@ -16,16 +16,33 @@ class TransferError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class TransferIssue:
+    path: str
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class TransferResult:
     plan: ComparisonPlan
+    completed_paths: frozenset[str]
+    issues: tuple[TransferIssue, ...] = ()
 
     @property
     def changed_count(self) -> int:
-        return sum(
-            entry.action
-            not in {"unchanged", "skip", "excluded"}
-            for entry in self.plan.entries
-        )
+        return len(self.completed_paths)
+
+    @property
+    def failed_count(self) -> int:
+        return sum(issue.status == "failed" for issue in self.issues)
+
+    @property
+    def skipped_count(self) -> int:
+        return sum(issue.status == "skipped" for issue in self.issues)
+
+    @property
+    def succeeded(self) -> bool:
+        return not self.issues
 
 
 def _entry_map(snapshot: TreeSnapshot) -> dict[str, TreeEntry]:
@@ -93,12 +110,62 @@ def _push_files(
     local: TreeSnapshot,
     remote: TreeSnapshot,
     transport: RemoteTransport,
-) -> None:
+) -> tuple[set[str], list[TransferIssue]]:
     local_entries = _entry_map(local)
+    completed: set[str] = set()
+    issues: list[TransferIssue] = []
+    unavailable_directories: set[str] = set()
+    planned_creations = {
+        entry.path
+        for entry in plan.entries
+        if entry.action == "create-remote"
+    }
+
+    def unavailable_parent(path: str) -> str | None:
+        candidate = PurePosixPath(path)
+        return next(
+            (
+                directory
+                for directory in sorted(unavailable_directories)
+                if PurePosixPath(directory) == candidate
+                or PurePosixPath(directory) in candidate.parents
+            ),
+            None,
+        )
+
     for directory in _remote_directories_to_create(plan, remote):
-        transport.make_directory(directory)
+        blocked_by = unavailable_parent(directory)
+        if blocked_by is not None:
+            unavailable_directories.add(directory)
+            if directory in planned_creations:
+                issues.append(
+                    TransferIssue(
+                        directory,
+                        "skipped",
+                        f"parent directory '{blocked_by}' could not be created",
+                    )
+                )
+            continue
+        try:
+            transport.make_directory(directory)
+        except PathOperationError as error:
+            unavailable_directories.add(directory)
+            issues.append(TransferIssue(directory, "failed", str(error)))
+            continue
+        if directory in planned_creations:
+            completed.add(directory)
     for entry in plan.entries:
         if entry.action not in {"upload", "replace-remote"}:
+            continue
+        blocked_by = unavailable_parent(entry.path)
+        if blocked_by is not None:
+            issues.append(
+                TransferIssue(
+                    entry.path,
+                    "skipped",
+                    f"parent directory '{blocked_by}' is unavailable",
+                )
+            )
             continue
         metadata = local_entries[entry.path]
         if metadata.size is None or metadata.modified_ns is None:
@@ -113,10 +180,20 @@ def _push_files(
                     modified_ns=metadata.modified_ns,
                     replace=entry.action == "replace-remote",
                 )
+        except PathOperationError as error:
+            issues.append(TransferIssue(entry.path, "failed", str(error)))
+            continue
         except OSError as error:
-            raise TransferError(
-                f"could not read local file '{path}': {error}"
-            ) from error
+            issues.append(
+                TransferIssue(
+                    entry.path,
+                    "failed",
+                    f"could not read local file '{path}': {error}",
+                )
+            )
+            continue
+        completed.add(entry.path)
+    return completed, issues
 
 
 def _replace_local_file(
@@ -179,7 +256,8 @@ def _pull_files(
     local: TreeSnapshot,
     remote: TreeSnapshot,
     transport: RemoteTransport,
-) -> None:
+) -> set[str]:
+    completed: set[str] = set()
     local_entries = _entry_map(local)
     remote_entries = _entry_map(remote)
     for entry in plan.entries:
@@ -191,9 +269,14 @@ def _pull_files(
                 remote_entries[entry.path],
                 transport,
             )
+            completed.add(entry.path)
+    return completed
 
 
-def _delete_remote(plan: ComparisonPlan, transport: RemoteTransport) -> None:
+def _delete_remote(
+    plan: ComparisonPlan,
+    transport: RemoteTransport,
+) -> tuple[set[str], list[TransferIssue]]:
     deletions = [
         entry for entry in plan.entries if entry.action == "delete-remote"
     ]
@@ -205,11 +288,19 @@ def _delete_remote(plan: ComparisonPlan, transport: RemoteTransport) -> None:
         (entry for entry in deletions if entry.remote_kind == "directory"),
         key=lambda entry: (-len(PurePosixPath(entry.path).parts), entry.path),
     )
+    completed: set[str] = set()
+    issues: list[TransferIssue] = []
     for entry in (*files, *directories):
-        transport.delete_path(
-            entry.path,
-            is_directory=entry.remote_kind == "directory",
-        )
+        try:
+            transport.delete_path(
+                entry.path,
+                is_directory=entry.remote_kind == "directory",
+            )
+        except PathOperationError as error:
+            issues.append(TransferIssue(entry.path, "failed", str(error)))
+            continue
+        completed.add(entry.path)
+    return completed, issues
 
 
 def execute_transfer(
@@ -222,8 +313,28 @@ def execute_transfer(
 ) -> TransferResult:
     _preflight(plan, local_root, local)
     if plan.direction == "push":
-        _push_files(plan, local_root, local, remote, transport)
+        completed, issues = _push_files(
+            plan,
+            local_root,
+            local,
+            remote,
+            transport,
+        )
     else:
-        _pull_files(plan, local_root, local, remote, transport)
-    _delete_remote(plan, transport)
-    return TransferResult(plan)
+        completed = _pull_files(plan, local_root, local, remote, transport)
+        issues = []
+    if issues:
+        issues.extend(
+            TransferIssue(
+                entry.path,
+                "skipped",
+                "remote pruning was suppressed after another transfer failed",
+            )
+            for entry in plan.entries
+            if entry.action == "delete-remote"
+        )
+    else:
+        deleted, deletion_issues = _delete_remote(plan, transport)
+        completed.update(deleted)
+        issues.extend(deletion_issues)
+    return TransferResult(plan, frozenset(completed), tuple(issues))

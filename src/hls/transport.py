@@ -20,6 +20,10 @@ class TransportError(RuntimeError):
     """Raised when a remote transport cannot be used safely."""
 
 
+class PathOperationError(TransportError):
+    """Raised when one remote path fails but the FTPS session remains usable."""
+
+
 def _parse_mlsd_modify(value: str, path: str) -> tuple[int, int]:
     base, separator, fraction = value.partition(".")
     if len(base) != 14 or not base.isdigit() or (
@@ -273,6 +277,10 @@ class ExplicitFTPSTransport:
         path = _relative_remote_path(relative_path)
         try:
             self._connected_client().mkd(path)
+        except ftplib.error_perm as error:
+            raise PathOperationError(
+                f"could not create remote directory '{path}': {error}"
+            ) from error
         except (OSError, ftplib.Error, ssl.SSLError) as error:
             raise TransportError(
                 f"could not create remote directory '{path}': {error}"
@@ -326,6 +334,11 @@ class ExplicitFTPSTransport:
                 raise TransportError(
                     f"local source changed while staging remote file '{path}'"
                 )
+        except ftplib.error_perm as error:
+            discard(temporary)
+            raise PathOperationError(
+                f"could not stage remote file '{path}': {error}"
+            ) from error
         except (OSError, ftplib.Error, ssl.SSLError) as error:
             discard(temporary)
             raise TransportError(
@@ -335,6 +348,11 @@ class ExplicitFTPSTransport:
         if not replace:
             try:
                 client.rename(temporary, path)
+            except ftplib.error_perm as error:
+                discard(temporary)
+                raise PathOperationError(
+                    f"could not install remote file '{path}': {error}"
+                ) from error
             except (OSError, ftplib.Error, ssl.SSLError) as error:
                 discard(temporary)
                 raise TransportError(
@@ -344,6 +362,11 @@ class ExplicitFTPSTransport:
 
         try:
             client.rename(path, backup)
+        except ftplib.error_perm as error:
+            discard(temporary)
+            raise PathOperationError(
+                f"could not stage replacement of remote file '{path}': {error}"
+            ) from error
         except (OSError, ftplib.Error, ssl.SSLError) as error:
             discard(temporary)
             raise TransportError(
@@ -351,6 +374,19 @@ class ExplicitFTPSTransport:
             ) from error
         try:
             client.rename(temporary, path)
+        except ftplib.error_perm as error:
+            discard(temporary)
+            try:
+                client.rename(backup, path)
+            except (OSError, ftplib.Error, ssl.SSLError) as restore_error:
+                raise TransportError(
+                    f"could not install remote file '{path}' and could not "
+                    f"restore its backup '{backup}': {restore_error}"
+                ) from error
+            raise PathOperationError(
+                f"could not install remote file '{path}'; its prior version "
+                f"was restored: {error}"
+            ) from error
         except (OSError, ftplib.Error, ssl.SSLError) as error:
             discard(temporary)
             try:
@@ -389,6 +425,10 @@ class ExplicitFTPSTransport:
                 client.rmd(path)
             else:
                 client.delete(path)
+        except ftplib.error_perm as error:
+            raise PathOperationError(
+                f"could not delete remote path '{path}': {error}"
+            ) from error
         except (OSError, ftplib.Error, ssl.SSLError) as error:
             raise TransportError(
                 f"could not delete remote path '{path}': {error}"

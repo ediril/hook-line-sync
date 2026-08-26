@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.26.2 — 2026-08-26
+
+### Changed
+
+- Made push continue independent paths after path-scoped FTPS permission
+  failures instead of stopping at the first rejected file or directory.
+- Made a failed directory skip its subtree, report failed and dependency-skipped
+  paths, return a nonzero command status, and suppress remote pruning after an
+  incomplete upload phase.
+- Kept session failures and uncertain replacement rollback failures fatal rather
+  than continuing on an untrustworthy connection or remote state.
+
 ## 0.8.26.1 — 2026-08-26
 
 ### Changed

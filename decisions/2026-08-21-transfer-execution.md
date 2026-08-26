@@ -23,7 +23,15 @@ checked for size, assigned the remote timestamp and existing local permissions,
 and atomically renamed over the destination.
 
 `--prune-remote` / `-p` deletes remote-only files and then directories deepest
-first. Deletes run only after every planned upload or download succeeds.
+first. Deletes run only after every planned upload succeeds.
+
+A path-scoped FTPS permission failure is recorded without ending a push.
+Failure to create a directory skips its descendants, while independent paths
+continue. The command returns a nonzero status with completed, failed, and
+skipped counts. Any upload failure suppresses the complete pruning phase, and
+no failure becomes a persistent exclusion. Session failures and replacement
+failures whose backup cannot be restored remain fatal because the connection or
+remote state is no longer trustworthy.
 
 ## Rationale
 
@@ -39,8 +47,8 @@ remote content until replacements are present.
 - Changed files are overwritten in the command's explicit direction; diff
   is the preview mechanism.
 - Transfers are atomic per file, not across the whole project. FTPS has no
-  project-wide transaction, so a later failure stops execution but does not
-  roll back earlier successful files.
+  project-wide transaction, so path-scoped permission failures leave earlier
+  successful files in place and allow independent later files to continue.
 - Local files selected for upload or replacement are revalidated before any
   mutation. A concurrent local change aborts the plan.
 - Symlinks and file/directory type changes are conflicts and cause no mutation.

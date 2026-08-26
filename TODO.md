@@ -1,5 +1,11 @@
 # Work Queue
 
+- [x] Continue independent push paths after path-scoped FTPS permission
+  failures, skip descendants of failed directories, return a failing status,
+  and suppress pruning after an incomplete upload phase.
+- [ ] Make diff traversal local-led and start literal directory selections at
+  their exact local and remote paths instead of walking from the project root;
+  retain ancestor inspection only when a wildcard has no narrower fixed prefix.
 - [x] Make shallow diff scope visible with a dark-blue italic `▸` collapsed
   directory state, use dark/bright cyan `r` and `l` for retained remote/local
   paths, and reserve gray status styling for exclusions.
