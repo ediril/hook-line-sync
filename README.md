@@ -331,28 +331,28 @@ Selectors are applied before local and remote snapshots are built. HLS descends
 only into selected directory containers and directories that can contain a
 pattern match.
 
-Diff uses compact, perspective-relative status and type columns. Directories
-receive `d`; files and symlinks leave the type column blank:
+Diff uses a compact, perspective-relative status column. Directories receive a
+trailing `/` and supporting color rather than a separate type column:
 
 ```text
-+ d new-directory
-+   new-file
-~   modified on the selected side
--   missing from the selected side
-r   remote-only and retained
-l   local-only and retained
-?   type or symlink conflict
-=   unchanged file
-  d directory exists on both sides
-x   excluded from synchronization
-d directory ▸ contents were not compared (follows any status above)
++ new-directory/
++ new-file
+~ modified on the selected side
+- missing from the selected side
+r remote-only and retained
+l local-only and retained
+? type or symlink conflict
+= unchanged file
+  directory/ exists on both sides
+x excluded from synchronization
+  directory/ ▸ contents were not compared
 ```
 
 The default selected side is local; `--pull` reverses it to remote. By default,
 diff prints synchronization actions, conflicts, one-sided paths that will be
 kept, and directories whose contents fall outside the selected depth. A trailing
 `▸` is a traversal indicator, not a replacement for the directory's status:
-`+ d cache ▸` is new locally, while `r d cache ▸` exists only remotely and will
+`+ cache/ ▸` is new locally, while `r cache/ ▸` exists only remotely and will
 be retained. Diff shows unchanged and excluded paths by default; use `-i`,
 `--inc`, or `--included-only` to show included paths only. Status lines use
 distinct terminal colors. Remote-only retained paths are dark cyan, local-only

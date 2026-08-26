@@ -8,7 +8,8 @@
   retain ancestor inspection only when a wildcard has no narrower fixed prefix.
 - [x] Make shallow diff scope visible with an independent trailing dark-blue
   italic `▸` traversal indicator, use dark/bright cyan `r` and `l` for retained
-  remote/local paths, and reserve gray status styling for exclusions.
+  remote/local paths, use trailing `/` plus blue coloring for directories, and
+  reserve gray status styling for exclusions.
 - [x] Group synchronization-rule inspection by folder while preserving visible
   precedence IDs, remove provably unnecessary exact rules during include or
   exclude updates, and use file-browser ordering in list and diff output.

@@ -8,8 +8,8 @@ of those commands receives an explicit directory operand, the directory is a
 synchronization container with the same shallow-by-default behavior.
 
 A directory that is selected but not traversed is always emitted by `diff`.
-Its synchronization status remains independent: for example, `+ d cache ▸` is
-a new local directory and `r d cache ▸` is a retained remote-only directory.
+Its synchronization status remains independent: for example, `+ cache/ ▸` is
+a new local directory and `r cache/ ▸` is a retained remote-only directory.
 The dark-blue italic trailing `▸` means HLS makes no claim about the directory's
 contents.
 Recursive traversal removes that suffix and prints the comparisons from inside
@@ -26,9 +26,9 @@ claim. A one-sided, excluded, or otherwise actionable container retains its
 meaningful status marker.
 
 Other directories that exist on both sides use a blank status column rather
-than `=` for the same reason. Their `d` type and optional `▸` traversal marker
-remain visible. One-sided and excluded directories retain their meaningful
-status markers.
+than `=` for the same reason. Their trailing `/`, directory color, and optional
+`▸` traversal marker remain visible. One-sided and excluded directories retain
+their meaningful status markers.
 
 Diff presents paths relative to each traversal root. An explicit selected
 directory is the anchor row; its immediate children use basenames and one level

@@ -324,19 +324,19 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     ]
     local_view = invoke(["list", "--recursive"], store)
     assert local_view[0] == 0 and local_view[2] == ""
-    assert "    node_modules/keep.js\n" in local_view[1]
-    assert "x   composer.json\n" in local_view[1]
-    assert "x   docs/note.txt\n" in local_view[1]
+    assert "  node_modules/keep.js\n" in local_view[1]
+    assert "x composer.json\n" in local_view[1]
+    assert "x docs/note.txt\n" in local_view[1]
     directory_view = invoke(["list", "node_modules"], store)
-    assert "x   node_modules/drop.js\n" in directory_view[1]
-    assert "    node_modules/keep.js\n" in directory_view[1]
-    assert "  d node_modules/package\n" in directory_view[1]
+    assert "x node_modules/drop.js\n" in directory_view[1]
+    assert "  node_modules/keep.js\n" in directory_view[1]
+    assert "  node_modules/package/\n" in directory_view[1]
     assert "node_modules/package/nested.js" not in directory_view[1]
-    assert "x d node_modules\n" not in directory_view[1]
+    assert "x node_modules/\n" not in directory_view[1]
     recursive_directory_view = invoke(
         ["list", "node_modules", "--recursive"], store
     )
-    assert "    node_modules/package/nested.js\n" in recursive_directory_view[1]
+    assert "  node_modules/package/nested.js\n" in recursive_directory_view[1]
     assert invoke(["exc"], store) == (
         0,
         "Exclusion rules for project 'prod':\n"
@@ -537,10 +537,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     local_listing = (
         0,
         "Local tree for project 'prod':\n"
-        "  d src/nested\n"
-        "    src/.env.example\n"
-        "x   src/debug.log\n"
-        "    src/main.py\n",
+        "  src/nested/\n"
+        "  src/.env.example\n"
+        "x src/debug.log\n"
+        "  src/main.py\n",
         "",
     )
     assert invoke(["list"], store) == local_listing
@@ -548,28 +548,28 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert invoke(["list", "*"], store) == (
         0,
         "Local tree for project 'prod':\n"
-        "    src/.env.example\n"
-        "x   src/debug.log\n"
-        "    src/main.py\n"
-        "    src/nested/child.py\n",
+        "  src/.env.example\n"
+        "x src/debug.log\n"
+        "  src/main.py\n"
+        "  src/nested/child.py\n",
         "",
     )
     monkeypatch.chdir(workspace)
     recursive_list = invoke(["list", "--recursive"], store)
-    assert "x   node_modules/package.js\n" in recursive_list[1]
-    assert "    src/.env.example\n" in recursive_list[1]
-    assert recursive_list[1].index("x d node_modules\n") < (
-        recursive_list[1].index("  d src\n")
+    assert "x node_modules/package.js\n" in recursive_list[1]
+    assert "  src/.env.example\n" in recursive_list[1]
+    assert recursive_list[1].index("x node_modules/\n") < (
+        recursive_list[1].index("  src/\n")
     )
-    assert recursive_list[1].index("  d src\n") < (
-        recursive_list[1].index("    README.md\n")
+    assert recursive_list[1].index("  src/\n") < (
+        recursive_list[1].index("  README.md\n")
     )
     colored_list = invoke(
         ["list", "--recursive", "--color", "always"], store
     )
-    assert "\033[90mx   src/debug.log\033[0m" in colored_list[1]
-    assert "  \033[38;5;75md src\033[0m" in colored_list[1]
-    assert "\033[90mx\033[0m \033[38;5;24md node_modules\033[0m" in (
+    assert "\033[90mx src/debug.log\033[0m" in colored_list[1]
+    assert "  \033[38;5;75msrc/\033[0m" in colored_list[1]
+    assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_list[1]
     )
     monkeypatch.chdir(source)
@@ -579,10 +579,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "Connecting securely over FTPS...\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
-    assert "+   main.py\n" in push_comparison[1]
-    assert "+ d nested ▸\n" in push_comparison[1]
-    assert push_comparison[1].index("+ d nested ▸\n") < (
-        push_comparison[1].index("+   .env.example\n")
+    assert "+ main.py\n" in push_comparison[1]
+    assert "+ nested/ ▸\n" in push_comparison[1]
+    assert push_comparison[1].index("+ nested/ ▸\n") < (
+        push_comparison[1].index("+ .env.example\n")
     )
     assert "src/nested/child.py" not in push_comparison[1]
     assert "README.md" not in push_comparison[1]
@@ -590,19 +590,19 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
-    assert "x   debug.log\n" in push_comparison[1]
+    assert "x debug.log\n" in push_comparison[1]
     hidden_exclusions = invoke(["diff", "-i"], store)
     assert "debug.log" not in hidden_exclusions[1]
 
     recursive_comparison = invoke(["diff", "-r"], store)
-    assert "  +   child.py\n" in recursive_comparison[1]
+    assert "  + child.py\n" in recursive_comparison[1]
 
     monkeypatch.chdir(workspace)
     pruned_comparison = invoke(
         ["diff", "--prune-remote", "--color", "always"], store
     )
-    assert "\033[31m-   deployed.html\033[0m\n" in pruned_comparison[1]
-    assert "  \033[3;38;5;24md src ▸\033[0m\n" in (
+    assert "\033[31m- deployed.html\033[0m\n" in pruned_comparison[1]
+    assert "  \033[3;38;5;24msrc/ ▸\033[0m\n" in (
         pruned_comparison[1]
     )
     monkeypatch.chdir(source)
@@ -614,33 +614,33 @@ def test_current_project_inference_drives_connect_and_tree_listings(
 
     monkeypatch.chdir(workspace)
     directory_comparison = invoke(["diff", "src"], store)
-    assert "= d src\n" not in directory_comparison[1]
-    assert "  d src\n" in directory_comparison[1]
-    assert "  + d nested ▸\n" in directory_comparison[1]
+    assert "= src/\n" not in directory_comparison[1]
+    assert "  src/\n" in directory_comparison[1]
+    assert "  + nested/ ▸\n" in directory_comparison[1]
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
-    assert "    +   child.py\n" in recursive_directory_comparison[1]
+    assert "    + child.py\n" in recursive_directory_comparison[1]
     expanded_comparison = invoke(
         ["diff", "README.md,src/main.py", "src"], store
     )
     assert expanded_comparison[0] == 0
-    assert "+   README.md\n" in expanded_comparison[1]
-    assert "  +   main.py\n" in expanded_comparison[1]
-    assert "d src ▸\n" not in expanded_comparison[1]
+    assert "+ README.md\n" in expanded_comparison[1]
+    assert "  + main.py\n" in expanded_comparison[1]
+    assert "src/ ▸\n" not in expanded_comparison[1]
 
     colored_comparison = invoke(
         ["diff", "**", "--color", "always"], store
     )
-    assert "  \033[38;5;75md src\033[0m" in colored_comparison[1]
-    assert "\033[90mx\033[0m \033[38;5;24md node_modules\033[0m" in (
+    assert "  \033[38;5;75msrc/\033[0m" in colored_comparison[1]
+    assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_comparison[1]
     )
-    assert "  \033[90mx   debug.log\033[0m" in colored_comparison[1]
-    assert "=   same.txt" in colored_comparison[1]
-    assert colored_comparison[1].index("d node_modules") < (
-        colored_comparison[1].index("d src")
+    assert "  \033[90mx debug.log\033[0m" in colored_comparison[1]
+    assert "= same.txt" in colored_comparison[1]
+    assert colored_comparison[1].index("node_modules/") < (
+        colored_comparison[1].index("src/")
     )
-    assert colored_comparison[1].index("d src") < (
+    assert colored_comparison[1].index("src/") < (
         colored_comparison[1].index("README.md")
     )
 
@@ -657,8 +657,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["diff", "--pull", "-r", "--color", "always"], store
     )
     assert pull_comparison[0] == 0
-    assert "\033[38;5;30mr   deployed.html\033[0m\n" in pull_comparison[1]
-    assert "\033[38;5;51ml   README.md\033[0m\n" in pull_comparison[1]
+    assert "\033[38;5;30mr deployed.html\033[0m\n" in pull_comparison[1]
+    assert "\033[38;5;51ml README.md\033[0m\n" in pull_comparison[1]
     with pytest.raises(SystemExit):
         run(["diff", "--pull", "-p"], store=store)
     with pytest.raises(SystemExit):

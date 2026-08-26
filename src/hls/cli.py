@@ -863,9 +863,9 @@ def _format_path_line(
     collapsed: bool = False,
 ) -> str:
     indent = "  " * depth
-    kind = "d" if directory else " "
+    label = f"{path}/" if directory else path
     traversal = " ▸" if collapsed else ""
-    body = f"{marker} {kind} {path}{traversal}"
+    body = f"{marker} {label}{traversal}"
     line = f"{indent}{body}"
     if not color:
         return line
@@ -876,13 +876,13 @@ def _format_path_line(
             )
             return (
                 f"{indent}{colored_marker} "
-                f"\033[3;38;5;24md {path} ▸\033[0m"
+                f"\033[3;38;5;24m{path}/ ▸\033[0m"
             )
         directory_color = "\033[38;5;24m" if excluded else "\033[38;5;75m"
         colored_marker = (
             f"{marker_color}{marker}\033[0m" if marker_color else marker
         )
-        return f"{indent}{colored_marker} {directory_color}d {path}\033[0m"
+        return f"{indent}{colored_marker} {directory_color}{path}/\033[0m"
     if marker_color:
         return f"{indent}{marker_color}{body}\033[0m"
     return line

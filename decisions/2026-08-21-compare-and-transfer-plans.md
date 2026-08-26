@@ -19,6 +19,11 @@ traversed depth adds a trailing `▸` indicator without replacing its
 synchronization status. Exclusions can be hidden from the presentation with
 `-i`/`--included-only`; they remain excluded from the synchronization plan.
 
+Directories use a trailing `/` rather than a separate `d` type column. Included
+and excluded directories retain their bright and dark blue coloring, so the
+slash is a conventional textual cue reinforced by color rather than the only
+distinction.
+
 Status lines use green, yellow, red, and magenta for actions and conflicts when
 stdout is a terminal. Retained remote/local paths use dark/bright cyan,
 untraversed directory details use dark-blue italics, unchanged files use the

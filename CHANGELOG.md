@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.26.15 — 2026-08-26
+
+### Changed
+
+- Replaced the separate `d` directory type column with a conventional trailing
+  `/` in list and diff output.
+- Retained bright/dark blue directory coloring and the trailing `▸` traversal
+  indicator as supporting visual cues.
+
 ## 0.8.26.14 — 2026-08-26
 
 ### Changed
