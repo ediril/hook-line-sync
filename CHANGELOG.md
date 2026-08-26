@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.26.8 — 2026-08-26
+
+### Changed
+
+- Removed the `=` status marker from directories that exist on both sides,
+  because directory-entry equality does not establish content equality.
+  One-sided and excluded directories retain their meaningful status markers.
+
+## 0.8.26.7 — 2026-08-26
+
+### Changed
+
+- Removed the redundant `= d directory` row for an explicitly selected
+  directory. The progress line identifies the scope, while one-sided,
+  excluded, or actionable container states remain visible.
+
 ## 0.8.26.6 — 2026-08-26
 
 ### Changed

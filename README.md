@@ -342,7 +342,8 @@ receive `d`; files and symlinks leave the type column blank:
 r   remote-only and retained
 l   local-only and retained
 ?   type or symlink conflict
-=   unchanged
+=   unchanged file
+  d directory exists on both sides
 x   excluded from synchronization
 d ▸ directory contents were not compared (follows any status above)
 ```
@@ -355,10 +356,10 @@ suffix is a traversal indicator, not a replacement for the directory's status:
 be retained. Diff shows unchanged and excluded paths by default; use `-i`,
 `--inc`, or `--included-only` to show included paths only. Status lines use
 distinct terminal colors. Remote-only retained paths are dark cyan, local-only
-retained paths are bright cyan, unchanged paths use the normal terminal
-foreground, excluded paths are gray, and untraversed directory details are dark
-blue and italic. Color is disabled when output is redirected or `NO_COLOR` is
-set.
+retained paths are bright cyan, unchanged files use the normal terminal
+foreground, excluded paths are gray, and untraversed directory details are
+dark blue and italic. Color is disabled when output is redirected or
+`NO_COLOR` is set.
 Included directory paths are bright blue, excluded directory paths are darker
 blue, and color can be controlled explicitly with
 `--color auto|always|never`.

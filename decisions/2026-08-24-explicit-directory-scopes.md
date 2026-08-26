@@ -18,6 +18,16 @@ the directory.
 display, matching normal directory-listing expectations. Its no-argument scope
 remains the current directory's immediate contents.
 
+Diff also omits an unchanged selected container because equality of the
+directory entry says nothing about equality of its contents. The progress line
+already identifies the scope. A one-sided, excluded, or otherwise actionable
+container remains visible.
+
+Other directories that exist on both sides use a blank status column rather
+than `=` for the same reason. Their `d` type and optional `▸` traversal marker
+remain visible. One-sided and excluded directories retain their meaningful
+status markers.
+
 ## Rationale
 
 Directory operands should not require spelling `directory/*`, and a scoped diff

@@ -914,8 +914,12 @@ def _format_comparison_entries(
         == "directory",
     ):
         collapsed = entry.path in collapsed_paths
-        marker = _comparison_marker(entry, direction)
         directory = _comparison_entry_kind(entry, direction) == "directory"
+        marker = (
+            " "
+            if directory and entry.action == "unchanged"
+            else _comparison_marker(entry, direction)
+        )
         lines.append(
             _format_path_line(
                 marker,
@@ -1374,6 +1378,11 @@ def _diff(
                 entry
                 for entry in plan.entries
                 if not arguments.included_only or entry.action != "excluded"
+                if not (
+                    include_container
+                    and entry.path == directory.as_posix()
+                    and entry.action == "unchanged"
+                )
             )
             lines = _format_comparison_entries(
                 shown,

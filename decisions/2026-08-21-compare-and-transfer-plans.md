@@ -12,15 +12,16 @@ modes.
 CLI output is a compact status view. Actions use `+`, `~`, `-`, and `?` for
 creation, modification, deletion, and conflict. A skipped remote-only path uses
 `r`; a skipped local-only path uses `l`. These side markers remain literal
-under either perspective. Exclusions use `x`, unchanged entries requested with
-the default view use `=`, and a directory outside the traversed depth adds a
-`d ▸` indicator without replacing its synchronization status. Exclusions can be
-hidden from the presentation with `-i`/`--included-only`; they remain excluded
-from the synchronization plan.
+under either perspective. Exclusions use `x`, unchanged files use `=`, and
+directories that exist on both sides leave the status column blank because
+entry equality does not establish content equality. A directory outside the
+traversed depth adds a `d ▸` indicator without replacing its synchronization
+status. Exclusions can be hidden from the presentation with
+`-i`/`--included-only`; they remain excluded from the synchronization plan.
 
 Status lines use green, yellow, red, and magenta for actions and conflicts when
 stdout is a terminal. Retained remote/local paths use dark/bright cyan,
-untraversed directory details use dark-blue italics, unchanged entries use the
+untraversed directory details use dark-blue italics, unchanged files use the
 normal terminal foreground, and gray is reserved for exclusions. Color is
 disabled for redirected output and the `NO_COLOR` convention, with
 `--color auto|always|never` as an explicit override.
