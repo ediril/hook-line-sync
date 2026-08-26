@@ -568,8 +568,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["list", "--recursive", "--color", "always"], store
     )
     assert "\033[90mx   src/debug.log\033[0m" in colored_list[1]
-    assert "  \033[94md src\033[0m" in colored_list[1]
-    assert "\033[90mx\033[0m \033[34md node_modules\033[0m" in colored_list[1]
+    assert "  \033[38;5;75md src\033[0m" in colored_list[1]
+    assert "\033[90mx\033[0m \033[38;5;24md node_modules\033[0m" in (
+        colored_list[1]
+    )
     monkeypatch.chdir(source)
     push_comparison = invoke(["diff"], store)
     push_progress = (
@@ -603,7 +605,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["diff", "--prune-remote", "--color", "always"], store
     )
     assert "\033[31m-   deployed.html\033[0m\n" in pruned_comparison[1]
-    assert "= \033[34;3md ▸ src\033[0m\n" in (
+    assert "= \033[3;38;5;24md ▸ src\033[0m\n" in (
         pruned_comparison[1]
     )
     monkeypatch.chdir(source)
@@ -634,8 +636,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     colored_comparison = invoke(
         ["diff", "**", "--color", "always"], store
     )
-    assert "= \033[94md src\033[0m" in colored_comparison[1]
-    assert "\033[90mx\033[0m \033[34md node_modules\033[0m" in (
+    assert "= \033[38;5;75md src\033[0m" in colored_comparison[1]
+    assert "\033[90mx\033[0m \033[38;5;24md node_modules\033[0m" in (
         colored_comparison[1]
     )
     assert "\033[90mx   src/debug.log\033[0m" in colored_comparison[1]
@@ -662,8 +664,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_comparison[0] == 0
     assert pull_comparison[2].endswith("Comparing directory 'src/nested'...\n")
     assert "Remote -> Local for project 'prod':\n" in pull_comparison[1]
-    assert "\033[36mr   deployed.html\033[0m\n" in pull_comparison[1]
-    assert "\033[96ml   README.md\033[0m\n" in pull_comparison[1]
+    assert "\033[38;5;30mr   deployed.html\033[0m\n" in pull_comparison[1]
+    assert "\033[38;5;51ml   README.md\033[0m\n" in pull_comparison[1]
     with pytest.raises(SystemExit):
         run(["diff", "--pull", "-p"], store=store)
     with pytest.raises(SystemExit):

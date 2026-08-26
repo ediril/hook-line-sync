@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.26.5 — 2026-08-26
+
+### Changed
+
+- Replaced terminal-theme-dependent basic colors with explicit 256-color values
+  for additions, retained local/remote paths, and included/excluded directories.
+  This gives `+` vivid green, `r` dark teal-cyan, `l` bright cyan, and excluded
+  directories a visibly darker blue than included directories.
+
 ## 0.8.26.4 — 2026-08-26
 
 ### Changed

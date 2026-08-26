@@ -849,8 +849,8 @@ def _format_path_line(
             colored_marker = (
                 f"{marker_color}{marker}\033[0m" if marker_color else marker
             )
-            return f"{colored_marker} \033[34;3md ▸ {path}\033[0m"
-        directory_color = "\033[34m" if excluded else "\033[94m"
+            return f"{colored_marker} \033[3;38;5;24md ▸ {path}\033[0m"
+        directory_color = "\033[38;5;24m" if excluded else "\033[38;5;75m"
         colored_marker = (
             f"{marker_color}{marker}\033[0m" if marker_color else marker
         )
@@ -896,13 +896,13 @@ def _format_comparison_entries(
 ) -> tuple[str, ...]:
     lines: list[str] = []
     colors = {
-        "+": "\033[32m",
+        "+": "\033[38;5;82m",
         "~": "\033[33m",
         "-": "\033[31m",
         "?": "\033[35m",
         "x": "\033[90m",
-        "r": "\033[36m",
-        "l": "\033[96m",
+        "r": "\033[38;5;30m",
+        "l": "\033[38;5;51m",
     }
     for entry in _file_browser_order(
         entries,
