@@ -5,6 +5,7 @@ import os
 import shlex
 import sys
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TextIO, TypeVar
 
@@ -42,14 +43,21 @@ from hls.selection import (
 )
 from hls.snapshot import (
     SnapshotError,
+    TreeEntry,
     TreeSnapshot,
     list_local_directory,
     snapshot_local,
 )
 from hls.transfer import TransferError, TransferResult, execute_transfer
-from hls.transport import ExplicitFTPSTransport, TransportError
+from hls.transport import ExplicitFTPSTransport, PathOperationError, TransportError
 
 _EntryT = TypeVar("_EntryT")
+
+
+@dataclass(frozen=True)
+class _DiffTraversalRoot:
+    path: PurePosixPath
+    include_container: bool = False
 
 CANONICAL_COMMANDS = (
     "add",
@@ -832,12 +840,16 @@ def _format_path_line(
     collapsed: bool = False,
 ) -> str:
     kind = "d" if directory else " "
-    line = f"{marker} {kind} {path}"
+    traversal = " ▸" if collapsed else ""
+    line = f"{marker} {kind}{traversal} {path}"
     if not color:
         return line
-    if collapsed:
-        return f"\033[34;3m{line}\033[0m"
     if directory:
+        if collapsed:
+            colored_marker = (
+                f"{marker_color}{marker}\033[0m" if marker_color else marker
+            )
+            return f"{colored_marker} \033[34;3md ▸ {path}\033[0m"
         directory_color = "\033[34m" if excluded else "\033[94m"
         colored_marker = (
             f"{marker_color}{marker}\033[0m" if marker_color else marker
@@ -892,7 +904,6 @@ def _format_comparison_entries(
         "x": "\033[90m",
         "r": "\033[36m",
         "l": "\033[96m",
-        "▸": "\033[34m",
     }
     for entry in _file_browser_order(
         entries,
@@ -901,7 +912,7 @@ def _format_comparison_entries(
         == "directory",
     ):
         collapsed = entry.path in collapsed_paths
-        marker = "▸" if collapsed else _comparison_marker(entry, direction)
+        marker = _comparison_marker(entry, direction)
         directory = _comparison_entry_kind(entry, direction) == "directory"
         lines.append(
             _format_path_line(
@@ -1033,6 +1044,7 @@ def _descendant_directories(
     selector: FileSelection | None,
     *,
     include_all: bool,
+    descend_remote_only: bool,
 ) -> tuple[tuple[PurePosixPath, bool, bool], ...]:
     local_directories = {
         entry.path: entry for entry in local.entries if entry.kind == "directory"
@@ -1049,6 +1061,7 @@ def _descendant_directories(
         )
         for path in paths
         for entry in (local_directories.get(path) or remote_directories[path],)
+        if path in local_directories or descend_remote_only
         if (selector is None or selector.may_match_descendant(path))
         and (
             include_all
@@ -1056,6 +1069,74 @@ def _descendant_directories(
             or rules.may_include_descendant(path)
         )
     )
+
+
+def _project_relative_current_directory(root: Path) -> PurePosixPath:
+    current = Path.cwd().resolve(strict=True)
+    try:
+        relative = current.relative_to(root)
+    except ValueError:
+        return PurePosixPath()
+    return PurePosixPath(*relative.parts)
+
+
+def _diff_traversal_roots(
+    arguments: argparse.Namespace,
+    root: Path,
+) -> tuple[_DiffTraversalRoot, ...]:
+    """Find the narrowest deterministic directories needed by the selection."""
+    base = _project_relative_current_directory(root)
+    operands = normalize_pattern_operands(arguments)
+    if not operands:
+        return (_DiffTraversalRoot(base),)
+
+    candidates: list[_DiffTraversalRoot] = []
+    for operand in operands:
+        project_path = base / PurePosixPath(operand)
+        if operand == ".":
+            candidates.append(_DiffTraversalRoot(base))
+            continue
+
+        wildcard_index = next(
+            (
+                index
+                for index, part in enumerate(project_path.parts)
+                if "*" in part
+            ),
+            None,
+        )
+        if wildcard_index is not None:
+            fixed_parts = project_path.parts[:wildcard_index]
+            fixed = PurePosixPath(*fixed_parts) if fixed_parts else PurePosixPath()
+            candidates.append(_DiffTraversalRoot(fixed))
+            continue
+
+        local_path = root.joinpath(*project_path.parts)
+        if local_path.is_dir() and not local_path.is_symlink():
+            candidates.append(_DiffTraversalRoot(project_path, include_container=True))
+        else:
+            candidates.append(_DiffTraversalRoot(project_path.parent))
+
+    ordered = sorted(
+        candidates,
+        key=lambda item: (item.path.parts, item.include_container),
+    )
+    roots: list[_DiffTraversalRoot] = []
+    for candidate in ordered:
+        covering = next(
+            (
+                existing
+                for existing in roots
+                if candidate.path.parts[: len(existing.path.parts)]
+                == existing.path.parts
+            ),
+            None,
+        )
+        if covering is None:
+            roots.append(candidate)
+        elif covering.path == candidate.path and candidate.include_container:
+            roots[roots.index(covering)] = candidate
+    return tuple(roots)
 
 
 def _resume_directory(value: str | None) -> PurePosixPath | None:
@@ -1143,14 +1224,37 @@ def _diff(
     color = _use_color(arguments.color, output)
     print(f"Checking differences for project '{name}'...", file=progress, flush=True)
     print("Connecting securely over FTPS...", file=progress, flush=True)
-    pending = [(PurePosixPath(), True, True)]
+    traversal_roots = _diff_traversal_roots(arguments, root)
+    if resume is not None:
+        root_index = next(
+            (
+                index
+                for index, traversal_root in enumerate(traversal_roots)
+                if resume.parts[: len(traversal_root.path.parts)]
+                == traversal_root.path.parts
+            ),
+            None,
+        )
+        if root_index is None:
+            raise SelectionError(f"resume directory '{resume}' is not reachable")
+        traversal_roots = traversal_roots[root_index:]
+    pending = [
+        (
+            traversal_root.path,
+            root.joinpath(*traversal_root.path.parts).is_dir(),
+            True,
+            traversal_root.include_container,
+            True,
+        )
+        for traversal_root in reversed(traversal_roots)
+    ]
     seeking = resume is not None
     selected_count = 0
     displayed_count = 0
     with ExplicitFTPSTransport(project) as transport:
         print(f"{perspective} for project '{name}':", file=output, flush=True)
         while pending:
-            directory, has_local, has_remote = pending.pop()
+            directory, has_local, has_remote, include_container, is_root = pending.pop()
             display_directory = directory.as_posix()
             print(
                 f"Comparing directory '{display_directory}'...",
@@ -1162,17 +1266,29 @@ def _diff(
                 if has_local
                 else TreeSnapshot()
             )
-            remote_listing = (
-                transport.list_directory(directory, rules)
-                if has_remote
-                else TreeSnapshot()
-            )
+            remote_directory_exists = has_remote
+            try:
+                remote_listing = (
+                    transport.list_directory(directory, rules)
+                    if has_remote
+                    else TreeSnapshot()
+                )
+            except PathOperationError:
+                if not is_root or not directory.parts:
+                    raise
+                remote_directory_exists = False
+                remote_listing = TreeSnapshot()
             descendants = _descendant_directories(
                 local_listing,
                 remote_listing,
                 rules,
                 selector,
                 include_all=arguments.all,
+                descend_remote_only=arguments.prune_remote,
+            )
+            pending_descendants = tuple(
+                (path, local_exists, remote_exists, False, False)
+                for path, local_exists, remote_exists in descendants
             )
 
             if seeking and directory != resume:
@@ -1185,7 +1301,11 @@ def _diff(
                 branch_length = len(current_parts) + 1
                 branch = PurePosixPath(*resume.parts[:branch_length])
                 matching_branch = next(
-                    (candidate for candidate in descendants if candidate[0] == branch),
+                    (
+                        candidate
+                        for candidate in pending_descendants
+                        if candidate[0] == branch
+                    ),
                     None,
                 )
                 if matching_branch is None:
@@ -1193,14 +1313,16 @@ def _diff(
                         f"resume directory '{resume}' is not reachable"
                     )
                 later = tuple(
-                    candidate for candidate in descendants if candidate[0] > branch
+                    candidate
+                    for candidate in pending_descendants
+                    if candidate[0] > branch
                 )
                 pending.extend(reversed(later))
                 pending.append(matching_branch)
                 continue
 
             seeking = False
-            pending.extend(reversed(descendants))
+            pending.extend(reversed(pending_descendants))
             local = _filtered_listing(
                 local_listing,
                 selector,
@@ -1211,6 +1333,32 @@ def _diff(
                 selector,
                 include_all=arguments.all,
             )
+            if include_container and directory.parts:
+                container_path = directory.as_posix()
+                excluded = rules.excludes(container_path, is_directory=True)
+                if arguments.all or not excluded:
+                    if has_local:
+                        local = TreeSnapshot(
+                            local.entries
+                            + (
+                                TreeEntry(
+                                    container_path,
+                                    "directory",
+                                    excluded=excluded,
+                                ),
+                            )
+                        )
+                    if remote_directory_exists:
+                        remote = TreeSnapshot(
+                            remote.entries
+                            + (
+                                TreeEntry(
+                                    container_path,
+                                    "directory",
+                                    excluded=excluded,
+                                ),
+                            )
+                        )
             selected_count += len(local.entries) + len(remote.entries)
             plan = build_comparison(
                 local,
@@ -1224,9 +1372,10 @@ def _diff(
             collapsed_paths = frozenset(
                 entry.path
                 for entry in plan.entries
-                if entry.action == "unchanged"
-                and _comparison_entry_kind(entry, direction) == "directory"
+                if _comparison_entry_kind(entry, direction) == "directory"
                 and entry.path not in descended_paths
+                and entry.path != directory.as_posix()
+                and entry.action != "excluded"
             )
             shown = (
                 plan.entries

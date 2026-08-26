@@ -344,23 +344,29 @@ l   local-only and retained
 ?   type or symlink conflict
 =   unchanged
 x   excluded from synchronization
-▸ d directory exists on both sides; contents were not compared
+d ▸ directory contents were not compared (follows any status above)
 ```
 
 The default selected side is local; `--pull` reverses it to remote. By default,
 diff prints synchronization actions, conflicts, one-sided paths that will be
-kept, and collapsed directories whose contents fall outside the selected
-depth. Use `hls diff --all` to also show unchanged and excluded paths. Status
-lines use distinct terminal colors. Remote-only retained paths are dark cyan,
-local-only retained paths are bright cyan, unchanged paths use the dim default
-color, excluded paths are gray, and collapsed directories are dark blue and
-italic. Color is disabled when output is redirected or `NO_COLOR` is set.
+kept, and directories whose contents fall outside the selected depth. A `d ▸`
+suffix is a traversal indicator, not a replacement for the directory's status:
+`+ d ▸ cache` is new locally, while `r d ▸ cache` exists only remotely and will
+be retained. Use `hls diff --all` to also show unchanged and excluded paths.
+Status lines use distinct terminal colors. Remote-only retained paths are dark
+cyan, local-only retained paths are bright cyan, unchanged paths use the dim
+default color, excluded paths are gray, and untraversed directory details are
+dark blue and italic. Color is disabled when output is redirected or
+`NO_COLOR` is set.
 Included directory paths are bright blue, excluded directory paths are darker
 blue, and color can be controlled explicitly with
 `--color auto|always|never`.
 
 Diff applies selectors before remote traversal and requests one MLSD listing per
-relevant directory. Results are printed and flushed after each directory rather
+relevant local directory. A literal directory scope starts directly at that
+directory on both sides; wildcard scopes start at their narrowest fixed prefix.
+Remote-only subtrees are not walked unless `--prune-remote` explicitly requires
+their contents. Results are printed and flushed after each directory rather
 than waiting for a complete remote snapshot. The default mode does not descend
 into wholly excluded branches; `--all` does so to produce its complete audit
 view. Push and pull continue to omit excluded paths entirely.

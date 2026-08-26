@@ -7,11 +7,12 @@ contents. `-r` or `--recursive` additionally selects every descendant. When one
 of those commands receives an explicit directory operand, the directory is a
 synchronization container with the same shallow-by-default behavior.
 
-An existing directory that is selected but not traversed is always emitted by
-`diff` with a collapsed `▸ d` state, even without `--all`. This state means only
-that the directory entry exists on both sides; HLS makes no claim about its
-contents. Terminal output renders it dark blue and italic. Recursive traversal
-replaces the collapsed state with comparisons from inside that directory.
+A directory that is selected but not traversed is always emitted by `diff`,
+even without `--all`. Its synchronization status remains independent: for
+example, `+ d ▸` is a new local directory and `r d ▸` is a retained remote-only
+directory. The dark-blue italic `d ▸` suffix means HLS makes no claim about the
+directory's contents. Recursive traversal removes that suffix and prints the
+comparisons from inside the directory.
 
 `list` uses the same operand expansion but omits the selected container from
 display, matching normal directory-listing expectations. Its no-argument scope
@@ -27,9 +28,16 @@ project operation remains explicit as `hls diff -r`, `hls push -r`, or
 
 Wildcard operands use the same rule: any matched directory acts as a container.
 This keeps quoted patterns and shell-expanded directory arguments consistent.
+Traversal starts at the narrowest fixed directory implied by the selection. A
+literal directory such as `var` is listed directly on both sides; HLS does not
+list `.` first merely to discover it. A wildcard starts at its fixed prefix, or
+at the current scope when it has no narrower prefix.
 
 ## Intentionally unchanged
 
 - Exclusions remain local policy and are applied before remote traversal.
 - Remote pruning remains push-only and explicitly authorized.
 - No paging or selector state is persisted.
+- A failed direct remote-directory lookup is provisionally treated as a missing
+  destination directory. Push remains responsible for reporting and skipping
+  any path the server later refuses to create or write.

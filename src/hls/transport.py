@@ -203,6 +203,11 @@ class ExplicitFTPSTransport:
                 ),
                 key=lambda item: item[0],
             )
+        except ftplib.error_perm as error:
+            display_path = remote_directory or "."
+            raise PathOperationError(
+                f"could not list remote directory '{display_path}': {error}"
+            ) from error
         except (OSError, ftplib.Error, ssl.SSLError) as error:
             display_path = remote_directory or "."
             raise TransportError(

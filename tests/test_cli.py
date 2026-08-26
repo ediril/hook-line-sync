@@ -575,14 +575,13 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     push_progress = (
         "Checking differences for project 'prod'...\n"
         "Connecting securely over FTPS...\n"
-        "Comparing directory '.'...\n"
         "Comparing directory 'src'...\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert "Local -> Remote for project 'prod':\n" in push_comparison[1]
     assert "+   src/main.py\n" in push_comparison[1]
-    assert "+ d src/nested\n" in push_comparison[1]
-    assert push_comparison[1].index("+ d src/nested\n") < (
+    assert "+ d ▸ src/nested\n" in push_comparison[1]
+    assert push_comparison[1].index("+ d ▸ src/nested\n") < (
         push_comparison[1].index("+   src/.env.example\n")
     )
     assert "src/nested/child.py" not in push_comparison[1]
@@ -602,7 +601,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["diff", "--prune-remote", "--color", "always"], store
     )
     assert "\033[31m-   deployed.html\033[0m\n" in pruned_comparison[1]
-    assert "\033[34;3m▸ d src\033[0m\n" in pruned_comparison[1]
+    assert "\033[2m=\033[0m \033[34;3md ▸ src\033[0m\n" in (
+        pruned_comparison[1]
+    )
     monkeypatch.chdir(source)
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
@@ -614,7 +615,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
 
     monkeypatch.chdir(workspace)
     directory_comparison = invoke(["diff", "src"], store)
-    assert "+ d src/nested\n" in directory_comparison[1]
+    assert directory_comparison[2].endswith("Comparing directory 'src'...\n")
+    assert "Comparing directory '.'" not in directory_comparison[2]
+    assert "+ d ▸ src/nested\n" in directory_comparison[1]
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
     assert "+   src/nested/child.py\n" in recursive_directory_comparison[1]
@@ -624,7 +627,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert expanded_comparison[0] == 0
     assert "+   README.md\n" in expanded_comparison[1]
     assert "+   src/main.py\n" in expanded_comparison[1]
-    assert "▸ d src\n" not in expanded_comparison[1]
+    assert "d ▸ src\n" not in expanded_comparison[1]
 
     colored_comparison = invoke(
         ["diff", "**", "--all", "--color", "always"], store

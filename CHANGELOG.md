@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.26.3 — 2026-08-26
+
+### Changed
+
+- Made diff traversal local-led and start literal directory scopes directly at
+  their selected local and remote paths. `hls diff var` now compares `var`
+  without first listing the project root.
+- Limited remote-only subtree traversal to explicitly requested remote pruning;
+  ordinary diff traversal now follows the authoritative local tree.
+- Separated directory traversal state from synchronization status. An
+  untraversed directory now retains its `+`, `r`, or `=` status and adds a
+  dark-blue italic `d ▸` indicator.
+
 ## 0.8.26.2 — 2026-08-26
 
 ### Changed

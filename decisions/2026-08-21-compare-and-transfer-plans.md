@@ -13,15 +13,15 @@ CLI output is a compact status view. Actions use `+`, `~`, `-`, and `?` for
 creation, modification, deletion, and conflict. A skipped remote-only path uses
 `r`; a skipped local-only path uses `l`. These side markers remain literal
 under either perspective. Exclusions use `x`, unchanged entries requested with
-`--all` use `=`, and an existing directory outside the traversed depth uses the
-collapsed `▸ d` state.
+`--all` use `=`, and a directory outside the traversed depth adds a `d ▸`
+indicator without replacing its synchronization status.
 
 Status lines use green, yellow, red, and magenta for actions and conflicts when
 stdout is a terminal. Retained remote/local paths use dark/bright cyan,
-collapsed directories use dark-blue italics, unchanged entries use dim default
-color, and gray is reserved for exclusions. Color is disabled for redirected
-output and the `NO_COLOR` convention, with `--color auto|always|never` as an
-explicit override.
+untraversed directory details use dark-blue italics, unchanged entries use dim
+default color, and gray is reserved for exclusions. Color is disabled for
+redirected output and the `NO_COLOR` convention, with
+`--color auto|always|never` as an explicit override.
 
 Comparison derives upload, download, replace, delete, skip, conflict, and
 unchanged actions from local-only, remote-only, changed, type-conflict, and
@@ -42,10 +42,11 @@ push. Changed paths are replaced in the command's selected direction.
 Diff, push, and pull accept zero or more path selectors. Each is interpreted
 relative to the current directory within the mapped local root and converted to
 a project-relative POSIX pattern. Multiple selectors form a deterministic
-union, allowing shell-expanded arguments such as unquoted `*`; directories in
-that expansion do not select their descendants. Quote a wildcard when HLS
-should interpret it unchanged. A literal selects one file, `*` matches within
-one path segment, and `**` permits recursive matching.
+union, allowing shell-expanded arguments such as unquoted `*`. A selected
+directory acts as a container: it includes its immediate contents, or its full
+subtree with `--recursive`. Quote a wildcard when HLS should interpret it
+unchanged. A literal selects one file, `*` matches within one path segment, and
+`**` permits recursive matching.
 
 Selectors cannot be absolute, traverse with `..`, or escape the mapped root. A
 selection whose complete union matches no non-excluded file on either side is
@@ -97,5 +98,6 @@ authorization to perform a destructive action.
 - Pull does not restore a missing local path merely because it exists remotely.
 - Independent remote additions remain untouched unless `--prune-remote` is
   explicitly supplied.
-- Compare and transfer selection share one matcher and operate only on regular
-  files. Required parent directories are plan mechanics, not selected content.
+- Compare and transfer selection share one matcher. Selected directories are
+  synchronization containers, while required parent directories remain plan
+  mechanics rather than independently selected content.
