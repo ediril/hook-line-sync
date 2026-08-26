@@ -281,7 +281,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="preview file changes without modifying anything",
         usage=(
             "hls diff [PATH ...] [--project PROFILE]\n"
-            "       [--pull | --prune-remote] [-r] [--all] [--paged]\n"
+            "       [--pull | --prune-remote] [-r] [--hide-excluded] [--paged]\n"
             "       [--resume DIRECTORY] [--color auto|always|never]"
         ),
         description=(
@@ -316,9 +316,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="include descendants of selected directories",
     )
     diff_parser.add_argument(
-        "--all",
+        "--hide-excluded",
         action="store_true",
-        help="also show unchanged and excluded paths",
+        help="omit excluded paths from the diff output",
     )
     diff_parser.add_argument(
         "--paged",
@@ -900,7 +900,6 @@ def _format_comparison_entries(
         "~": "\033[33m",
         "-": "\033[31m",
         "?": "\033[35m",
-        "=": "\033[2m",
         "x": "\033[90m",
         "r": "\033[36m",
         "l": "\033[96m",
@@ -920,7 +919,7 @@ def _format_comparison_entries(
                 directory=directory,
                 path=entry.path,
                 color=color,
-                marker_color=colors[marker],
+                marker_color=colors.get(marker),
                 excluded=entry.action == "excluded",
                 collapsed=collapsed,
             )
@@ -1024,15 +1023,12 @@ def _directory_contents_selection(
 def _filtered_listing(
     listing: TreeSnapshot,
     selector: FileSelection | None,
-    *,
-    include_all: bool,
 ) -> TreeSnapshot:
     return TreeSnapshot(
         tuple(
             entry
             for entry in listing.entries
-            if (include_all or not entry.excluded)
-            and (selector is None or selector.matches(entry.path))
+            if selector is None or selector.matches(entry.path)
         )
     )
 
@@ -1043,7 +1039,6 @@ def _descendant_directories(
     rules: RuleSet,
     selector: FileSelection | None,
     *,
-    include_all: bool,
     descend_remote_only: bool,
 ) -> tuple[tuple[PurePosixPath, bool, bool], ...]:
     local_directories = {
@@ -1064,8 +1059,7 @@ def _descendant_directories(
         if path in local_directories or descend_remote_only
         if (selector is None or selector.may_match_descendant(path))
         and (
-            include_all
-            or not entry.excluded
+            not entry.excluded
             or rules.may_include_descendant(path)
         )
     )
@@ -1162,8 +1156,8 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
         command.append("--prune-remote")
     if arguments.recursive:
         command.append("--recursive")
-    if arguments.all:
-        command.append("--all")
+    if arguments.hide_excluded:
+        command.append("--hide-excluded")
     if arguments.color != "auto":
         command.extend(("--color", arguments.color))
     command.extend(("--paged", "--resume", directory.as_posix()))
@@ -1283,7 +1277,6 @@ def _diff(
                 remote_listing,
                 rules,
                 selector,
-                include_all=arguments.all,
                 descend_remote_only=arguments.prune_remote,
             )
             pending_descendants = tuple(
@@ -1326,39 +1319,36 @@ def _diff(
             local = _filtered_listing(
                 local_listing,
                 selector,
-                include_all=arguments.all,
             )
             remote = _filtered_listing(
                 remote_listing,
                 selector,
-                include_all=arguments.all,
             )
             if include_container and directory.parts:
                 container_path = directory.as_posix()
                 excluded = rules.excludes(container_path, is_directory=True)
-                if arguments.all or not excluded:
-                    if has_local:
-                        local = TreeSnapshot(
-                            local.entries
-                            + (
-                                TreeEntry(
-                                    container_path,
-                                    "directory",
-                                    excluded=excluded,
-                                ),
-                            )
+                if has_local:
+                    local = TreeSnapshot(
+                        local.entries
+                        + (
+                            TreeEntry(
+                                container_path,
+                                "directory",
+                                excluded=excluded,
+                            ),
                         )
-                    if remote_directory_exists:
-                        remote = TreeSnapshot(
-                            remote.entries
-                            + (
-                                TreeEntry(
-                                    container_path,
-                                    "directory",
-                                    excluded=excluded,
-                                ),
-                            )
+                    )
+                if remote_directory_exists:
+                    remote = TreeSnapshot(
+                        remote.entries
+                        + (
+                            TreeEntry(
+                                container_path,
+                                "directory",
+                                excluded=excluded,
+                            ),
                         )
+                    )
             selected_count += len(local.entries) + len(remote.entries)
             plan = build_comparison(
                 local,
@@ -1377,15 +1367,10 @@ def _diff(
                 and entry.path != directory.as_posix()
                 and entry.action != "excluded"
             )
-            shown = (
-                plan.entries
-                if arguments.all
-                else tuple(
-                    entry
-                    for entry in plan.entries
-                    if entry.action not in {"unchanged", "excluded"}
-                    or entry.path in collapsed_paths
-                )
+            shown = tuple(
+                entry
+                for entry in plan.entries
+                if not arguments.hide_excluded or entry.action != "excluded"
             )
             lines = _format_comparison_entries(
                 shown,
@@ -1399,9 +1384,8 @@ def _diff(
 
             if arguments.paged:
                 if not lines:
-                    label = "entries" if arguments.all else "changes"
                     print(
-                        f"  no {label} in {display_directory}",
+                        f"  no entries in {display_directory}",
                         file=output,
                         flush=True,
                     )

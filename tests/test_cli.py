@@ -590,7 +590,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
-    assert "src/debug.log" not in push_comparison[1]
+    assert "x   src/debug.log\n" in push_comparison[1]
+    hidden_exclusions = invoke(["diff", "--hide-excluded"], store)
+    assert "src/debug.log" not in hidden_exclusions[1]
 
     recursive_comparison = invoke(["diff", "-r"], store)
     assert "Comparing directory 'src/nested'...\n" in recursive_comparison[2]
@@ -601,7 +603,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["diff", "--prune-remote", "--color", "always"], store
     )
     assert "\033[31m-   deployed.html\033[0m\n" in pruned_comparison[1]
-    assert "\033[2m=\033[0m \033[34;3md ▸ src\033[0m\n" in (
+    assert "= \033[34;3md ▸ src\033[0m\n" in (
         pruned_comparison[1]
     )
     monkeypatch.chdir(source)
@@ -630,14 +632,14 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "d ▸ src\n" not in expanded_comparison[1]
 
     colored_comparison = invoke(
-        ["diff", "**", "--all", "--color", "always"], store
+        ["diff", "**", "--color", "always"], store
     )
-    assert "\033[2m=\033[0m \033[94md src\033[0m" in colored_comparison[1]
+    assert "= \033[94md src\033[0m" in colored_comparison[1]
     assert "\033[90mx\033[0m \033[34md node_modules\033[0m" in (
         colored_comparison[1]
     )
     assert "\033[90mx   src/debug.log\033[0m" in colored_comparison[1]
-    assert "\033[2m=   same.txt\033[0m" in colored_comparison[1]
+    assert "=   same.txt" in colored_comparison[1]
     assert colored_comparison[1].index("d node_modules") < (
         colored_comparison[1].index("d src")
     )
@@ -685,7 +687,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
-    assert len(transports) == 14
+    assert len(transports) == 15
 
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(

@@ -267,11 +267,11 @@ combined in one command. A literal filename containing a comma cannot be
 addressed because commas delimit pattern groups.
 
 The project is inferred from the current directory; use `--project <name>`
-elsewhere. Excluded paths stay outside push, pull, remote pruning, and the
-default diff; they remain visible in the local listing and in `hls diff --all`.
-Empty patterns, absolute paths, parent traversal, and partial-segment `**` are
-rejected. A quoted wildcard operand that matches nothing is rejected unless
-`--pattern` is used.
+elsewhere. Excluded paths stay outside push, pull, and remote pruning, but remain
+visible in the local listing and default diff. Use `hls diff --hide-excluded`
+to suppress those diagnostics. Empty patterns, absolute paths, parent
+traversal, and partial-segment `**` are rejected. A quoted wildcard operand
+that matches nothing is rejected unless `--pattern` is used.
 
 Rules are stored as explicit `id`, `action`, and `pattern` records. HLS does not
 store Gitignore lines, and `!` or a leading `/` has no special rule meaning.
@@ -352,12 +352,12 @@ diff prints synchronization actions, conflicts, one-sided paths that will be
 kept, and directories whose contents fall outside the selected depth. A `d ▸`
 suffix is a traversal indicator, not a replacement for the directory's status:
 `+ d ▸ cache` is new locally, while `r d ▸ cache` exists only remotely and will
-be retained. Use `hls diff --all` to also show unchanged and excluded paths.
-Status lines use distinct terminal colors. Remote-only retained paths are dark
-cyan, local-only retained paths are bright cyan, unchanged paths use the dim
-default color, excluded paths are gray, and untraversed directory details are
-dark blue and italic. Color is disabled when output is redirected or
-`NO_COLOR` is set.
+be retained. Diff shows unchanged and excluded paths by default; use
+`--hide-excluded` to omit exclusions from the output. Status lines use distinct
+terminal colors. Remote-only retained paths are dark cyan, local-only retained
+paths are bright cyan, unchanged paths use the normal terminal foreground,
+excluded paths are gray, and untraversed directory details are dark blue and
+italic. Color is disabled when output is redirected or `NO_COLOR` is set.
 Included directory paths are bright blue, excluded directory paths are darker
 blue, and color can be controlled explicitly with
 `--color auto|always|never`.
@@ -367,9 +367,10 @@ relevant local directory. A literal directory scope starts directly at that
 directory on both sides; wildcard scopes start at their narrowest fixed prefix.
 Remote-only subtrees are not walked unless `--prune-remote` explicitly requires
 their contents. Results are printed and flushed after each directory rather
-than waiting for a complete remote snapshot. The default mode does not descend
-into wholly excluded branches; `--all` does so to produce its complete audit
-view. Push and pull continue to omit excluded paths entirely.
+than waiting for a complete remote snapshot. Excluded directories remain
+visible boundaries but their excluded subtrees are not traversed; a narrower
+include rule can still make HLS enter the relevant branch. Push and pull
+continue to omit excluded paths entirely.
 
 For an interruptible directory-by-directory review, use:
 
@@ -397,7 +398,7 @@ files. Remote pruning belongs exclusively to the push direction, so
 
 File identity uses size and modification timestamps normalized to the coarser
 precision reported by the local filesystem and remote MLSD facts. Identical
-paths are omitted unless `--all` is supplied.
+paths are shown with `=`.
 
 Diff prints immediately flushed progress to stderr while it connects and moves
 through directories. Diff entries are progressively written to stdout, so they

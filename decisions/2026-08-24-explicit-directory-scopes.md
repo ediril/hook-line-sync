@@ -7,12 +7,12 @@ contents. `-r` or `--recursive` additionally selects every descendant. When one
 of those commands receives an explicit directory operand, the directory is a
 synchronization container with the same shallow-by-default behavior.
 
-A directory that is selected but not traversed is always emitted by `diff`,
-even without `--all`. Its synchronization status remains independent: for
-example, `+ d ▸` is a new local directory and `r d ▸` is a retained remote-only
-directory. The dark-blue italic `d ▸` suffix means HLS makes no claim about the
-directory's contents. Recursive traversal removes that suffix and prints the
-comparisons from inside the directory.
+A directory that is selected but not traversed is always emitted by `diff`.
+Its synchronization status remains independent: for example, `+ d ▸` is a new
+local directory and `r d ▸` is a retained remote-only directory. The dark-blue
+italic `d ▸` suffix means HLS makes no claim about the directory's contents.
+Recursive traversal removes that suffix and prints the comparisons from inside
+the directory.
 
 `list` uses the same operand expansion but omits the selected container from
 display, matching normal directory-listing expectations. Its no-argument scope

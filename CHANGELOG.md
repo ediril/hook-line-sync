@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.26.4 — 2026-08-26
+
+### Changed
+
+- Made diff show unchanged and excluded entries by default and replaced
+  `--all` with `--hide-excluded` for suppressing exclusion diagnostics.
+- Kept excluded directories as visible traversal boundaries without walking
+  their excluded subtrees, preserving recursive diff performance.
+- Rendered unchanged `=` markers in the terminal's normal foreground color so
+  gray remains exclusive to `x` exclusions.
+
 ## 0.8.26.3 — 2026-08-26
 
 ### Changed

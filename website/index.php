@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.26.3';
+$version = '0.8.26.4';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 
@@ -87,7 +87,7 @@ function h(string $value): string
                         <span class="terminal-state">TLS:ON</span>
                     </div>
                     <div class="terminal-body">
-                        <p><span class="prompt">❯</span> <b>hls diff -r --all</b></p>
+                        <p><span class="prompt">❯</span> <b>hls diff -r</b></p>
                         <p class="muted">Checking differences for project 'discovery'...</p>
                         <p class="muted">Comparing directory '.'...</p>
                         <p class="terminal-heading">Local -&gt; Remote for project 'discovery':</p>
@@ -140,7 +140,7 @@ function h(string $value): string
                     <span class="step-number">03</span>
                     <div class="step-icon" aria-hidden="true">∆</div>
                     <h3>Read the diff</h3>
-                    <p>Compare local and remote files before changing either side. Add <code>--all</code> when you also want unchanged and excluded paths.</p>
+                    <p>Compare local and remote files before changing either side. Unchanged and excluded paths stay visible by default.</p>
                     <code>hls diff -r</code>
                 </li>
                 <li>
