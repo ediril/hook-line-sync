@@ -29,6 +29,14 @@ than `=` for the same reason. Their `d` type and optional `▸` traversal marker
 remain visible. One-sided and excluded directories retain their meaningful
 status markers.
 
+Diff presents paths relative to each traversal root. An explicit selected
+directory is the anchor row; its immediate children use basenames and one level
+of indentation, with each deeper level adding another indentation level. This
+is presentation-only: selectors, comparison entries, diagnostics, resume
+cursors, and transfer plans retain full project-relative paths. Disjoint
+multi-root selections also retain full paths in the display so identical
+basenames cannot become ambiguous.
+
 ## Rationale
 
 Directory operands should not require spelling `directory/*`, and a scoped diff

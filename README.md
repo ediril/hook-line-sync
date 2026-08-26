@@ -374,6 +374,14 @@ visible boundaries but their excluded subtrees are not traversed; a narrower
 include rule can still make HLS enter the relevant branch. Push and pull
 continue to omit excluded paths entirely.
 
+Diff renders paths as a tree relative to the selected scope. An explicit
+directory remains as the anchor row, immediate children show only their names,
+and deeper descendants are indented beneath their parent instead of repeating
+the complete project-relative prefix. Disjoint multi-root selections retain
+full paths so identical basenames remain distinguishable. Selection,
+comparison, and transfer plans continue to use full project-relative paths
+internally.
+
 For an interruptible directory-by-directory review, use:
 
 ```console

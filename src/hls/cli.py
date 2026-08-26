@@ -59,6 +59,17 @@ class _DiffTraversalRoot:
     path: PurePosixPath
     include_container: bool = False
 
+
+@dataclass(frozen=True)
+class _PendingDiffDirectory:
+    path: PurePosixPath
+    has_local: bool
+    has_remote: bool
+    include_container: bool
+    is_root: bool
+    display_root: PurePosixPath | None
+    display_anchor: bool
+
 CANONICAL_COMMANDS = (
     "add",
     "connect",
@@ -837,14 +848,17 @@ def _format_path_line(
     *,
     directory: bool,
     path: str,
+    depth: int = 0,
     color: bool,
     marker_color: str | None,
     excluded: bool,
     collapsed: bool = False,
 ) -> str:
+    indent = "  " * depth
     kind = "d" if directory else " "
     traversal = " ▸" if collapsed else ""
-    line = f"{marker} {kind}{traversal} {path}"
+    body = f"{marker} {kind}{traversal} {path}"
+    line = f"{indent}{body}"
     if not color:
         return line
     if directory:
@@ -852,14 +866,17 @@ def _format_path_line(
             colored_marker = (
                 f"{marker_color}{marker}\033[0m" if marker_color else marker
             )
-            return f"{colored_marker} \033[3;38;5;24md ▸ {path}\033[0m"
+            return (
+                f"{indent}{colored_marker} "
+                f"\033[3;38;5;24md ▸ {path}\033[0m"
+            )
         directory_color = "\033[38;5;24m" if excluded else "\033[38;5;75m"
         colored_marker = (
             f"{marker_color}{marker}\033[0m" if marker_color else marker
         )
-        return f"{colored_marker} {directory_color}d {path}\033[0m"
+        return f"{indent}{colored_marker} {directory_color}d {path}\033[0m"
     if marker_color:
-        return f"{marker_color}{line}\033[0m"
+        return f"{indent}{marker_color}{body}\033[0m"
     return line
 
 
@@ -896,6 +913,7 @@ def _format_comparison_entries(
     *,
     color: bool,
     collapsed_paths: frozenset[str] = frozenset(),
+    display_path: Callable[[str], tuple[int, str]] | None = None,
 ) -> tuple[str, ...]:
     lines: list[str] = []
     colors = {
@@ -920,11 +938,13 @@ def _format_comparison_entries(
             if directory and entry.action == "unchanged"
             else _comparison_marker(entry, direction)
         )
+        depth, path = display_path(entry.path) if display_path else (0, entry.path)
         lines.append(
             _format_path_line(
                 marker,
                 directory=directory,
-                path=entry.path,
+                path=path,
+                depth=depth,
                 color=color,
                 marker_color=colors.get(marker),
                 excluded=entry.action == "excluded",
@@ -932,6 +952,26 @@ def _format_comparison_entries(
             )
         )
     return tuple(lines)
+
+
+def _scoped_display_path(
+    path: str,
+    *,
+    display_root: PurePosixPath | None,
+    anchored: bool,
+) -> tuple[int, str]:
+    project_path = PurePosixPath(path)
+    if display_root is None:
+        return 0, project_path.as_posix()
+    if project_path == display_root and display_root.parts:
+        return 0, display_root.name
+    relative = (
+        project_path.relative_to(display_root)
+        if display_root.parts
+        else project_path
+    )
+    depth = len(relative.parts) if anchored else max(len(relative.parts) - 1, 0)
+    return depth, relative.name
 
 
 def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection:
@@ -1240,12 +1280,16 @@ def _diff(
             raise SelectionError(f"resume directory '{resume}' is not reachable")
         traversal_roots = traversal_roots[root_index:]
     pending = [
-        (
-            traversal_root.path,
-            root.joinpath(*traversal_root.path.parts).is_dir(),
-            True,
-            traversal_root.include_container,
-            True,
+        _PendingDiffDirectory(
+            path=traversal_root.path,
+            has_local=root.joinpath(*traversal_root.path.parts).is_dir(),
+            has_remote=True,
+            include_container=traversal_root.include_container,
+            is_root=True,
+            display_root=(
+                traversal_root.path if len(traversal_roots) == 1 else None
+            ),
+            display_anchor=traversal_root.include_container,
         )
         for traversal_root in reversed(traversal_roots)
     ]
@@ -1255,7 +1299,8 @@ def _diff(
     with ExplicitFTPSTransport(project) as transport:
         print(f"{perspective} for project '{name}':", file=output, flush=True)
         while pending:
-            directory, has_local, has_remote, include_container, is_root = pending.pop()
+            current = pending.pop()
+            directory = current.path
             display_directory = directory.as_posix()
             print(
                 f"Comparing directory '{display_directory}'",
@@ -1264,18 +1309,18 @@ def _diff(
             )
             local_listing = (
                 list_local_directory(root, directory, rules)
-                if has_local
+                if current.has_local
                 else TreeSnapshot()
             )
-            remote_directory_exists = has_remote
+            remote_directory_exists = current.has_remote
             try:
                 remote_listing = (
                     transport.list_directory(directory, rules)
-                    if has_remote
+                    if current.has_remote
                     else TreeSnapshot()
                 )
             except PathOperationError:
-                if not is_root or not directory.parts:
+                if not current.is_root or not directory.parts:
                     raise
                 remote_directory_exists = False
                 remote_listing = TreeSnapshot()
@@ -1287,7 +1332,15 @@ def _diff(
                 descend_remote_only=arguments.prune_remote,
             )
             pending_descendants = tuple(
-                (path, local_exists, remote_exists, False, False)
+                _PendingDiffDirectory(
+                    path=path,
+                    has_local=local_exists,
+                    has_remote=remote_exists,
+                    include_container=False,
+                    is_root=False,
+                    display_root=current.display_root,
+                    display_anchor=current.display_anchor,
+                )
                 for path, local_exists, remote_exists in descendants
             )
 
@@ -1304,7 +1357,7 @@ def _diff(
                     (
                         candidate
                         for candidate in pending_descendants
-                        if candidate[0] == branch
+                        if candidate.path == branch
                     ),
                     None,
                 )
@@ -1315,7 +1368,7 @@ def _diff(
                 later = tuple(
                     candidate
                     for candidate in pending_descendants
-                    if candidate[0] > branch
+                    if candidate.path > branch
                 )
                 pending.extend(reversed(later))
                 pending.append(matching_branch)
@@ -1331,10 +1384,10 @@ def _diff(
                 remote_listing,
                 selector,
             )
-            if include_container and directory.parts:
+            if current.include_container and directory.parts:
                 container_path = directory.as_posix()
                 excluded = rules.excludes(container_path, is_directory=True)
-                if has_local:
+                if current.has_local:
                     local = TreeSnapshot(
                         local.entries
                         + (
@@ -1384,6 +1437,11 @@ def _diff(
                 direction,
                 color=color,
                 collapsed_paths=collapsed_paths,
+                display_path=lambda path: _scoped_display_path(
+                    path,
+                    display_root=current.display_root,
+                    anchored=current.display_anchor,
+                ),
             )
             for line in lines:
                 print(line, file=output, flush=True)
@@ -1398,7 +1456,7 @@ def _diff(
                     )
                 if pending:
                     print(
-                        f"Resume: {_resume_command(arguments, pending[-1][0])}",
+                        f"Resume: {_resume_command(arguments, pending[-1].path)}",
                         file=output,
                         flush=True,
                     )

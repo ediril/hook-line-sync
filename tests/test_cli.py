@@ -581,10 +581,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert "Local -> Remote for project 'prod':\n" in push_comparison[1]
-    assert "+   src/main.py\n" in push_comparison[1]
-    assert "+ d ▸ src/nested\n" in push_comparison[1]
-    assert push_comparison[1].index("+ d ▸ src/nested\n") < (
-        push_comparison[1].index("+   src/.env.example\n")
+    assert "+   main.py\n" in push_comparison[1]
+    assert "+ d ▸ nested\n" in push_comparison[1]
+    assert push_comparison[1].index("+ d ▸ nested\n") < (
+        push_comparison[1].index("+   .env.example\n")
     )
     assert "src/nested/child.py" not in push_comparison[1]
     assert "README.md" not in push_comparison[1]
@@ -592,13 +592,13 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
-    assert "x   src/debug.log\n" in push_comparison[1]
+    assert "x   debug.log\n" in push_comparison[1]
     hidden_exclusions = invoke(["diff", "-i"], store)
-    assert "src/debug.log" not in hidden_exclusions[1]
+    assert "debug.log" not in hidden_exclusions[1]
 
     recursive_comparison = invoke(["diff", "-r"], store)
     assert "Comparing directory 'src/nested'\n" in recursive_comparison[2]
-    assert "+   src/nested/child.py\n" in recursive_comparison[1]
+    assert "  +   child.py\n" in recursive_comparison[1]
 
     monkeypatch.chdir(workspace)
     pruned_comparison = invoke(
@@ -613,7 +613,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert selected_comparison[0] == 0
     assert selected_comparison[2].endswith("Comparing directory 'src'\n")
     assert "src/nested" not in selected_comparison[2]
-    assert "src/main.py" in selected_comparison[1]
+    assert "main.py" in selected_comparison[1]
     assert "README.md" not in selected_comparison[1]
     assert "deployed.html" not in selected_comparison[1]
 
@@ -623,16 +623,16 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "Comparing directory '.'" not in directory_comparison[2]
     assert "= d src\n" not in directory_comparison[1]
     assert "  d src\n" in directory_comparison[1]
-    assert "+ d ▸ src/nested\n" in directory_comparison[1]
+    assert "  + d ▸ nested\n" in directory_comparison[1]
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
-    assert "+   src/nested/child.py\n" in recursive_directory_comparison[1]
+    assert "    +   child.py\n" in recursive_directory_comparison[1]
     expanded_comparison = invoke(
         ["diff", "README.md,src/main.py", "src"], store
     )
     assert expanded_comparison[0] == 0
     assert "+   README.md\n" in expanded_comparison[1]
-    assert "+   src/main.py\n" in expanded_comparison[1]
+    assert "  +   main.py\n" in expanded_comparison[1]
     assert "d ▸ src\n" not in expanded_comparison[1]
 
     colored_comparison = invoke(
@@ -642,7 +642,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "\033[90mx\033[0m \033[38;5;24md node_modules\033[0m" in (
         colored_comparison[1]
     )
-    assert "\033[90mx   src/debug.log\033[0m" in colored_comparison[1]
+    assert "  \033[90mx   debug.log\033[0m" in colored_comparison[1]
     assert "=   same.txt" in colored_comparison[1]
     assert colored_comparison[1].index("d node_modules") < (
         colored_comparison[1].index("d src")
@@ -656,7 +656,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     resumed = invoke(
         ["diff", ".", "--recursive", "--paged", "--resume", "src"], store
     )
-    assert "src/main.py" in resumed[1]
+    assert "main.py" in resumed[1]
     assert "--resume src/nested" in resumed[1]
     monkeypatch.chdir(workspace)
 

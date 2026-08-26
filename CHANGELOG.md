@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.26.10 — 2026-08-26
+
+### Changed
+
+- Rendered diff paths as an indented tree relative to each selected scope,
+  replacing repeated directory prefixes with basenames under a visible anchor.
+- Retained full displayed paths for disjoint multi-root selections so identical
+  basenames remain distinguishable.
+- Kept full project-relative paths in selectors, comparison state, resume
+  cursors, diagnostics, and transfer plans; only terminal presentation changed.
+
 ## 0.8.26.9 — 2026-08-26
 
 ### Changed
