@@ -663,6 +663,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         run(["diff", "--pull", "-p"], store=store)
     with pytest.raises(SystemExit):
         run(["pull", "-p"], store=store)
+    with pytest.raises(SystemExit):
+        run(["pull"], store=store)
 
     monkeypatch.chdir(source)
     recursive_push = invoke(["push"], store)

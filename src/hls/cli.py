@@ -379,13 +379,13 @@ def build_parser() -> argparse.ArgumentParser:
         )
         add_pattern_operands(
             transfer_parser,
-            required=False,
+            required=command == "pull",
+            metavar="PATH",
             help_text=(
                 "relative file paths or wildcard patterns; defaults to the "
                 "complete current subtree"
                 if command == "push"
-                else "relative file paths or wildcard patterns; defaults to "
-                "immediate contents of the current directory"
+                else "required relative file paths or wildcard patterns"
             ),
         )
         transfer_parser.add_argument(

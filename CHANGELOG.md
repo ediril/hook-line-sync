@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.26.14 — 2026-08-26
+
+### Changed
+
+- Made pull require an explicit file, directory, or pattern operand. Use
+  `hls pull .` for the current directory and add `-r` for its complete subtree.
+- Kept explicit pull directories shallow by default.
+
 ## 0.8.26.13 — 2026-08-26
 
 ### Changed

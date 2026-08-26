@@ -62,10 +62,11 @@ Selectors are applied during snapshot traversal, before comparison. Local and
 remote walkers enter only directories whose project-relative prefixes can
 still satisfy the pattern. A single-segment `*` therefore scans only the
 corresponding directory; recursive traversal occurs only where `**` or later
-pattern segments can match descendants. With no operands, diff and pull select
-the current directory's immediate contents; `-r` extends through the current
-subtree. Bare push intentionally selects the complete current subtree and is
-previewed by `hls diff -r`.
+pattern segments can match descendants. With no operands, diff selects the
+current directory's immediate contents. Bare push intentionally selects the
+complete current subtree and is previewed by `hls diff -r`. Pull requires an
+explicit operand; `hls pull .` selects the current directory, and `-r` extends
+a directory selection through its subtree.
 
 The positional arguments are reserved for selectors. An explicit project
 override therefore uses `--project <name>`; otherwise the current directory

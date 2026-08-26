@@ -32,8 +32,9 @@
 - [x] Give `list` the shared path-selector model and make remote pruning an
   explicitly push-only action with unambiguous diff markers.
 - [x] Implement current-directory scope contracts for `diff`, `push`, and
-  `pull`: bare push uses the complete current subtree, while diff, pull, and
-  explicit directory operands remain shallow unless `-r` is supplied.
+  `pull`: bare push uses the complete current subtree, pull requires an explicit
+  path, and diff plus explicit directory operands remain shallow unless `-r`
+  is supplied.
 - [x] Complete packaging documentation, release checks, and PyPI publication
   preparation:
   - [x] Define the concrete support and service benefits of the voluntary

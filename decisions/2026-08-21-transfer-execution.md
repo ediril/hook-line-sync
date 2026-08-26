@@ -8,10 +8,10 @@ Push and pull take fresh selected snapshots, build the same comparison plan
 shown by `hls diff`, reject the entire plan if it contains a type or symlink
 conflict, and then execute its selected actions. Bare push includes the complete
 current subtree and is equivalent to `hls push -r`; preview it with
-`hls diff -r`. Bare pull includes only the current directory's immediate
-contents. An explicit directory operand remains shallow unless `-r` is supplied.
-A literal or wildcard selector limits both transfer and prune actions to
-matching paths.
+`hls diff -r`. Pull requires an explicit file, directory, or pattern operand;
+`hls pull .` explicitly selects the current directory. A directory operand
+remains shallow unless `-r` is supplied. A literal or wildcard selector limits
+both transfer and prune actions to matching paths.
 
 Push creates required remote parent directories, uploads local-only files, and
 replaces changed remote files. Each upload is staged under a unique temporary
