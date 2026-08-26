@@ -664,6 +664,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     with pytest.raises(SystemExit):
         run(["pull", "-p"], store=store)
 
+    monkeypatch.chdir(source)
+    recursive_push = invoke(["push"], store)
+    assert recursive_push[0] == 0
+    assert ("upload", "src/nested/child.py", b"child", 5, False) in operations
+    operations.clear()
+
     monkeypatch.chdir(workspace)
     push_result = invoke(["push", "src"], store)
     assert push_result[0] == 0
@@ -682,7 +688,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
-    assert len(transports) == 15
+    assert len(transports) == 16
 
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(

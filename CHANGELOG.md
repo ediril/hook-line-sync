@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.26.13 — 2026-08-26
+
+### Changed
+
+- Made bare `hls push` recursively synchronize the complete current subtree,
+  equivalent to `hls push -r` and previewed by `hls diff -r`.
+- Kept explicit directory operands shallow by default, so `hls push app`
+  includes only `app` and its immediate contents unless `-r` is supplied.
+- Left diff and pull default scope unchanged.
+
 ## 0.8.26.12 — 2026-08-26
 
 ### Changed

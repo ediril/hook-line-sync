@@ -114,11 +114,11 @@ rejected and lists its candidates. The established `ls` compatibility spelling
 for `list` remains available but is intentionally omitted from the help menu.
 
 Every path-accepting command supports multiple operands and comma-separated
-groups. List, diff, push, and pull interpret wildcards as selectors and use no
-operands for the current directory's immediate contents; add `-r` to include
-the current subtree. Exclude and include resolve wildcard operands to current
-local paths by default, use `--pattern` to retain wildcards, and use no operands
-to list their rules.
+groups. List, diff, push, and pull interpret wildcards as selectors. Bare push
+uses the complete current subtree; list, diff, and pull use the current
+directory's immediate contents unless `-r` is supplied. Exclude and include
+resolve wildcard operands to current local paths by default, use `--pattern` to
+retain wildcards, and use no operands to list their rules.
 
 List every configured profile and mark the one whose local root
 contains the current directory:
@@ -418,7 +418,7 @@ files follow by name, matching `hls list`.
 
 ## Push and pull
 
-Apply the push or pull projection for the current directory's immediate
+Push the complete current subtree, or pull the current directory's immediate
 contents:
 
 ```console
@@ -426,7 +426,7 @@ hls push
 hls pull
 ```
 
-Apply the complete current subtree projection explicitly:
+The recursive push spelling remains equivalent; pull requires it explicitly:
 
 ```console
 hls push -r
@@ -445,10 +445,12 @@ hls push templates
 hls push templates -r
 ```
 
-No-argument push and pull use the same current-directory scope as diff:
-immediate contents by default and the complete current subtree with `-r`.
-Explicit directory operands follow the same container rule. This keeps every
-scoped diff equal to the corresponding transfer plan.
+No-argument push is recursive, so `hls push` is equivalent to `hls push -r`.
+No-argument pull remains shallow. Explicit directory operands also remain
+shallow unless `-r` is supplied: `hls push app` selects `app` and its immediate
+contents, while `hls push app -r` selects its complete subtree. Preview bare
+push with `hls diff -r`; explicitly scoped push and pull commands retain the
+same scope as their corresponding diff.
 
 Use `--project <name>` outside a mapped project. Push uploads local-only files
 and replaces changed remote files. Pull replaces changed local files, but it

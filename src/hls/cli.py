@@ -381,8 +381,11 @@ def build_parser() -> argparse.ArgumentParser:
             transfer_parser,
             required=False,
             help_text=(
-                "relative file paths or wildcard patterns; defaults to immediate "
-                "contents of the current directory"
+                "relative file paths or wildcard patterns; defaults to the "
+                "complete current subtree"
+                if command == "push"
+                else "relative file paths or wildcard patterns; defaults to "
+                "immediate contents of the current directory"
             ),
         )
         transfer_parser.add_argument(
@@ -394,7 +397,12 @@ def build_parser() -> argparse.ArgumentParser:
             "-r",
             "--recursive",
             action="store_true",
-            help="include descendants of selected directories",
+            help=(
+                "include descendants of explicit selected directories; bare "
+                "push is already recursive"
+                if command == "push"
+                else "include descendants of selected directories"
+            ),
         )
         transfer_parser.set_defaults(prune_remote=False)
         if command == "push":
@@ -977,7 +985,8 @@ def _scoped_display_path(
 def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection:
     operands = list(normalize_pattern_operands(arguments))
     if not operands:
-        return _current_directory_selection(root, recursive=arguments.recursive)
+        recursive = arguments.recursive or arguments.command == "push"
+        return _current_directory_selection(root, recursive=recursive)
     return _directory_contents_selection(
         operands,
         root,

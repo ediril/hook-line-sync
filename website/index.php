@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.26.12';
+$version = '0.8.26.13';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 
@@ -95,7 +95,7 @@ function h(string $value): string
                         <p class="remote-only"><span>r</span> &nbsp; legacy.php</p>
                         <p>&nbsp; <span class="changed">~</span> &nbsp; site.css</p>
                         <p>&nbsp; <span class="added">+</span> <span class="directory">d icons</span></p>
-                        <p class="terminal-gap"><span class="prompt">❯</span> <b>hls push -r</b></p>
+                        <p class="terminal-gap"><span class="prompt">❯</span> <b>hls push</b></p>
                         <p><span class="success">✓</span> Push completed: 3 changes.</p>
                         <span class="cursor" aria-hidden="true"></span>
                     </div>
@@ -147,7 +147,7 @@ function h(string $value): string
                     <div class="step-icon" aria-hidden="true">↥</div>
                     <h3>Push the changes</h3>
                     <p>Upload new and modified files. Remote-only files stay untouched unless you explicitly enable pruning.</p>
-                    <code>hls push -r</code>
+                    <code>hls push</code>
                 </li>
             </ol>
         </section>

@@ -41,10 +41,10 @@ basenames cannot become ambiguous.
 ## Rationale
 
 Directory operands should not require spelling `directory/*`, and a scoped diff
-must describe the corresponding push or pull exactly. Making no-argument
-commands current-directory-scoped keeps accidental transfers bounded; a full
-project operation remains explicit as `hls diff -r`, `hls push -r`, or
-`hls pull -r` from the mapped root.
+must describe the corresponding explicit push or pull exactly. Explicit
+directory operands remain shallow by default. Bare push is the deliberate
+exception: it selects the complete current subtree and is equivalent to
+`hls push -r`; its preview is `hls diff -r`. Bare diff and pull remain shallow.
 
 Wildcard operands use the same rule: any matched directory acts as a container.
 This keeps quoted patterns and shell-expanded directory arguments consistent.
