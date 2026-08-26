@@ -339,21 +339,24 @@ receive `d`; files and symlinks leave the type column blank:
 +   new-file
 ~   modified on the selected side
 -   missing from the selected side
-·   present on only one side but left untouched
+r   remote-only and retained
+l   local-only and retained
 ?   type or symlink conflict
 =   unchanged
 x   excluded from synchronization
-… d directory exists on both sides; contents were not compared
+▸ d directory exists on both sides; contents were not compared
 ```
 
 The default selected side is local; `--pull` reverses it to remote. By default,
 diff prints synchronization actions, conflicts, one-sided paths that will be
 kept, and collapsed directories whose contents fall outside the selected
 depth. Use `hls diff --all` to also show unchanged and excluded paths. Status
-lines use distinct terminal colors; unchanged and excluded paths are dimmed,
-while collapsed directories are gray and italic. Color is disabled when output
-is redirected or `NO_COLOR` is set. Directory paths are bright blue, excluded
-directory paths are darker blue, and color can be controlled explicitly with
+lines use distinct terminal colors. Remote-only retained paths are dark cyan,
+local-only retained paths are bright cyan, unchanged paths use the dim default
+color, excluded paths are gray, and collapsed directories are dark blue and
+italic. Color is disabled when output is redirected or `NO_COLOR` is set.
+Included directory paths are bright blue, excluded directory paths are darker
+blue, and color can be controlled explicitly with
 `--color auto|always|never`.
 
 Diff applies selectors before remote traversal and requests one MLSD listing per
@@ -375,7 +378,7 @@ no paging session, though it must list the cursor's ancestor directories again
 to reconstruct the remaining walk safely.
 
 Local path existence remains authoritative for transfer behavior, so a
-remote-only path is shown with `·` and skipped rather than restored or deleted
+remote-only path is shown with `r` and skipped rather than restored or deleted
 by default. Preview its deletion with `-` explicitly using:
 
 ```console

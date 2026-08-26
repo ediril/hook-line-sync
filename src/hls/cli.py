@@ -799,7 +799,7 @@ def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
     if entry.action == "unchanged":
         return "="
     if entry.action == "skip":
-        return "·"
+        return "r" if entry.state == "remote-only" else "l"
     if entry.state == "changed":
         return "~"
     if direction == "push":
@@ -836,7 +836,7 @@ def _format_path_line(
     if not color:
         return line
     if collapsed:
-        return f"\033[90;3m{line}\033[0m"
+        return f"\033[34;3m{line}\033[0m"
     if directory:
         directory_color = "\033[34m" if excluded else "\033[94m"
         colored_marker = (
@@ -888,10 +888,11 @@ def _format_comparison_entries(
         "~": "\033[33m",
         "-": "\033[31m",
         "?": "\033[35m",
-        "=": "\033[90m",
+        "=": "\033[2m",
         "x": "\033[90m",
-        "·": "\033[90m",
-        "…": "\033[90m",
+        "r": "\033[36m",
+        "l": "\033[96m",
+        "▸": "\033[34m",
     }
     for entry in _file_browser_order(
         entries,
@@ -900,7 +901,7 @@ def _format_comparison_entries(
         == "directory",
     ):
         collapsed = entry.path in collapsed_paths
-        marker = "…" if collapsed else _comparison_marker(entry, direction)
+        marker = "▸" if collapsed else _comparison_marker(entry, direction)
         directory = _comparison_entry_kind(entry, direction) == "directory"
         lines.append(
             _format_path_line(

@@ -264,6 +264,8 @@ code { font-family: var(--mono); }
 .changed { color: var(--yellow); }
 .removed { color: var(--red); }
 .excluded { color: #4b5660; }
+.remote-only { color: #2b9299; }
+.local-only { color: var(--cyan); }
 .directory { color: var(--blue); }
 .directory-dark { color: var(--dark-blue); }
 .cursor { display: inline-block; width: 8px; height: 15px; margin-top: 10px; background: var(--acid); animation: blink 1.1s steps(1) infinite; }

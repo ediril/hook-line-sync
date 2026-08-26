@@ -601,7 +601,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["diff", "--prune-remote", "--color", "always"], store
     )
     assert "\033[31m-   deployed.html\033[0m\n" in pruned_comparison[1]
-    assert "\033[90;3m… d src\033[0m\n" in pruned_comparison[1]
+    assert "\033[34;3m▸ d src\033[0m\n" in pruned_comparison[1]
     monkeypatch.chdir(source)
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
@@ -623,17 +623,17 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert expanded_comparison[0] == 0
     assert "+   README.md\n" in expanded_comparison[1]
     assert "+   src/main.py\n" in expanded_comparison[1]
-    assert "… d src\n" not in expanded_comparison[1]
+    assert "▸ d src\n" not in expanded_comparison[1]
 
     colored_comparison = invoke(
         ["diff", "**", "--all", "--color", "always"], store
     )
-    assert "\033[90m=\033[0m \033[94md src\033[0m" in colored_comparison[1]
+    assert "\033[2m=\033[0m \033[94md src\033[0m" in colored_comparison[1]
     assert "\033[90mx\033[0m \033[34md node_modules\033[0m" in (
         colored_comparison[1]
     )
     assert "\033[90mx   src/debug.log\033[0m" in colored_comparison[1]
-    assert "\033[90m=   same.txt\033[0m" in colored_comparison[1]
+    assert "\033[2m=   same.txt\033[0m" in colored_comparison[1]
     assert colored_comparison[1].index("d node_modules") < (
         colored_comparison[1].index("d src")
     )
@@ -650,12 +650,14 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "--resume src/nested" in resumed[1]
     monkeypatch.chdir(workspace)
 
-    pull_comparison = invoke(["diff", "--pull", "-r"], store)
+    pull_comparison = invoke(
+        ["diff", "--pull", "-r", "--color", "always"], store
+    )
     assert pull_comparison[0] == 0
     assert pull_comparison[2].endswith("Comparing directory 'src/nested'...\n")
     assert "Remote -> Local for project 'prod':\n" in pull_comparison[1]
-    assert "·   deployed.html\n" in pull_comparison[1]
-    assert "·   README.md\n" in pull_comparison[1]
+    assert "\033[36mr   deployed.html\033[0m\n" in pull_comparison[1]
+    assert "\033[96ml   README.md\033[0m\n" in pull_comparison[1]
     with pytest.raises(SystemExit):
         run(["diff", "--pull", "-p"], store=store)
     with pytest.raises(SystemExit):

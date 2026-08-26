@@ -31,7 +31,7 @@ permit descent.
 Compare requests diagnostic snapshots that expose excluded files with an
 explicit exclusion flag and traverse excluded directories needed to enumerate
 them. Comparison converts those entries to a neutral `excluded` action, shown
-with a gray `·` marker. Push, pull, tree listings, and pruning continue to use
+with a gray `x` marker. Push, pull, tree listings, and pruning continue to use
 operational snapshots in which excluded paths are absent.
 
 ## Rationale
@@ -45,7 +45,7 @@ Unique-prefix resolution provides predictable shorthand without maintaining a
 growing alias table. Rejecting ambiguity prevents command meaning from silently
 changing when a new command is added.
 
-Compare, push, pull, exclude, and include register one shared pattern-operand
+Diff, push, pull, exclude, and include register one shared pattern-operand
 grammar. It accepts shell-expanded argument lists, preserves quoted wildcards,
 and flattens comma-separated groups before command-specific validation. The
 shared declaration controls whether operands are optional or required; commands

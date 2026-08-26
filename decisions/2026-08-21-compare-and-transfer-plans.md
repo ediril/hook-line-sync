@@ -4,20 +4,24 @@ Date: 2026-08-21
 
 ## Decision
 
-`hls compare`, with `hls cmp` as its shorthand, presents one deterministic
-projection of the complete local and remote project trees. By default it shows
-what `hls push` would do. `hls compare --pull` instead shows what `hls pull`
-would do. It replaces the planned `hls list diff` and push/pull `--dry` modes.
+`hls diff` presents one deterministic projection of the selected local and
+remote scope. By default it shows what `hls push` would do. `hls diff --pull`
+instead shows what `hls pull` would do. It replaces separate push/pull `--dry`
+modes.
 
-CLI output is a compact status view relative to the selected side. The default
-local perspective uses `+` for local-only, `~` for modified, `-` for
-remote-only (missing locally), and `!` for conflicts. `--pull` selects the
-remote perspective, reversing which one-sided state receives `+` or `-` while
-leaving modified and conflict markers unchanged. Identical paths are omitted.
+CLI output is a compact status view. Actions use `+`, `~`, `-`, and `?` for
+creation, modification, deletion, and conflict. A skipped remote-only path uses
+`r`; a skipped local-only path uses `l`. These side markers remain literal
+under either perspective. Exclusions use `x`, unchanged entries requested with
+`--all` use `=`, and an existing directory outside the traversed depth uses the
+collapsed `▸ d` state.
 
-Status lines use green, yellow, red, and magenta when stdout is a terminal.
-Color is disabled for redirected output and the `NO_COLOR` convention, with
-`--color auto|always|never` as an explicit override.
+Status lines use green, yellow, red, and magenta for actions and conflicts when
+stdout is a terminal. Retained remote/local paths use dark/bright cyan,
+collapsed directories use dark-blue italics, unchanged entries use dim default
+color, and gray is reserved for exclusions. Color is disabled for redirected
+output and the `NO_COLOR` convention, with `--color auto|always|never` as an
+explicit override.
 
 Comparison derives upload, download, replace, delete, skip, conflict, and
 unchanged actions from local-only, remote-only, changed, type-conflict, and
@@ -26,24 +30,22 @@ non-excluded remote path that is absent locally is skipped by default in both
 directions. Running pull must not recreate a path that was intentionally
 deleted locally.
 
-Compare, push, and pull accept `--prune-remote`, with the shorthand `-p`, to
-include deletion of remote-only paths. The long name states which side will
-change even in pull mode. A real operation takes fresh complete snapshots and
+Diff and push accept `--prune-remote`, with the shorthand `-p`, to include
+deletion of remote-only paths. Pull rejects pruning. A real operation takes
+fresh snapshots and
 builds its own transfer plan immediately before mutation; it does not execute a
 previously displayed comparison.
 
 A local-only path remains local during pull and is eligible for upload during
-push. The overwrite policy for changed paths will be decided with comparison
-states.
+push. Changed paths are replaced in the command's selected direction.
 
-Compare, push, and pull accept zero or more path selectors. Each is interpreted
+Diff, push, and pull accept zero or more path selectors. Each is interpreted
 relative to the current directory within the mapped local root and converted to
 a project-relative POSIX pattern. Multiple selectors form a deterministic
 union, allowing shell-expanded arguments such as unquoted `*`; directories in
 that expansion do not select their descendants. Quote a wildcard when HLS
 should interpret it unchanged. A literal selects one file, `*` matches within
-one path segment, and `**` permits recursive matching. An omitted selector
-addresses the complete project.
+one path segment, and `**` permits recursive matching.
 
 Selectors cannot be absolute, traverse with `..`, or escape the mapped root. A
 selection whose complete union matches no non-excluded file on either side is
@@ -56,7 +58,9 @@ Selectors are applied during snapshot traversal, before comparison. Local and
 remote walkers enter only directories whose project-relative prefixes can
 still satisfy the pattern. A single-segment `*` therefore scans only the
 corresponding directory; recursive traversal occurs only where `**` or later
-pattern segments can match descendants.
+pattern segments can match descendants. With no operands, the current
+directory's immediate contents are selected; `-r` extends through the current
+subtree.
 
 The positional arguments are reserved for selectors. An explicit project
 override therefore uses `--project <name>`; otherwise the current directory
@@ -82,8 +86,7 @@ authorization to perform a destructive action.
 
 ## Consequences
 
-- `hls compare` and `hls cmp` produce the same push-oriented output and make no
-  changes.
+- `hls diff` produces push-oriented output by default and makes no changes.
 - `--pull` changes the projection to pull behavior.
 - Push and pull do not have a `--dry` option.
 - Remote-only paths are reported and skipped by default on push and pull.

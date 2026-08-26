@@ -8,9 +8,9 @@ of those commands receives an explicit directory operand, the directory is a
 synchronization container with the same shallow-by-default behavior.
 
 An existing directory that is selected but not traversed is always emitted by
-`diff` with a collapsed `… d` state, even without `--all`. This state means only
+`diff` with a collapsed `▸ d` state, even without `--all`. This state means only
 that the directory entry exists on both sides; HLS makes no claim about its
-contents. Terminal output renders it gray and italic. Recursive traversal
+contents. Terminal output renders it dark blue and italic. Recursive traversal
 replaces the collapsed state with comparisons from inside that directory.
 
 `list` uses the same operand expansion but omits the selected container from

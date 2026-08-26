@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.26.1 — 2026-08-26
+
+### Changed
+
+- Replaced the ambiguous retained-path `·` marker with side-specific `r` and
+  `l` markers, using dark cyan for remote-only and bright cyan for local-only.
+- Replaced the gray italic collapsed-directory ellipsis with a dark-blue italic
+  `▸ d` state and moved unchanged `=` entries to dim default coloring, reserving
+  gray status styling for `x` exclusions.
+
 ## 0.8.25.2 — 2026-08-25
 
 ### Changed

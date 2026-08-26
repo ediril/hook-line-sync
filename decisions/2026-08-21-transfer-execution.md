@@ -4,11 +4,12 @@ Date: 2026-08-21
 
 ## Decision
 
-Push and pull take fresh complete snapshots, build the same comparison plan
-shown by `hls compare`, reject the entire plan if it contains a type or symlink
-conflict, and then execute its selected actions. With no selector, the complete
-non-excluded project is in scope. A literal or wildcard selector limits both
-transfer and prune actions to matching regular files.
+Push and pull take fresh selected snapshots, build the same comparison plan
+shown by `hls diff`, reject the entire plan if it contains a type or symlink
+conflict, and then execute its selected actions. With no operands, the current
+directory's immediate contents are in scope; `-r` includes its subtree. A
+literal or wildcard selector limits both transfer and prune actions to matching
+paths.
 
 Push creates required remote parent directories, uploads local-only files, and
 replaces changed remote files. Each upload is staged under a unique temporary
@@ -35,7 +36,7 @@ remote content until replacements are present.
 ## Consequences
 
 - The FTPS server must support MFMT as well as MLSD for push.
-- Changed files are overwritten in the command's explicit direction; compare
+- Changed files are overwritten in the command's explicit direction; diff
   is the preview mechanism.
 - Transfers are atomic per file, not across the whole project. FTPS has no
   project-wide transaction, so a later failure stops execution but does not

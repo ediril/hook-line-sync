@@ -1,7 +1,8 @@
 # Work Queue
 
-- [x] Make shallow diff scope visible by always displaying existing but
-  uninspected directories with a collapsed `…` state and gray italic styling.
+- [x] Make shallow diff scope visible with a dark-blue italic `▸` collapsed
+  directory state, use dark/bright cyan `r` and `l` for retained remote/local
+  paths, and reserve gray status styling for exclusions.
 - [x] Group synchronization-rule inspection by folder while preserving visible
   precedence IDs, remove provably unnecessary exact rules during include or
   exclude updates, and use file-browser ordering in list and diff output.
