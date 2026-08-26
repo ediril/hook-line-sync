@@ -593,7 +593,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
     assert "x   src/debug.log\n" in push_comparison[1]
-    hidden_exclusions = invoke(["diff", "--hide-excluded"], store)
+    hidden_exclusions = invoke(["diff", "-i"], store)
     assert "src/debug.log" not in hidden_exclusions[1]
 
     recursive_comparison = invoke(["diff", "-r"], store)

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.26.6 — 2026-08-26
+
+### Changed
+
+- Renamed the diff exclusion-display override to the positive
+  `-i`/`--inc`/`--included-only` aliases.
+
 ## 0.8.26.5 — 2026-08-26
 
 ### Changed

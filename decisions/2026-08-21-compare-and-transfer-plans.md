@@ -15,8 +15,8 @@ creation, modification, deletion, and conflict. A skipped remote-only path uses
 under either perspective. Exclusions use `x`, unchanged entries requested with
 the default view use `=`, and a directory outside the traversed depth adds a
 `d ▸` indicator without replacing its synchronization status. Exclusions can be
-hidden from the presentation with `--hide-excluded`; they remain excluded from
-the synchronization plan.
+hidden from the presentation with `-i`/`--included-only`; they remain excluded
+from the synchronization plan.
 
 Status lines use green, yellow, red, and magenta for actions and conflicts when
 stdout is a terminal. Retained remote/local paths use dark/bright cyan,

@@ -268,10 +268,10 @@ addressed because commas delimit pattern groups.
 
 The project is inferred from the current directory; use `--project <name>`
 elsewhere. Excluded paths stay outside push, pull, and remote pruning, but remain
-visible in the local listing and default diff. Use `hls diff --hide-excluded`
-to suppress those diagnostics. Empty patterns, absolute paths, parent
-traversal, and partial-segment `**` are rejected. A quoted wildcard operand
-that matches nothing is rejected unless `--pattern` is used.
+visible in the local listing and default diff. Use `hls diff -i`, `--inc`, or
+`--included-only` to suppress those diagnostics. Empty patterns, absolute
+paths, parent traversal, and partial-segment `**` are rejected. A quoted
+wildcard operand that matches nothing is rejected unless `--pattern` is used.
 
 Rules are stored as explicit `id`, `action`, and `pattern` records. HLS does not
 store Gitignore lines, and `!` or a leading `/` has no special rule meaning.
@@ -352,12 +352,13 @@ diff prints synchronization actions, conflicts, one-sided paths that will be
 kept, and directories whose contents fall outside the selected depth. A `d ▸`
 suffix is a traversal indicator, not a replacement for the directory's status:
 `+ d ▸ cache` is new locally, while `r d ▸ cache` exists only remotely and will
-be retained. Diff shows unchanged and excluded paths by default; use
-`--hide-excluded` to omit exclusions from the output. Status lines use distinct
-terminal colors. Remote-only retained paths are dark cyan, local-only retained
-paths are bright cyan, unchanged paths use the normal terminal foreground,
-excluded paths are gray, and untraversed directory details are dark blue and
-italic. Color is disabled when output is redirected or `NO_COLOR` is set.
+be retained. Diff shows unchanged and excluded paths by default; use `-i`,
+`--inc`, or `--included-only` to show included paths only. Status lines use
+distinct terminal colors. Remote-only retained paths are dark cyan, local-only
+retained paths are bright cyan, unchanged paths use the normal terminal
+foreground, excluded paths are gray, and untraversed directory details are dark
+blue and italic. Color is disabled when output is redirected or `NO_COLOR` is
+set.
 Included directory paths are bright blue, excluded directory paths are darker
 blue, and color can be controlled explicitly with
 `--color auto|always|never`.

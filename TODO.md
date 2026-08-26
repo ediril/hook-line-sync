@@ -24,7 +24,7 @@
     tree with exclusion status; remove `tracked`, `lsl`, and `lsr`.
   - [x] Stream diff results one deterministic directory at a time.
   - [x] Show unchanged and excluded paths by default, with
-    `--hide-excluded` for a quieter view.
+    `-i`/`--included-only` for an included-path-only view.
   - [x] Add stateless `--paged` and `--resume` directory cursors.
 - [x] Split profile inspection into a minimal `profiles` list and detailed
   `profile [PROFILE]` view, and interactively resolve ambiguous command prefixes

@@ -281,7 +281,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="preview file changes without modifying anything",
         usage=(
             "hls diff [PATH ...] [--project PROFILE]\n"
-            "       [--pull | --prune-remote] [-r] [--hide-excluded] [--paged]\n"
+            "       [--pull | --prune-remote] [-r] [-i] [--paged]\n"
             "       [--resume DIRECTORY] [--color auto|always|never]"
         ),
         description=(
@@ -316,9 +316,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="include descendants of selected directories",
     )
     diff_parser.add_argument(
-        "--hide-excluded",
+        "-i",
+        "--inc",
+        "--included-only",
+        dest="included_only",
         action="store_true",
-        help="omit excluded paths from the diff output",
+        help="show only included paths",
     )
     diff_parser.add_argument(
         "--paged",
@@ -1156,8 +1159,8 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
         command.append("--prune-remote")
     if arguments.recursive:
         command.append("--recursive")
-    if arguments.hide_excluded:
-        command.append("--hide-excluded")
+    if arguments.included_only:
+        command.append("-i")
     if arguments.color != "auto":
         command.extend(("--color", arguments.color))
     command.extend(("--paged", "--resume", directory.as_posix()))
@@ -1370,7 +1373,7 @@ def _diff(
             shown = tuple(
                 entry
                 for entry in plan.entries
-                if not arguments.hide_excluded or entry.action != "excluded"
+                if not arguments.included_only or entry.action != "excluded"
             )
             lines = _format_comparison_entries(
                 shown,
