@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.26.9 — 2026-08-26
+
+### Changed
+
+- Restored an explicitly selected directory as a blank-status `d directory`
+  row, keeping the scope visible without implying content equality.
+- Removed trailing ellipses from progressive `Comparing directory` messages.
+
 ## 0.8.26.8 — 2026-08-26
 
 ### Changed

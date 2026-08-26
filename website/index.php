@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.26.8';
+$version = '0.8.26.9';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 
@@ -89,7 +89,7 @@ function h(string $value): string
                     <div class="terminal-body">
                         <p><span class="prompt">❯</span> <b>hls diff -r</b></p>
                         <p class="muted">Checking differences for project 'discovery'...</p>
-                        <p class="muted">Comparing directory '.'...</p>
+                        <p class="muted">Comparing directory '.'</p>
                         <p class="terminal-heading">Local -&gt; Remote for project 'discovery':</p>
                         <p><span class="added">+</span> &nbsp; index.php</p>
                         <p><span class="changed">~</span> &nbsp; assets/site.css</p>

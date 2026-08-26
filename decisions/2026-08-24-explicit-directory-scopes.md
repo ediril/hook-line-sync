@@ -18,10 +18,11 @@ the directory.
 display, matching normal directory-listing expectations. Its no-argument scope
 remains the current directory's immediate contents.
 
-Diff also omits an unchanged selected container because equality of the
-directory entry says nothing about equality of its contents. The progress line
-already identifies the scope. A one-sided, excluded, or otherwise actionable
-container remains visible.
+Diff shows an unchanged selected container with a blank status column because
+equality of the directory entry says nothing about equality of its contents.
+This keeps the selected directory visible without making a content-equality
+claim. A one-sided, excluded, or otherwise actionable container retains its
+meaningful status marker.
 
 Other directories that exist on both sides use a blank status column rather
 than `=` for the same reason. Their `d` type and optional `▸` traversal marker

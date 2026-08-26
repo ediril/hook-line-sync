@@ -1258,7 +1258,7 @@ def _diff(
             directory, has_local, has_remote, include_container, is_root = pending.pop()
             display_directory = directory.as_posix()
             print(
-                f"Comparing directory '{display_directory}'...",
+                f"Comparing directory '{display_directory}'",
                 file=progress,
                 flush=True,
             )
@@ -1378,11 +1378,6 @@ def _diff(
                 entry
                 for entry in plan.entries
                 if not arguments.included_only or entry.action != "excluded"
-                if not (
-                    include_container
-                    and entry.path == directory.as_posix()
-                    and entry.action == "unchanged"
-                )
             )
             lines = _format_comparison_entries(
                 shown,
