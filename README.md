@@ -1,6 +1,6 @@
 # Hook Line Sync
 
-Hook Line Sync (`hls`) is a Python CLI for transferring files between mapped
+Hook Line Sync (`hlsync`) is a Python CLI for transferring files between mapped
 local folders and remote servers over explicit FTP over TLS (FTPS).
 
 The project is in pre-alpha development. Configuration, connection, mapping,
@@ -41,9 +41,9 @@ python -m pip install -e '.[dev]'
 pytest
 ```
 
-The release distribution is named `hook-line-sync`; the installed command and
-Python package are both named `hls`. Once the first release is published to
-PyPI, installation will be:
+The release distribution is named `hook-line-sync`, the installed command is
+`hlsync`, and the internal Python package remains `hls`. Once the first release
+is published to PyPI, installation will be:
 
 ```console
 python -m pip install hook-line-sync
@@ -61,10 +61,10 @@ root on shared hosting.
 Add a project with its FTPS endpoint and absolute remote root:
 
 ```console
-hls add prod --host ftp.example.com --remote-root /public_html/site
+hlsync add prod --host ftp.example.com --remote-root /public_html/site
 ```
 
-`hls add` proposes the current directory as the project's local root. Yes is
+`hlsync add` proposes the current directory as the project's local root. Yes is
 the default: press Enter to map it immediately, or decline to save the project
 without a mapping. The project is not saved if that local root overlaps another
 project.
@@ -87,13 +87,13 @@ Credential values are never written to `~/.hls/configs.json`.
 Verify a project's FTPS connection:
 
 ```console
-hls connect prod
+hlsync connect prod
 ```
 
 From anywhere under a mapped local root, the project name can be omitted:
 
 ```console
-hls connect
+hlsync connect
 ```
 
 An explicit name takes precedence. The command verifies authentication, the
@@ -103,13 +103,13 @@ connection. It does not create a persistent session.
 Remove a project and its locally stored mapping:
 
 ```console
-hls remove prod
+hlsync remove prod
 ```
 
 Removal does not connect to the server or delete remote files.
 
-Command names may be shortened to any unique prefix. For example, `hls con`
-means `hls connect`, while `hls d` means `hls diff`. An ambiguous prefix is
+Command names may be shortened to any unique prefix. For example, `hlsync con`
+means `hlsync connect`, while `hlsync d` means `hlsync diff`. An ambiguous prefix is
 rejected and lists its candidates. The established `ls` compatibility spelling
 for `list` remains available but is intentionally omitted from the help menu.
 
@@ -124,7 +124,7 @@ List every configured profile and mark the one whose local root
 contains the current directory:
 
 ```console
-hls profiles
+hlsync profiles
 ```
 
 The active profile is marked with `*`; other profile names are printed without
@@ -132,13 +132,13 @@ connection details. Inspect the current profile inferred from the working
 directory, or name one explicitly from anywhere:
 
 ```console
-hls profile
-hls profile staging
+hlsync profile
+hlsync profile staging
 ```
 
 The detail view shows protocol, host and port, local and remote roots,
 credential environment-variable names, and the number of synchronization
-rules. It never displays credential values; use `hls rules` to inspect the
+rules. It never displays credential values; use `hlsync rules` to inspect the
 rules themselves.
 
 When a command prefix matches more than one command, an interactive terminal
@@ -148,12 +148,12 @@ input or guessing, which keeps scripts safe.
 
 ## Local roots
 
-If mapping was declined during `hls add`, run `hls map` later from the root of
+If mapping was declined during `hlsync add`, run `hlsync map` later from the root of
 the local project:
 
 ```console
 cd ~/Sites/my-site
-hls map prod
+hlsync map prod
 ```
 
 The current directory is canonicalized and persisted as the project's single
@@ -161,28 +161,28 @@ local root. Every relative path underneath it maps to the same relative path
 under the remote root. Local roots may not overlap across projects, so future
 push and pull commands can determine the project and remote subdirectory from
 the current directory without ambient state. If the project is already mapped,
-`hls map` shows the existing and proposed roots and requires confirmation before
+`hlsync map` shows the existing and proposed roots and requires confirmation before
 replacing the mapping; no is the default. Existing relative synchronization
 rules are retained when the root changes.
 
 Persist exclusions after mapping by naming local paths:
 
 ```console
-hls exclude .git node_modules
-hls exc '*.md'
-hls exc composer.*
+hlsync exclude .git node_modules
+hlsync exc '*.md'
+hlsync exc composer.*
 ```
 
 Operands are relative to the current directory within the project. HLS expands
 quoted wildcards against the current local tree before recording exact paths,
-so `hls exc *.md` and `hls exc '*.md'` have the same effect. A literal or
+so `hlsync exc *.md` and `hlsync exc '*.md'` have the same effect. A literal or
 expanded directory means its complete subtree.
 
 Use `--pattern` only when the rule itself should remain a reusable wildcard:
 
 ```console
-hls exc --pattern '*.md'
-hls exc --pattern '**/*.log'
+hlsync exc --pattern '*.md'
+hlsync exc --pattern '**/*.log'
 ```
 
 In pattern mode, `*` matches within one directory level and `**` crosses
@@ -193,17 +193,17 @@ Each rule receives a stable numeric ID. Omit patterns to inspect the rules
 recorded by each command:
 
 ```console
-hls exc
-hls inc
+hlsync exc
+hlsync inc
 ```
 
-`hls exc` lists exclusion rules and `hls inc` lists inclusion rules. Rules are
+`hlsync exc` lists exclusion rules and `hlsync inc` lists inclusion rules. Rules are
 grouped beneath the nearest literal folder and sorted by name. Patterns that can
 apply beneath any folder appear under `Everywhere`. Display the complete policy
 with:
 
 ```console
-hls rules
+hlsync rules
 ```
 
 A higher matching rule ID wins. Adding the exact same normalized pattern again
@@ -214,25 +214,25 @@ rather than guessing that they are equivalent. Remove any unwanted rule by its
 stable ID:
 
 ```console
-hls rules remove 3
+hlsync rules remove 3
 ```
 
 List the current local directory and its exclusion status with:
 
 ```console
-hls list
-hls list *
-hls list .
-hls list templates
-hls list --recursive
+hlsync list
+hlsync list *
+hlsync list .
+hlsync list templates
+hlsync list --recursive
 ```
 
-With no operands, `hls list` performs its own one-level selection, so dotfiles
+With no operands, `hlsync list` performs its own one-level selection, so dotfiles
 are included without relying on shell wildcard behavior. `.` has the same
 one-level meaning. Add `-r` or `--recursive` to include every descendant under
 the current directory. Explicit path and wildcard operands retain the shared
 selector syntax. A selected file is listed directly; a selected directory acts
-as a container, so `hls list templates` lists the immediate children of
+as a container, so `hlsync list templates` lists the immediate children of
 `templates` without requiring `templates/*`. Add `-r` to include all descendants
 of selected directories. Bare `*` continues to be expanded by the shell, while
 quoted patterns are interpreted by HLS.
@@ -245,19 +245,19 @@ excluded paths use `x`; included files leave both columns blank. Use
 `--project <name>` outside a mapped root, where selection starts at the mapped
 root. On terminals, included directories are bright blue, excluded directories
 are darker blue, and excluded files are gray. Use `--color auto|always|never`
-to control coloring. `hls ls` remains an unadvertised compatibility spelling.
+to control coloring. `hlsync ls` remains an unadvertised compatibility spelling.
 
 Re-include narrower paths later by appending an ordered override:
 
 ```console
-hls include node_modules/required-package/dist
-hls inc var/generated/index.html
+hlsync include node_modules/required-package/dist
+hlsync inc var/generated/index.html
 ```
 
 Use pattern mode for a reusable recursive inclusion:
 
 ```console
-hls inc --pattern 'vendor/**'
+hlsync inc --pattern 'vendor/**'
 ```
 
 Whether the shell or HLS expands a normal wildcard operand, HLS records the
@@ -268,7 +268,7 @@ addressed because commas delimit pattern groups.
 
 The project is inferred from the current directory; use `--project <name>`
 elsewhere. Excluded paths stay outside push, pull, and remote pruning, but remain
-visible in the local listing and default diff. Use `hls diff -i`, `--inc`, or
+visible in the local listing and default diff. Use `hlsync diff -i`, `--inc`, or
 `--included-only` to suppress those diagnostics. Empty patterns, absolute
 paths, parent traversal, and partial-segment `**` are rejected. A quoted
 wildcard operand that matches nothing is rejected unless `--pattern` is used.
@@ -285,34 +285,34 @@ Preview what a push of the current directory's immediate contents would do
 without changing either side:
 
 ```console
-hls diff
+hlsync diff
 ```
 
 Preview the complete current subtree explicitly:
 
 ```console
-hls diff -r
+hlsync diff -r
 ```
 
 Use the pull projection when needed:
 
 ```console
-hls diff --pull
+hlsync diff --pull
 ```
 
 Limit the projection to one or more paths or wildcard patterns relative to the
 current directory:
 
 ```console
-hls diff index.html
-hls diff index.html app.js styles.css
-hls diff 'index.html,app.js,styles.css'
-hls diff *
-hls diff 'src/*.js'
-hls diff '**/*.css'
-hls diff .
-hls diff templates
-hls diff templates -r
+hlsync diff index.html
+hlsync diff index.html app.js styles.css
+hlsync diff 'index.html,app.js,styles.css'
+hlsync diff *
+hlsync diff 'src/*.js'
+hlsync diff '**/*.css'
+hlsync diff .
+hlsync diff templates
+hlsync diff templates -r
 ```
 
 An unquoted wildcard may be expanded by the shell into multiple arguments; HLS
@@ -385,7 +385,7 @@ internally.
 For an interruptible directory-by-directory review, use:
 
 ```console
-hls diff --paged
+hlsync diff --paged
 ```
 
 Paged mode compares one directory, prints the exact resume command, and exits
@@ -399,12 +399,12 @@ remote-only path is shown with `r` and skipped rather than restored or deleted
 by default. Preview its deletion with `-` explicitly using:
 
 ```console
-hls diff --prune-remote
+hlsync diff --prune-remote
 ```
 
 When a selector is present, pruning is strictly limited to matching remote-only
 files. Remote pruning belongs exclusively to the push direction, so
-`hls diff --pull --prune-remote` is rejected.
+`hlsync diff --pull --prune-remote` is rejected.
 
 File identity uses size and modification timestamps normalized to the coarser
 precision reported by the local filesystem and remote MLSD facts. Identical
@@ -414,43 +414,43 @@ Diff prints immediately flushed connection progress to stderr. Diff entries are
 progressively written to stdout as directories are read, so they can be
 redirected without mixing status messages into the result.
 Within each displayed directory, subdirectories are sorted first by name and
-files follow by name, matching `hls list`.
+files follow by name, matching `hlsync list`.
 
 ## Push and pull
 
 Push the complete current subtree, or pull an explicitly selected path:
 
 ```console
-hls push
-hls pull index.html
+hlsync push
+hlsync pull index.html
 ```
 
 The recursive push spelling remains equivalent. Use `.` to explicitly select
 the current directory for pull, with `-r` when its full subtree is intended:
 
 ```console
-hls push -r
-hls pull .
-hls pull . -r
+hlsync push -r
+hlsync pull .
+hlsync pull . -r
 ```
 
 Limit execution with the same selection syntax used by diff:
 
 ```console
-hls push index.html
-hls push index.html app.js styles.css
-hls push *
-hls push 'src/*.js'
-hls pull '**/*.css'
-hls push templates
-hls push templates -r
+hlsync push index.html
+hlsync push index.html app.js styles.css
+hlsync push *
+hlsync push 'src/*.js'
+hlsync pull '**/*.css'
+hlsync push templates
+hlsync push templates -r
 ```
 
-No-argument push is recursive, so `hls push` is equivalent to `hls push -r`.
+No-argument push is recursive, so `hlsync push` is equivalent to `hlsync push -r`.
 Pull requires at least one file, directory, or pattern operand. Explicit
-directory operands remain shallow unless `-r` is supplied: `hls pull app`
-selects `app` and its immediate contents, while `hls pull app -r` selects its
-complete subtree. Preview bare push with `hls diff -r`; explicitly scoped push
+directory operands remain shallow unless `-r` is supplied: `hlsync pull app`
+selects `app` and its immediate contents, while `hlsync pull app -r` selects its
+complete subtree. Preview bare push with `hlsync diff -r`; explicitly scoped push
 and pull commands retain the same scope as their corresponding diff.
 
 Use `--project <name>` outside a mapped project. Push uploads local-only files
@@ -462,8 +462,8 @@ Remote-only paths are reported and left untouched unless pruning is explicitly
 authorized on a push:
 
 ```console
-hls push --prune-remote
-hls push -p 'generated/*.html'
+hlsync push --prune-remote
+hlsync push -p 'generated/*.html'
 ```
 
 A path-scoped FTPS permission failure does not stop unrelated uploads. HLS

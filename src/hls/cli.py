@@ -136,7 +136,7 @@ def _resolve_command_name(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="hls",
+        prog="hlsync",
         description=(
             "Transfer mapped files over explicit FTP over TLS. Commands may be "
             "shortened to any unique prefix."
@@ -182,8 +182,8 @@ def build_parser() -> argparse.ArgumentParser:
             command,
             help=help_text,
             usage=(
-                f"hls {command} [PATH ...] [--project PROJECT_NAME]\n"
-                f"       hls {command} --pattern PATTERN ... "
+                f"hlsync {command} [PATH ...] [--project PROJECT_NAME]\n"
+                f"       hlsync {command} --pattern PATTERN ... "
                 "[--project PROJECT_NAME]"
             ),
         )
@@ -211,8 +211,8 @@ def build_parser() -> argparse.ArgumentParser:
         "rules",
         help="list or remove synchronization rules",
         usage=(
-            "hls rules [--project PROJECT_NAME]\n"
-            "       hls rules remove RULE_ID [--project PROJECT_NAME]"
+            "hlsync rules [--project PROJECT_NAME]\n"
+            "       hlsync rules remove RULE_ID [--project PROJECT_NAME]"
         ),
         description=(
             "List synchronization rules, or remove one rule by its numeric ID."
@@ -291,7 +291,7 @@ def build_parser() -> argparse.ArgumentParser:
         "diff",
         help="preview file changes without modifying anything",
         usage=(
-            "hls diff [PATH ...] [--project PROFILE]\n"
+            "hlsync diff [PATH ...] [--project PROFILE]\n"
             "       [--pull | --prune-remote] [-r] [-i] [--paged]\n"
             "       [--resume DIRECTORY] [--color auto|always|never]"
         ),
@@ -1227,7 +1227,7 @@ def _resume_directory(value: str | None) -> PurePosixPath | None:
 
 
 def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> str:
-    command = ["hls", "diff", *arguments.pattern_operands]
+    command = ["hlsync", "diff", *arguments.pattern_operands]
     if arguments.project_name is not None:
         command.extend(("--project", arguments.project_name))
     if arguments.pull:
@@ -1647,7 +1647,7 @@ def run(
         TransportError,
         TransferError,
     ) as error:
-        print(f"hls: error: {error}", file=stderr)
+        print(f"hlsync: error: {error}", file=stderr)
         return 1
     if message is not None:
         print(message, file=stdout)

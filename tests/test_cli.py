@@ -84,18 +84,18 @@ def test_project_lifecycle_uses_production_credentials_and_version(
         "pull                replace changed local files from the remote project"
     )
     assert pull_help in help_output
-    assert "usage: hls diff" in invoke(["help", "d"], store)[1]
+    assert "usage: hlsync diff" in invoke(["help", "d"], store)[1]
     rules_help = invoke(["help", "rules"], store)[1]
-    assert "hls rules [--project PROJECT_NAME]" in rules_help
-    assert "hls rules remove RULE_ID [--project PROJECT_NAME]" in rules_help
+    assert "hlsync rules [--project PROJECT_NAME]" in rules_help
+    assert "hlsync rules remove RULE_ID [--project PROJECT_NAME]" in rules_help
     assert "[{remove}] [rule_id]" not in rules_help
     assert "profile             show details for one profile" in help_output
     assert "profiles            list configured profiles" in help_output
     assert "list                list the current local directory" in help_output
     for command in ("exclude", "include"):
         rule_help = invoke(["help", command], store)[1]
-        assert f"hls {command} [PATH ...]" in rule_help
-        assert f"hls {command} --pattern PATTERN ..." in rule_help
+        assert f"hlsync {command} [PATH ...]" in rule_help
+        assert f"hlsync {command} --pattern PATTERN ..." in rule_help
 
     list_status, list_stdout, list_stderr = invoke(["profiles"], store)
     assert (list_status, list_stderr) == (0, "")
@@ -648,7 +648,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
 
     paged = invoke(["diff", ".", "--recursive", "--paged"], store)
-    assert "Resume: hls diff . --recursive --paged --resume src\n" in paged[1]
+    assert "Resume: hlsync diff . --recursive --paged --resume src\n" in paged[1]
     resumed = invoke(
         ["diff", ".", "--recursive", "--paged", "--resume", "src"], store
     )

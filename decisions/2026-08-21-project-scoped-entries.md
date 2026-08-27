@@ -11,7 +11,7 @@ to the same FTPS host.
 
 Mapping representation is governed by the later single-local-root decision. A
 project is removed locally with
-`hls remove <project-name>`; removal deletes its configuration and mappings but
+`hlsync remove <project-name>`; removal deletes its configuration and mappings but
 never connects to the server or deletes remote content.
 
 ## Rationale
@@ -26,7 +26,7 @@ future transfers.
 
 - Configuration schema version 4 uses a top-level `projects` object rather than
   `servers`.
-- `hls add` requires both `--host` and `--remote-root`.
+- `hlsync add` requires both `--host` and `--remote-root`.
 - The connection protocol is selected with `--protocol`; it defaults to `ftps`,
   the only currently supported value.
 - Projects default to `PROD_FTPS_USERNAME` and `PROD_FTPS_PASSWORD`; either

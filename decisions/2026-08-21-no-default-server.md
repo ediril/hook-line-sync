@@ -20,7 +20,7 @@ location.
 
 ## Consequences
 
-- The `hls set` command and top-level `default` configuration field do not
+- The `hlsync set` command and top-level `default` configuration field do not
   exist.
 - Removing the default advanced the pre-alpha configuration schema rather than
   adding a compatibility path.

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.27.1 — 2026-08-27
+
+### Changed
+
+- Renamed the installed CLI command from `hls` to `hlsync` across the console
+  entry point, help and error output, resume commands, release validation,
+  documentation, and website examples.
+- Removed the old `hls` console entry instead of retaining a compatibility
+  alias. The `hls` Python package, `~/.hls/configs.json` configuration path, and
+  `hook-line-sync` PyPI distribution name remain unchanged.
+
 ## 0.8.26.17 — 2026-08-26
 
 ### Changed

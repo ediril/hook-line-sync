@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "src" / "hls" / "__init__.py"
 CHANGELOG_FILE = ROOT / "CHANGELOG.md"
 WEBSITE_FILE = ROOT / "website" / "index.php"
+PYPROJECT_FILE = ROOT / "pyproject.toml"
 
 VERSION_PATTERN = re.compile(
     r'^__version__ = "(?P<version>0\.(?P<month>[1-9]|1[0-2])\.'
@@ -21,6 +22,10 @@ VERSION_PATTERN = re.compile(
 WEBSITE_VERSION_PATTERN = re.compile(
     r"^\$version = '(?P<version>[^']+)';$",
     re.MULTILINE,
+)
+CONSOLE_SCRIPTS_PATTERN = re.compile(
+    r"^\[project\.scripts\]\s*$\n(?P<body>.*?)(?=^\[|\Z)",
+    re.MULTILINE | re.DOTALL,
 )
 
 
@@ -40,6 +45,16 @@ def validate_release(tag: str | None = None) -> str:
     if tag is not None and tag != f"v{version}":
         raise SystemExit(
             f"release check failed: tag {tag!r} does not match v{version}"
+        )
+
+    scripts_match = CONSOLE_SCRIPTS_PATTERN.search(PYPROJECT_FILE.read_text())
+    if (
+        scripts_match is None
+        or scripts_match["body"].strip() != 'hlsync = "hls.cli:main"'
+    ):
+        raise SystemExit(
+            "release check failed: pyproject.toml must expose only the "
+            "hlsync = hls.cli:main console script"
         )
 
     website_versions = tuple(

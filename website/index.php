@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.26.17';
+$version = '0.8.27.1';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 
@@ -17,7 +17,7 @@ function h(string $value): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080b10">
     <meta name="description" content="HLS adds project mapping, readable diffs, and deliberate pushes to a simple FTPS workflow.">
-    <title>Hook Line Sync — a better way to just FTP it</title>
+    <title>Hook Line Sync — a better way to "just FTP it"</title>
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -83,11 +83,11 @@ function h(string $value): string
                 <div class="terminal">
                     <div class="terminal-bar">
                         <div class="terminal-dots" aria-hidden="true"><i></i><i></i><i></i></div>
-                        <span>~/sites/discovery — hls</span>
+                        <span>~/sites/discovery — hlsync</span>
                         <span class="terminal-state">TLS:ON</span>
                     </div>
                     <div class="terminal-body">
-                        <p><span class="prompt">❯</span> <b>hls diff -r</b></p>
+                        <p><span class="prompt">❯</span> <b>hlsync diff -r</b></p>
                         <p class="muted">Checking differences for project 'discovery'...</p>
                         <p><span class="directory">&nbsp; assets/</span></p>
                         <p class="excluded"><span>x</span> <span class="directory-dark">vendor/</span></p>
@@ -95,7 +95,7 @@ function h(string $value): string
                         <p class="remote-only"><span>r</span> &nbsp; legacy.php</p>
                         <p>&nbsp; <span class="changed">~</span> &nbsp; site.css</p>
                         <p>&nbsp; <span class="added">+</span> <span class="directory">icons/</span></p>
-                        <p class="terminal-gap"><span class="prompt">❯</span> <b>hls push</b></p>
+                        <p class="terminal-gap"><span class="prompt">❯</span> <b>hlsync push</b></p>
                         <p><span class="success">✓</span> Push completed: 3 changes.</p>
                         <span class="cursor" aria-hidden="true"></span>
                     </div>
@@ -126,28 +126,28 @@ function h(string $value): string
                     <div class="step-icon" aria-hidden="true">⌖</div>
                     <h3>Map the project</h3>
                     <p>Connect the current local directory to its remote root. HLS recognizes that project from any directory beneath it.</p>
-                    <code>hls add prod --host …</code>
+                    <code>hlsync add prod --host …</code>
                 </li>
                 <li>
                     <span class="step-number">02</span>
                     <div class="step-icon" aria-hidden="true">⌁</div>
                     <h3>Exclude what doesn’t belong</h3>
                     <p>Exclude files that should never leave your machine. Use an explicit pattern when future matching files should stay excluded too.</p>
-                    <code>hls exc --pattern '*.map'</code>
+                    <code>hlsync exc --pattern '*.map'</code>
                 </li>
                 <li>
                     <span class="step-number">03</span>
                     <div class="step-icon" aria-hidden="true">∆</div>
                     <h3>Read the diff</h3>
                     <p>Compare local and remote files before changing either side. Unchanged and excluded paths stay visible by default.</p>
-                    <code>hls diff -r</code>
+                    <code>hlsync diff -r</code>
                 </li>
                 <li>
                     <span class="step-number">04</span>
                     <div class="step-icon" aria-hidden="true">↥</div>
                     <h3>Push the changes</h3>
                     <p>Upload new and modified files. Remote-only files stay untouched unless you explicitly enable pruning.</p>
-                    <code>hls push</code>
+                    <code>hlsync push</code>
                 </li>
             </ol>
         </section>

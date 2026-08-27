@@ -4,9 +4,9 @@ Date: 2026-08-21
 
 ## Decision
 
-`hls diff` presents one deterministic projection of the selected local and
-remote scope. By default it shows what `hls push` would do. `hls diff --pull`
-instead shows what `hls pull` would do. It replaces separate push/pull `--dry`
+`hlsync diff` presents one deterministic projection of the selected local and
+remote scope. By default it shows what `hlsync push` would do. `hlsync diff --pull`
+instead shows what `hlsync pull` would do. It replaces separate push/pull `--dry`
 modes.
 
 CLI output is a compact status view. Actions use `+`, `~`, `-`, and `?` for
@@ -69,8 +69,8 @@ still satisfy the pattern. A single-segment `*` therefore scans only the
 corresponding directory; recursive traversal occurs only where `**` or later
 pattern segments can match descendants. With no operands, diff selects the
 current directory's immediate contents. Bare push intentionally selects the
-complete current subtree and is previewed by `hls diff -r`. Pull requires an
-explicit operand; `hls pull .` selects the current directory, and `-r` extends
+complete current subtree and is previewed by `hlsync diff -r`. Pull requires an
+explicit operand; `hlsync pull .` selects the current directory, and `-r` extends
 a directory selection through its subtree.
 
 The positional arguments are reserved for selectors. An explicit project
@@ -97,7 +97,7 @@ authorization to perform a destructive action.
 
 ## Consequences
 
-- `hls diff` produces push-oriented output by default and makes no changes.
+- `hlsync diff` produces push-oriented output by default and makes no changes.
 - `--pull` changes the projection to pull behavior.
 - Push and pull do not have a `--dry` option.
 - Remote-only paths are reported and skipped by default on push and pull.

@@ -44,7 +44,7 @@ Directory operands should not require spelling `directory/*`, and a scoped diff
 must describe the corresponding explicit push or pull exactly. Explicit
 directory operands remain shallow by default. Bare push is the deliberate
 exception: it selects the complete current subtree and is equivalent to
-`hls push -r`; its preview is `hls diff -r`. Bare diff remains shallow. Pull has
+`hlsync push -r`; its preview is `hlsync diff -r`. Bare diff remains shallow. Pull has
 no bare scope: it requires an explicit operand, with `.` available to select the
 current directory.
 

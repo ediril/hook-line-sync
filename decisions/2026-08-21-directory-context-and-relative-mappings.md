@@ -6,7 +6,7 @@ Status: Superseded by `2026-08-21-single-local-root-mapping.md`.
 
 ## Decision
 
-`hls use <project>` associates a project with the canonical current directory.
+`hlsync use <project>` associates a project with the canonical current directory.
 The association applies to descendants through nearest-ancestor lookup and is
 stored separately in `~/.hls/contexts.json`. An explicitly supplied project
 takes precedence; otherwise a command uses the directory context and fails when
@@ -16,7 +16,7 @@ become a global default.
 The mapping command is:
 
 ```text
-hls map <local-directory> [<relative-remote-directory>] [--project <name>]
+hlsync map <local-directory> [<relative-remote-directory>] [--project <name>]
 ```
 
 Local input may be relative or absolute, but mappings persist its canonical
@@ -38,8 +38,8 @@ deterministic regardless of the spelling or working directory used at creation.
 
 ## Consequences
 
-- `hls use` displays the inherited context, `hls use <project>` sets one, and
-  `hls use --clear` removes the context set at the current directory.
+- `hlsync use` displays the inherited context, `hlsync use <project>` sets one, and
+  `hlsync use --clear` removes the context set at the current directory.
 - Removing a project also removes directory contexts that name it.
 - Absolute remote mapping arguments and `..` traversal are rejected.
 - Configuration schema version 5 stores relative mapping destinations. Context

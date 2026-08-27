@@ -3,7 +3,7 @@
 Date: 2026-08-22
 
 Status: Rule representation and matching semantics superseded by
-`2026-08-22-structured-hls-rules.md`; command-prefix decisions remain current.
+`2026-08-22-structured-hlsync-rules.md`; command-prefix decisions remain current.
 
 ## Decision
 
@@ -14,8 +14,8 @@ registered with the argument parser and therefore do not appear in the help
 menu. Ambiguous prefixes fail and name every candidate rather than choosing
 based on registration order.
 
-`hls map` only maps the current directory. `hls exclude` and `hls include`,
-which naturally permit `hls exc` and `hls inc`, append one or more pattern
+`hlsync map` only maps the current directory. `hlsync exclude` and `hlsync include`,
+which naturally permit `hlsync exc` and `hlsync inc`, append one or more pattern
 arguments to the inferred project's persistent synchronization scope. Each
 argument may also contain comma-separated patterns, so quoted HLS wildcards and
 unquoted shell-expanded argument lists are both accepted. `--project <name>` is

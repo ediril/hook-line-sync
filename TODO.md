@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Rename the installed CLI command from `hls` to `hlsync` without changing
+  the Python package, configuration path, or PyPI distribution name.
 - [x] Continue independent push paths after path-scoped FTPS permission
   failures, skip descendants of failed directories, return a failing status,
   and suppress pruning after an incomplete upload phase.
@@ -13,12 +15,12 @@
 - [x] Group synchronization-rule inspection by folder while preserving visible
   precedence IDs, remove provably unnecessary exact rules during include or
   exclude updates, and use file-browser ordering in list and diff output.
-- [x] Treat explicit `hls list` directory operands as containers and standardize
+- [x] Treat explicit `hlsync list` directory operands as containers and standardize
   the gray excluded-path marker as `x` across list and diff.
-- [x] Make `hls list` current-directory-scoped by default, including dotfiles,
+- [x] Make `hlsync list` current-directory-scoped by default, including dotfiles,
   with explicit `-r`/`--recursive` subtree traversal.
 - [x] Use `x` and diff-consistent terminal coloring for excluded paths in
-  `hls list`.
+  `hlsync list`.
 - [x] Align the homepage mini-diff with the push-only pruning markers.
 - [x] Simplify inspection commands and make remote comparison interruptible:
   - [x] Use `profiles` for configured entries and `list` for the complete local

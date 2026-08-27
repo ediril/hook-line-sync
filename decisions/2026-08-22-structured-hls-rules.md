@@ -29,13 +29,13 @@ symbolically.
 
 ## Management and diagnostics
 
-`hls rules` groups the complete policy by its nearest literal folder and sorts
+`hlsync rules` groups the complete policy by its nearest literal folder and sorts
 expressions by name. Patterns without a fixed folder appear under `Everywhere`.
 Stable IDs remain visible because higher matching IDs still take precedence,
 even though the inspection view is organized for readability rather than
-evaluation order. `hls rules remove <id>` removes a specific persisted rule.
-`hls include` and `hls exclude` without operands provide filtered grouped views
-with the same IDs. `hls list` is the materialized local-tree view of the policy.
+evaluation order. `hlsync rules remove <id>` removes a specific persisted rule.
+`hlsync include` and `hlsync exclude` without operands provide filtered grouped views
+with the same IDs. `hlsync list` is the materialized local-tree view of the policy.
 
 ## Consequences
 

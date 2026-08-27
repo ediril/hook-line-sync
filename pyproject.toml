@@ -41,7 +41,7 @@ dev = [
 ]
 
 [project.scripts]
-hls = "hls.cli:main"
+hlsync = "hls.cli:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "hls.__version__" }

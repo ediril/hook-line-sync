@@ -5,11 +5,11 @@ Date: 2026-08-21
 ## Decision
 
 Push and pull take fresh selected snapshots, build the same comparison plan
-shown by `hls diff`, reject the entire plan if it contains a type or symlink
+shown by `hlsync diff`, reject the entire plan if it contains a type or symlink
 conflict, and then execute its selected actions. Bare push includes the complete
-current subtree and is equivalent to `hls push -r`; preview it with
-`hls diff -r`. Pull requires an explicit file, directory, or pattern operand;
-`hls pull .` explicitly selects the current directory. A directory operand
+current subtree and is equivalent to `hlsync push -r`; preview it with
+`hlsync diff -r`. Pull requires an explicit file, directory, or pattern operand;
+`hlsync pull .` explicitly selects the current directory. A directory operand
 remains shallow unless `-r` is supplied. A literal or wildcard selector limits
 both transfer and prune actions to matching paths.
 

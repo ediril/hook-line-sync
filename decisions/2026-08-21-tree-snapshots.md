@@ -4,7 +4,7 @@ Date: 2026-08-21
 
 ## Decision
 
-`hls list local` and `hls list remote` snapshot the complete mapped project,
+`hlsync list local` and `hlsync list remote` snapshot the complete mapped project,
 even when the current directory is a descendant of its local root. The current
 directory selects the project but does not narrow the listing. An explicit
 project name may be supplied as an override.
@@ -29,8 +29,8 @@ cycle.
 
 ## Consequences
 
-- `hls list local [project]` requires a mapped project but no network access.
-- `hls list remote [project]` connects securely and recursively lists the
+- `hlsync list local [project]` requires a mapped project but no network access.
+- `hlsync list remote [project]` connects securely and recursively lists the
   configured remote root over protected FTPS data connections.
 - Servers without MLSD support fail explicitly; no unreliable fallback exists.
 - File sizes and normalized modification timestamps are intentionally deferred

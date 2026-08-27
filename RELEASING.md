@@ -1,7 +1,7 @@
 # Releasing HLS
 
 HLS publishes the `hook-line-sync` distribution to PyPI. The installed command
-and import package remain `hls`.
+is `hlsync`; the import package remains `hls`.
 
 ## PyPI requirements
 
@@ -34,7 +34,7 @@ repository.
 5. A Git tag is not required by PyPI. It is strongly recommended for source
    provenance: tag the release commit as `v<version>`, push that tag, and create
    a corresponding GitHub Release.
-6. Install the published version in a clean environment and run `hls --version`
+6. Install the published version in a clean environment and run `hlsync --version`
    before announcing it.
 
 PyPI does not allow a published version to be replaced. If publication fails

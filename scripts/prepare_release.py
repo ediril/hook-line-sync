@@ -21,10 +21,10 @@ def run(*arguments: str) -> None:
     subprocess.run(arguments, cwd=ROOT, check=True)
 
 
-def installed_hls(venv: Path) -> Path:
+def installed_hlsync(venv: Path) -> Path:
     directory = "Scripts" if os.name == "nt" else "bin"
     suffix = ".exe" if os.name == "nt" else ""
-    return venv / directory / f"hls{suffix}"
+    return venv / directory / f"hlsync{suffix}"
 
 
 def venv_python(venv: Path) -> Path:
@@ -61,7 +61,7 @@ def main() -> None:
         artifacts = (*wheels, *source_archives)
         run(sys.executable, "-m", "twine", "check", *(map(os.fspath, artifacts)))
 
-        with tempfile.TemporaryDirectory(prefix="hls-install-check-") as temp:
+        with tempfile.TemporaryDirectory(prefix="hlsync-install-check-") as temp:
             venv = Path(temp) / "venv"
             run(sys.executable, "-m", "venv", os.fspath(venv))
             run(
@@ -72,7 +72,7 @@ def main() -> None:
                 os.fspath(wheels[0]),
             )
             output = subprocess.check_output(
-                [os.fspath(installed_hls(venv)), "--version"],
+                [os.fspath(installed_hlsync(venv)), "--version"],
                 cwd=ROOT,
                 text=True,
             ).strip()
