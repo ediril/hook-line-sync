@@ -90,6 +90,17 @@ CANONICAL_COMMANDS = (
 COMMAND_ALIASES = {"ls": "list"}
 
 
+def _add_included_only_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "-i",
+        "--inc",
+        "--included-only",
+        dest="included_only",
+        action="store_true",
+        help="show only included paths",
+    )
+
+
 def _resolve_command_name(
     value: str,
     *,
@@ -286,6 +297,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="include descendants of the selected directories",
     )
+    _add_included_only_argument(list_parser)
 
     diff_parser = subparsers.add_parser(
         "diff",
@@ -326,14 +338,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="include descendants of selected directories",
     )
-    diff_parser.add_argument(
-        "-i",
-        "--inc",
-        "--included-only",
-        dest="included_only",
-        action="store_true",
-        help="show only included paths",
-    )
+    _add_included_only_argument(diff_parser)
     diff_parser.add_argument(
         "--paged",
         action="store_true",
@@ -786,6 +791,7 @@ def _list_local(
                 entry.path,
                 directory=entry.kind == "directory",
             )
+            and (not arguments.included_only or not entry.excluded)
         )
     )
     if not snapshot.entries:

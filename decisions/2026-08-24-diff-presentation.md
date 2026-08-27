@@ -10,10 +10,11 @@ file, and `x` excluded. Directories end in `/`; a directory present on both
 sides has no equality marker because its entry says nothing about its contents.
 A trailing `▸` marks a directory whose contents were not traversed.
 
-Unchanged and excluded entries are shown by default. `-i`, `--inc`, or
-`--included-only` hides excluded entries. Color reinforces but never replaces
-the textual meaning, respects `NO_COLOR` and redirected output, and can be
-controlled with `--color auto|always|never`.
+List and diff show excluded entries by default. `-i`, `--inc`, or
+`--included-only` hides them. Diff also shows unchanged entries by default.
+Color reinforces but never replaces the textual meaning, respects `NO_COLOR`
+and redirected output, and can be controlled with
+`--color auto|always|never`.
 
 A coherent scope is headed by one full project-relative anchor. Its children
 use basenames and hierarchy indentation; disjoint roots keep full paths to

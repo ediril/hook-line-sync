@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Add `-i`, `--inc`, and `--included-only` to `hlsync list` so its
+  exclusion diagnostics can be hidden consistently with `hlsync diff`.
 - [x] Rename the installed CLI command from `hls` to `hlsync` without changing
   the Python package, configuration path, or PyPI distribution name.
 - [x] Continue independent push paths after path-scoped FTPS permission

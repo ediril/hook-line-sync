@@ -564,6 +564,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert recursive_list[1].index("  src/\n") < (
         recursive_list[1].index("  README.md\n")
     )
+    included_only_list = invoke(["list", "--recursive", "-i"], store)
+    assert "node_modules/package.js" not in included_only_list[1]
+    assert "  src/.env.example\n" in included_only_list[1]
     colored_list = invoke(
         ["list", "--recursive", "--color", "always"], store
     )

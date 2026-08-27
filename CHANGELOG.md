@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.27.2 — 2026-08-27
+
+### Changed
+
+- Added `-i`, `--inc`, and `--included-only` to `hlsync list` to hide excluded
+  entries consistently with `hlsync diff`.
+
 ## 0.8.27.1 — 2026-08-27
 
 ### Changed

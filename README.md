@@ -240,8 +240,9 @@ quoted patterns are interpreted by HLS.
 Listings use file-browser order at every displayed level: directories first by
 name, followed by files by name.
 
-The command does not connect to FTPS. Directories use a `d` type marker and
-excluded paths use `x`; included files leave both columns blank. Use
+The command does not connect to FTPS. Directories end in `/`, excluded paths
+use `x`, and included files leave the status column blank. Use
+`-i`, `--inc`, or `--included-only` to hide excluded paths. Use
 `--project <name>` outside a mapped root, where selection starts at the mapped
 root. On terminals, included directories are bright blue, excluded directories
 are darker blue, and excluded files are gray. Use `--color auto|always|never`
