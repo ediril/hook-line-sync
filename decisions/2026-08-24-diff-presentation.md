@@ -16,12 +16,14 @@ Color reinforces but never replaces the textual meaning, respects `NO_COLOR`
 and redirected output, and can be controlled with
 `--color auto|always|never`.
 
-A coherent scope is headed by one full project-relative anchor. Its children
-use basenames and hierarchy indentation; disjoint roots keep full paths to
-avoid ambiguity. Entries use file-browser order at every level: directories
-first by name, then files by name. Diff flushes results after each compared
-directory. `--paged` exits after one directory and prints an exact stateless
-`--resume` command for the next deterministic directory.
+A coherent scope is headed by one full project-relative anchor at column zero.
+Its children begin one indent beneath it, including neutral directories that do
+not reserve an invisible status column. Children use basenames and hierarchy
+indentation; disjoint roots keep full paths to avoid ambiguity. Entries use
+file-browser order at every level: directories first by name, then files by
+name. Diff flushes results after each compared directory. `--paged` exits after
+one directory and prints an exact stateless `--resume` command for the next
+deterministic directory.
 
 ## Rationale
 

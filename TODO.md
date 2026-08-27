@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Align diff hierarchy from a column-zero scope anchor and stop reserving
+  an invisible status column for neutral directories.
 - [x] Add `-i`, `--inc`, and `--included-only` to `hlsync list` so its
   exclusion diagnostics can be hidden consistently with `hlsync diff`.
 - [x] Rename the installed CLI command from `hls` to `hlsync` without changing

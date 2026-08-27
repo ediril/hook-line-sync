@@ -375,13 +375,13 @@ visible boundaries but their excluded subtrees are not traversed; a narrower
 include rule can still make HLS enter the relevant branch. Push and pull
 continue to omit excluded paths entirely.
 
-Diff renders one full project-relative scope anchor rather than printing each
-ancestor as a separate row. Immediate entries show only their names beneath
-that anchor, and recursive descendants gain one indentation level per directory
-instead of repeating the complete path. Disjoint multi-root selections retain
-full paths so identical basenames remain distinguishable. Selection,
-comparison, and transfer plans continue to use full project-relative paths
-internally.
+Diff renders one full project-relative scope anchor at column zero rather than
+printing each ancestor as a separate row. Immediate entries begin one indent
+beneath that anchor, including neutral directories that have no status marker;
+recursive descendants gain one indentation level per directory instead of
+repeating the complete path. Disjoint multi-root selections retain full paths
+so identical basenames remain distinguishable. Selection, comparison, and
+transfer plans continue to use full project-relative paths internally.
 
 For an interruptible directory-by-directory review, use:
 

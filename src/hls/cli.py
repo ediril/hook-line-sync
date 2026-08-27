@@ -867,16 +867,24 @@ def _format_path_line(
     marker_color: str | None,
     excluded: bool,
     collapsed: bool = False,
+    omit_empty_directory_marker: bool = False,
 ) -> str:
     indent = "  " * depth
     label = f"{path}/" if directory else path
     traversal = " ▸" if collapsed else ""
-    body = f"{marker} {label}{traversal}"
+    omit_marker = omit_empty_directory_marker and directory and marker == " "
+    body = (
+        f"{label}{traversal}"
+        if omit_marker
+        else f"{marker} {label}{traversal}"
+    )
     line = f"{indent}{body}"
     if not color:
         return line
     if directory:
         if collapsed:
+            if omit_marker:
+                return f"{indent}\033[3;38;5;24m{path}/ ▸\033[0m"
             colored_marker = (
                 f"{marker_color}{marker}\033[0m" if marker_color else marker
             )
@@ -885,6 +893,8 @@ def _format_path_line(
                 f"\033[3;38;5;24m{path}/ ▸\033[0m"
             )
         directory_color = "\033[38;5;24m" if excluded else "\033[38;5;75m"
+        if omit_marker:
+            return f"{indent}{directory_color}{path}/\033[0m"
         colored_marker = (
             f"{marker_color}{marker}\033[0m" if marker_color else marker
         )
@@ -963,6 +973,7 @@ def _format_comparison_entries(
                 marker_color=colors.get(marker),
                 excluded=entry.action == "excluded",
                 collapsed=collapsed,
+                omit_empty_directory_marker=True,
             )
         )
     return tuple(lines)
@@ -1008,6 +1019,7 @@ def _scope_header_lines(
             color=color,
             marker_color=None,
             excluded=False,
+            omit_empty_directory_marker=True,
         ),
     )
 

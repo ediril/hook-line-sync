@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.27.3 — 2026-08-27
+
+### Changed
+
+- Moved a diff's selected scope anchor to column zero and aligned every child
+  beneath it, including neutral directories without visible status markers.
+
 ## 0.8.27.2 — 2026-08-27
 
 ### Changed

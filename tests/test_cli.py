@@ -605,7 +605,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["diff", "--prune-remote", "--color", "always"], store
     )
     assert "\033[31m- deployed.html\033[0m\n" in pruned_comparison[1]
-    assert "  \033[3;38;5;24msrc/ ▸\033[0m\n" in (
+    assert "\033[3;38;5;24msrc/ ▸\033[0m\n" in (
         pruned_comparison[1]
     )
     monkeypatch.chdir(source)
@@ -618,13 +618,13 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     monkeypatch.chdir(workspace)
     directory_comparison = invoke(["diff", "src"], store)
     assert "= src/\n" not in directory_comparison[1]
-    assert "  src/\n" in directory_comparison[1]
+    assert directory_comparison[1].startswith("src/\n")
     assert "  + nested/ ▸\n" in directory_comparison[1]
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
     assert "    + child.py\n" in recursive_directory_comparison[1]
     nested_directory_comparison = invoke(["diff", "src/nested"], store)
-    assert "  src/nested/\n" in nested_directory_comparison[1]
+    assert nested_directory_comparison[1].startswith("src/nested/\n")
     assert "  + child.py\n" in nested_directory_comparison[1]
     expanded_comparison = invoke(
         ["diff", "README.md,src/main.py", "src"], store
@@ -637,7 +637,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     colored_comparison = invoke(
         ["diff", "**", "--color", "always"], store
     )
-    assert "  \033[38;5;75msrc/\033[0m" in colored_comparison[1]
+    assert "\033[38;5;75msrc/\033[0m" in colored_comparison[1]
     assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_comparison[1]
     )
