@@ -1,26 +1,22 @@
-# MIT license and voluntary Business subscription
+# MIT license and voluntary business subscription
 
 Date: 2026-08-22
 
 ## Decision
 
-Release HLS under the MIT License. Offer a voluntary Business subscription for
-professional users who want to support continued development and receive
-additional services or support.
+Hook Line Sync is released under the MIT License. A voluntary paid subscription
+may offer professional support or additional services, but payment is not a
+condition of using the CLI.
 
-## Consequences
+## Rationale
 
-- The MIT license permits personal and commercial use without payment.
-- The Business subscription is not a second software license and must not be
-  presented as legally required for commercial use.
-- The paid offering must provide value apart from permission to use the
-  MIT-licensed CLI, such as support or additional services.
-- HLS remains open-source software rather than source-available software with a
-  noncommercial restriction.
+An established permissive license supports adoption and contribution. A paid
+offering must earn revenue through service value rather than an honor-system
+restriction that the software license does not impose.
 
-The initial offering is a cancellable monthly Business Support subscription per
-organization. It includes private installation and configuration help, review
-of one HLS deployment setup, compatibility troubleshooting, and priority triage
-of reproducible defects. It has no guaranteed response or resolution time.
-Pricing and the subscription channel remain business decisions and do not
-affect the MIT license.
+## Intentionally excluded
+
+- A commercial-use restriction or dual-license requirement.
+- Presenting the subscription as permission to use MIT-licensed software.
+- Implied response-time or resolution guarantees unless a service explicitly
+  offers them.

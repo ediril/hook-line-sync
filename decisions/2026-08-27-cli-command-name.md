@@ -4,24 +4,19 @@ Date: 2026-08-27
 
 ## Decision
 
-The installed console command is `hlsync`. The former `hls` entry point is
-removed rather than retained as a compatibility alias. User-facing usage,
-errors, generated resume commands, release checks, documentation, and website
-examples use `hlsync`.
+The installed console command is `hlsync`. User-facing usage, errors, generated
+commands, release checks, documentation, and website examples use that name.
 
 The PyPI distribution remains `hook-line-sync`, the internal Python package
-remains `hls`, and configuration remains at `~/.hls/configs.json`. Existing
-profiles and rules therefore require no migration.
+remains `hls`, and configuration remains at `~/.hls/configs.json`.
 
 ## Rationale
 
-`hlsync` communicates synchronization more clearly at the shell and avoids the
-many unrelated meanings of `hls`. Renaming only the console boundary delivers
-that clarity without creating needless import or configuration churn.
+`hlsync` describes synchronization clearly at the shell and avoids the many
+unrelated meanings of `hls`. Renaming only the console boundary avoids needless
+package and configuration churn.
 
-## Consequences
+## Intentionally excluded
 
-- Reinstalling the package creates `hlsync`, not `hls`.
-- Scripts and shell history that invoke `hls` must be updated.
-- Python imports continue to use `hls`.
-- Existing configuration is read without conversion.
+- An installed `hls` compatibility alias.
+- Renaming the Python import package, distribution, or configuration path.

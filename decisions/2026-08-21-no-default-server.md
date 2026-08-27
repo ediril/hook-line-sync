@@ -1,28 +1,22 @@
-# No default project
+# No default profile
 
 Date: 2026-08-21
 
 ## Decision
 
-Hook Line Sync does not persist or use a default project. Mapping creation and
-project mutation require a name explicitly. Connection verification accepts an
-explicit project, or infers one from the unique mapped local root containing the
-current directory. File operations select their project through the same
-persisted mapping; ambiguous selection must fail rather than consulting ambient
-global state.
+Hook Line Sync does not persist a default profile. A command either names a
+profile explicitly where that command permits it, or resolves the one unique
+mapped local root containing the current directory. An unmapped or ambiguous
+location is an error.
 
 ## Rationale
 
-A mutable default can redirect a command without anything in that command
-showing the effective destination. For a transfer tool, that convenience is not
-worth the risk of uploading or downloading against the wrong project or server
-location.
+An ambient default can redirect a transfer without the command or working
+directory revealing its destination. Filesystem context keeps destination
+selection visible and deterministic.
 
-## Consequences
+## Intentionally excluded
 
-- The `hlsync set` command and top-level `default` configuration field do not
-  exist.
-- Removing the default advanced the pre-alpha configuration schema rather than
-  adding a compatibility path.
-- A local path that matches mappings for more than one project will require an
-  explicit disambiguation mechanism when transfer commands are implemented.
+- A global or directory-scoped `use` setting.
+- Guessing a profile when resolution has no unique answer.
+- Falling back to the first configured profile.

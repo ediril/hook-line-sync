@@ -1,0 +1,37 @@
+# Diff presentation
+
+Date: 2026-08-24
+
+## Decision
+
+Diff uses compact textual statuses: `+` create, `~` replace, `-` delete,
+`?` conflict, `r` remote-only retained, `l` local-only retained, `=` unchanged
+file, and `x` excluded. Directories end in `/`; a directory present on both
+sides has no equality marker because its entry says nothing about its contents.
+A trailing `▸` marks a directory whose contents were not traversed.
+
+Unchanged and excluded entries are shown by default. `-i`, `--inc`, or
+`--included-only` hides excluded entries. Color reinforces but never replaces
+the textual meaning, respects `NO_COLOR` and redirected output, and can be
+controlled with `--color auto|always|never`.
+
+A coherent scope is headed by one full project-relative anchor. Its children
+use basenames and hierarchy indentation; disjoint roots keep full paths to
+avoid ambiguity. Entries use file-browser order at every level: directories
+first by name, then files by name. Diff flushes results after each compared
+directory. `--paged` exits after one directory and prints an exact stateless
+`--resume` command for the next deterministic directory.
+
+## Rationale
+
+The display must distinguish action, retention, exclusion, and unknown depth at
+a glance without claiming that an unvisited subtree is equal. Progressive and
+stateless paging keep a slow FTPS comparison reviewable and interruptible.
+
+## Intentionally excluded
+
+- A separate `d` type column or an equality marker on two-sided directories.
+- Repeating the complete parent path on every child.
+- Using color as the only status signal.
+- Persisting a paging session or cached comparison cursor.
+- Displaying redundant direction and per-directory progress headings on stdout.

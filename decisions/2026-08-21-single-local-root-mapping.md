@@ -1,36 +1,26 @@
-# One local root per project
+# One local root per profile
 
 Date: 2026-08-21
 
 ## Decision
 
-Each project has at most one canonical absolute local root. `hlsync map <project>`
-sets it to the current directory. Every descendant maps to the same relative
-path beneath the project's remote root. Local roots may not equal, contain, or
-be contained by another project's local root.
+Each profile has at most one canonical absolute local root. A descendant maps
+to the identical project-relative path beneath the profile's remote root.
+Local roots belonging to different profiles may not equal, contain, or be
+contained by one another.
 
-The `hlsync use` command and directory-context storage are removed. Commands can
-infer a project by locating the unique mapped local root containing their
-canonical current path.
-
-`hlsync map` only establishes the root correspondence. Persistent synchronization
-scope is managed independently by the ordered rules described in the
-2026-08-22 command-prefix and synchronization-rules decision.
+`hlsync add` proposes the current directory as the local root and defaults its
+confirmation to yes. `hlsync map <profile>` maps the current directory later;
+replacing an existing root requires confirmation and defaults to no.
 
 ## Rationale
 
-A project already owns its remote root, so parallel local-to-remote mapping
-collections duplicate information and complicate selection. A single recursive
-root correspondence makes subdirectory resolution mechanical and removes
-ambient project-selection state. Global overlap rejection guarantees that
-current-directory inference has exactly one answer.
+One root correspondence makes path translation mechanical and lets the current
+directory identify exactly one profile. Rejecting overlap preserves that
+invariant across every command.
 
-## Consequences
+## Intentionally excluded
 
-- Configuration schema version 6 replaces mapping arrays with `local_root` and
-  `exclusions` fields.
-- Mapping an already-mapped project fails rather than replacing its root.
-- Overlap is detected when `hlsync map` learns the local root, not when `hlsync add`
-  creates an unmapped project.
-- The obsolete `~/.hls/contexts.json` file is ignored. The application does not
-  delete it automatically.
+- Multiple local mappings within one profile.
+- Persisted current-profile or directory-context state.
+- Silently replacing a mapping or accepting overlapping roots.
