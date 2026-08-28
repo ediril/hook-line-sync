@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.28.11 — 2026-08-28
+
+### Changed
+
+- Aligned streamed transfer paths with fixed-width operation labels for easier
+  scanning without relying on terminal-specific tab stops.
+
+## 0.8.28.10 — 2026-08-28
+
+### Changed
+
+- Streamed `Adding`, `Updating`, `Creating`, and `Deleting` path updates as
+  transfer operations begin, so long transfers identify the active path.
+- Replaced the successful transfer's internal comparison table with a compact
+  change count while continuing to report deliberately retained remote-only
+  paths.
+
 ## 0.8.28.9 — 2026-08-28
 
 ### Changed

@@ -222,6 +222,10 @@ Push uploads local-only files and replaces changed remote files. Pull replaces
 changed existing local files but never restores a missing local path. Excluded
 paths never enter a transfer or prune operation.
 
+Transfers print `Adding`, `Updating`, `Creating`, or `Deleting` with the path
+immediately before each operation begins, then finish with a compact count.
+Remote-only paths that were deliberately retained are still reported.
+
 Remote-only paths remain untouched unless a push explicitly authorizes pruning:
 
 ```console

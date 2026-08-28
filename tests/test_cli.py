@@ -728,10 +728,13 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert push_result[0] == 0
     assert push_result[2].startswith("Preparing push for project 'prod'...\n")
     assert "Comparing local and remote files...\n" in push_result[2]
-    assert push_result[2].endswith("Pushing changes...\n")
-    assert "Push completed for project 'prod': 3 change(s)." in push_result[1]
-    assert "untraversed" in push_result[1]
-    assert "src/nested" in push_result[1]
+    assert push_result[2].endswith(
+        "Pushing changes...\n"
+        "  Creating src/\n"
+        "  Adding   src/.env.example\n"
+        "  Adding   src/main.py\n"
+    )
+    assert push_result[1] == "Push complete: 3 changes.\n"
     assert operations == [
         ("mkdir", "src"),
         ("upload", "src/.env.example", b"KEY=value", 9, False),
@@ -742,8 +745,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_result[2].startswith("Preparing pull for project 'prod'...\n")
     assert "Comparing local and remote files...\n" in pull_result[2]
     assert pull_result[2].endswith("Pulling changes...\n")
-    assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
-    assert "skip           remote-only" in pull_result[1]
+    assert pull_result[1] == (
+        "Pull complete: no changes.\n"
+        "  Not restored: deployed.html (missing locally)\n"
+    )
 
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(

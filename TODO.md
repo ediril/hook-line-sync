@@ -1,5 +1,8 @@
 # Work Queue
 
+- [x] Align streamed transfer paths in a stable fixed-width operation column.
+- [x] Stream plain-language path updates as transfer operations begin and
+  replace the internal comparison table with a compact success summary.
 - [x] Rewrite the README as a concise but complete current-user guide and
   document why safe FTPS replacement requires staging files.
 - [x] Recover HLSync-owned abandoned upload and backup artifacts automatically

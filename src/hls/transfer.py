@@ -3,11 +3,13 @@ from __future__ import annotations
 import os
 import stat
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import Literal
 
 from hls.comparison import ComparisonEntry, ComparisonPlan
-from hls.snapshot import TreeEntry, TreeSnapshot
+from hls.snapshot import EntryKind, TreeEntry, TreeSnapshot
 from hls.transport import PathOperationError, RemoteTransport
 
 
@@ -20,6 +22,16 @@ class TransferIssue:
     path: str
     status: str
     reason: str
+
+
+@dataclass(frozen=True)
+class TransferOperation:
+    action: Literal["add", "update", "delete", "create"]
+    path: str
+    kind: EntryKind
+
+
+TransferProgress = Callable[[TransferOperation], None]
 
 
 @dataclass(frozen=True)
@@ -110,6 +122,7 @@ def _push_files(
     local: TreeSnapshot,
     remote: TreeSnapshot,
     transport: RemoteTransport,
+    progress: TransferProgress | None,
 ) -> tuple[set[str], list[TransferIssue]]:
     local_entries = _entry_map(local)
     completed: set[str] = set()
@@ -147,6 +160,8 @@ def _push_files(
                 )
             continue
         try:
+            if progress is not None:
+                progress(TransferOperation("create", directory, "directory"))
             transport.make_directory(directory)
         except PathOperationError as error:
             unavailable_directories.add(directory)
@@ -172,6 +187,9 @@ def _push_files(
             raise TransferError(f"local file metadata is incomplete: {entry.path}")
         path = local_root / Path(*PurePosixPath(entry.path).parts)
         try:
+            if progress is not None:
+                action = "add" if entry.action == "upload" else "update"
+                progress(TransferOperation(action, entry.path, "file"))
             with path.open("rb") as source:
                 transport.upload_file(
                     source,
@@ -256,12 +274,15 @@ def _pull_files(
     local: TreeSnapshot,
     remote: TreeSnapshot,
     transport: RemoteTransport,
+    progress: TransferProgress | None,
 ) -> set[str]:
     completed: set[str] = set()
     local_entries = _entry_map(local)
     remote_entries = _entry_map(remote)
     for entry in plan.entries:
         if entry.action == "replace-local":
+            if progress is not None:
+                progress(TransferOperation("update", entry.path, "file"))
             _replace_local_file(
                 local_root,
                 entry,
@@ -276,6 +297,7 @@ def _pull_files(
 def _delete_remote(
     plan: ComparisonPlan,
     transport: RemoteTransport,
+    progress: TransferProgress | None,
 ) -> tuple[set[str], list[TransferIssue]]:
     deletions = [
         entry for entry in plan.entries if entry.action == "delete-remote"
@@ -292,6 +314,14 @@ def _delete_remote(
     issues: list[TransferIssue] = []
     for entry in (*files, *directories):
         try:
+            if progress is not None:
+                progress(
+                    TransferOperation(
+                        "delete",
+                        entry.path,
+                        entry.remote_kind or "file",
+                    )
+                )
             transport.delete_path(
                 entry.path,
                 is_directory=entry.remote_kind == "directory",
@@ -310,6 +340,7 @@ def execute_transfer(
     local: TreeSnapshot,
     remote: TreeSnapshot,
     transport: RemoteTransport,
+    progress: TransferProgress | None = None,
 ) -> TransferResult:
     _preflight(plan, local_root, local)
     if plan.direction == "push":
@@ -319,9 +350,17 @@ def execute_transfer(
             local,
             remote,
             transport,
+            progress,
         )
     else:
-        completed = _pull_files(plan, local_root, local, remote, transport)
+        completed = _pull_files(
+            plan,
+            local_root,
+            local,
+            remote,
+            transport,
+            progress,
+        )
         issues = []
     if issues:
         issues.extend(
@@ -334,7 +373,7 @@ def execute_transfer(
             if entry.action == "delete-remote"
         )
     else:
-        deleted, deletion_issues = _delete_remote(plan, transport)
+        deleted, deletion_issues = _delete_remote(plan, transport, progress)
         completed.update(deleted)
         issues.extend(deletion_issues)
     return TransferResult(plan, frozenset(completed), tuple(issues))

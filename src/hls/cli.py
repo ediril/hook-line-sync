@@ -53,7 +53,12 @@ from hls.snapshot import (
     list_local_directory,
     snapshot_local,
 )
-from hls.transfer import TransferError, TransferResult, execute_transfer
+from hls.transfer import (
+    TransferError,
+    TransferOperation,
+    TransferResult,
+    execute_transfer,
+)
 from hls.transport import ExplicitFTPSTransport, PathOperationError, TransportError
 
 _EntryT = TypeVar("_EntryT")
@@ -1576,16 +1581,40 @@ def _format_transfer(name: str, result: TransferResult) -> str:
             for issue in result.issues
         )
         return "\n".join(lines)
-    lines = [
-        f"{direction} completed for project '{name}': "
-        f"{result.changed_count} change(s)."
-    ]
-    for entry in result.plan.differences:
-        lines.append(
-            f"  {entry.action:<14} {entry.state:<16} "
-            f"{_comparison_kind(entry):<20} {entry.path}"
+    count = result.changed_count
+    changes = (
+        "no changes"
+        if count == 0
+        else f"{count} change{'s' if count != 1 else ''}"
+    )
+    lines = [f"{direction} complete: {changes}."]
+    skipped = [entry for entry in result.plan.entries if entry.action == "skip"]
+    if result.plan.direction == "push":
+        lines.extend(f"  Retained remotely: {entry.path}" for entry in skipped)
+    else:
+        lines.extend(
+            f"  Not restored: {entry.path} (missing locally)"
+            for entry in skipped
         )
     return "\n".join(lines)
+
+
+def _report_transfer_operation(
+    operation: TransferOperation,
+    progress: TextIO,
+) -> None:
+    labels = {
+        "add": "Adding",
+        "update": "Updating",
+        "delete": "Deleting",
+        "create": "Creating",
+    }
+    suffix = "/" if operation.kind == "directory" else ""
+    print(
+        f"  {labels[operation.action]:<8} {operation.path}{suffix}",
+        file=progress,
+        flush=True,
+    )
 
 
 def _transfer(
@@ -1629,6 +1658,10 @@ def _transfer(
             local=local,
             remote=remote,
             transport=transport,
+            progress=lambda operation: _report_transfer_operation(
+                operation,
+                progress,
+            ),
         )
     return name, result
 

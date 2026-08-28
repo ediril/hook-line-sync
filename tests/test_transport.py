@@ -15,7 +15,7 @@ from hls.config import ProjectConfiguration
 from hls.rules import RuleSet, SyncRule
 from hls.selection import FileSelector
 from hls.snapshot import TreeEntry, TreeSnapshot, snapshot_local
-from hls.transfer import execute_transfer
+from hls.transfer import TransferOperation, execute_transfer
 from hls.transport import (
     ExplicitFTPSTransport,
     PathOperationError,
@@ -128,7 +128,6 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
         ),
         ssl_context=context,
     )
-
     with transport:
         # The fixture refuses unprotected data connections, so recursive MLSD
         # success proves that PROT P was negotiated rather than merely called.
@@ -367,6 +366,7 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
         ProjectConfiguration(host="localhost", remote_root="/", port=port),
         ssl_context=context,
     )
+    progress = []
 
     with transport:
         rules = RuleSet()
@@ -400,6 +400,7 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             local=local,
             remote=remote,
             transport=transport,
+            progress=progress.append,
         )
         assert (remote_root / "nested" / "selected.txt").read_text() == (
             "local version"
@@ -434,6 +435,7 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             local=local,
             remote=remote,
             transport=transport,
+            progress=progress.append,
         )
         assert selected.read_text(encoding="utf-8") == "remote version"
         assert selected.stat().st_mtime_ns == remote_timestamp_ns
@@ -455,8 +457,15 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             local=local,
             remote=remote,
             transport=transport,
+            progress=progress.append,
         )
         assert not orphan.exists()
+        assert progress == [
+            TransferOperation("create", "nested", "directory"),
+            TransferOperation("add", "nested/selected.txt", "file"),
+            TransferOperation("update", "nested/selected.txt", "file"),
+            TransferOperation("delete", "orphan.txt", "file"),
+        ]
 
 
 def test_push_skips_an_unwritable_subtree_and_continues_independent_files(

@@ -22,6 +22,12 @@ download is written and synced beside its destination, verifies size, preserves
 existing local permissions, applies the remote timestamp, and atomically
 renames into place.
 
+Immediately before each remote mutation or local replacement, execution emits
+a semantic operation event. The CLI renders these as plain-language `Adding`,
+`Updating`, `Creating`, or `Deleting` lines and flushes them immediately. A
+successful command ends with a compact count and reports retained remote-only
+paths, but does not repeat the complete comparison model.
+
 Explicit push pruning deletes remote-only files and then directories deepest
 first, only after every planned upload succeeds. Type and symlink conflicts
 reject the plan before mutation. A path-scoped permission failure skips that
@@ -34,7 +40,8 @@ aborts because subsequent remote state cannot be trusted.
 Per-file staging makes replacement recoverable within FTP's capabilities.
 Timestamp preservation prevents a successful transfer from immediately
 comparing as changed, and delete-last ordering keeps old remote content until
-new content is safely present.
+new content is safely present. Streaming the attempted operation identifies a
+slow or failed path without presenting an operation as already successful.
 
 ## Intentionally excluded
 
@@ -45,3 +52,4 @@ new content is safely present.
 - Trusting server-specific MFMT response text as evidence of the applied time.
 - Concurrent pushes to the same profile; artifact recovery assumes one active
   push per profile.
+- Reprinting internal comparison actions after a successful transfer.
