@@ -26,7 +26,11 @@ Immediately before each remote mutation or local replacement, execution emits
 a semantic operation event. The CLI renders these as plain-language `Adding`,
 `Updating`, `Creating`, or `Deleting` lines and flushes them immediately. A
 successful command ends with a compact count and reports retained remote-only
-paths, but does not repeat the complete comparison model.
+paths, but does not repeat the complete comparison model. A command with no
+executable actions reports that there is nothing to push or pull and omits the
+empty transfer-phase heading. Push-only retained paths include an explicit
+`-p` pruning hint without enumerating the paths again; pull never suggests
+remote deletion.
 
 Explicit push pruning deletes remote-only files and then directories deepest
 first, only after every planned upload succeeds. Type and symlink conflicts

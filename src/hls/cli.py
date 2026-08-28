@@ -1582,20 +1582,19 @@ def _format_transfer(name: str, result: TransferResult) -> str:
         )
         return "\n".join(lines)
     count = result.changed_count
-    changes = (
-        "no changes"
-        if count == 0
-        else f"{count} change{'s' if count != 1 else ''}"
-    )
-    lines = [f"{direction} complete: {changes}."]
+    if count == 0:
+        lines = [f"Nothing to {result.plan.direction}."]
+    else:
+        changes = f"{count} change{'s' if count != 1 else ''}"
+        lines = [f"{direction} complete: {changes}."]
     skipped = [entry for entry in result.plan.entries if entry.action == "skip"]
     if result.plan.direction == "push":
-        lines.extend(f"  Retained remotely: {entry.path}" for entry in skipped)
+        if skipped:
+            lines.append("Remote-only paths retained; use -p to delete them.")
     else:
-        lines.extend(
-            f"  Not restored: {entry.path} (missing locally)"
-            for entry in skipped
-        )
+        if skipped:
+            lines.append("Remote-only paths not restored:")
+            lines.extend(f"  {entry.path}" for entry in skipped)
     return "\n".join(lines)
 
 
@@ -1650,8 +1649,18 @@ def _transfer(
             direction=arguments.command,
             progress=progress,
         )
-        progress_action = "Pushing" if arguments.command == "push" else "Pulling"
-        print(f"{progress_action} changes...", file=progress, flush=True)
+        executable_actions = {
+            "create-remote",
+            "upload",
+            "replace-remote",
+            "replace-local",
+            "delete-remote",
+        }
+        if any(entry.action in executable_actions for entry in plan.entries):
+            progress_action = (
+                "Pushing" if arguments.command == "push" else "Pulling"
+            )
+            print(f"{progress_action} changes...", file=progress, flush=True)
         result = execute_transfer(
             plan,
             local_root=root,

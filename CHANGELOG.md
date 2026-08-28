@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.28.13 — 2026-08-28
+
+### Changed
+
+- Collapsed the post-push remote-only report to one `-p` pruning hint instead
+  of enumerating paths already available through `diff`.
+
+## 0.8.28.12 — 2026-08-28
+
+### Changed
+
+- Replaced empty `Pushing changes` or `Pulling changes` phases with a direct
+  `Nothing to push` or `Nothing to pull` result.
+- Grouped retained remote-only paths after push and added a push-only hint that
+  `-p` authorizes their deletion.
+
 ## 0.8.28.11 — 2026-08-28
 
 ### Changed

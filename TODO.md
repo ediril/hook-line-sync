@@ -1,5 +1,9 @@
 # Work Queue
 
+- [x] Collapse the post-push remote-only report to one pruning hint instead of
+  repeating paths already available through `diff`.
+- [x] Report an empty transfer plainly and point push users to `-p` when
+  selected remote-only paths are deliberately retained.
 - [x] Align streamed transfer paths in a stable fixed-width operation column.
 - [x] Stream plain-language path updates as transfer operations begin and
   replace the internal comparison table with a compact success summary.

@@ -740,14 +740,21 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ("upload", "src/.env.example", b"KEY=value", 9, False),
         ("upload", "src/main.py", b"print('hello')", 14, False),
     ]
+    retained_push = invoke(["push", "deployed.html"], store)
+    assert "Pushing changes..." not in retained_push[2]
+    assert retained_push[1] == (
+        "Nothing to push.\n"
+        "Remote-only paths retained; use -p to delete them.\n"
+    )
     pull_result = invoke(["pull", "deployed.html"], store)
     assert pull_result[0] == 0
     assert pull_result[2].startswith("Preparing pull for project 'prod'...\n")
     assert "Comparing local and remote files...\n" in pull_result[2]
-    assert pull_result[2].endswith("Pulling changes...\n")
+    assert "Pulling changes..." not in pull_result[2]
     assert pull_result[1] == (
-        "Pull complete: no changes.\n"
-        "  Not restored: deployed.html (missing locally)\n"
+        "Nothing to pull.\n"
+        "Remote-only paths not restored:\n"
+        "  deployed.html\n"
     )
 
 
