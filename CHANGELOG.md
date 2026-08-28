@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.28.3 — 2026-08-28
+
+### Changed
+
+- Added `!` for excluded paths that exist remotely while retaining `x` for
+  excluded paths that exist only locally; remote-present exclusions remain
+  burnt orange.
+
 ## 0.8.28.2 — 2026-08-28
 
 ### Changed

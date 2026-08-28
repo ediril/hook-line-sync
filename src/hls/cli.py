@@ -816,7 +816,7 @@ def _comparison_kind(entry: ComparisonEntry) -> str:
 
 def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
     if entry.action == "excluded":
-        return "x"
+        return "!" if entry.remote_kind is not None else "x"
     if entry.action == "conflict":
         return "?"
     if entry.action == "unchanged":
@@ -928,16 +928,17 @@ def _format_comparison_entries(
     display_path: Callable[[str], tuple[int, str]] | None = None,
 ) -> tuple[str, ...]:
     lines: list[str] = []
+    excluded_remote_color = "\033[38;5;166m"
     colors = {
         "+": "\033[38;5;82m",
         "~": "\033[33m",
         "-": "\033[31m",
         "?": "\033[35m",
         "x": "\033[90m",
+        "!": excluded_remote_color,
         "r": "\033[38;5;30m",
         "l": "\033[38;5;51m",
     }
-    excluded_remote_color = "\033[38;5;166m"
     for entry in _file_browser_order(
         entries,
         path_of=lambda item: item.path,
@@ -964,7 +965,7 @@ def _format_comparison_entries(
                 path=path,
                 depth=depth,
                 color=color,
-                marker_color=remote_exclusion_color or colors.get(marker),
+                marker_color=colors.get(marker),
                 excluded=entry.action == "excluded",
                 collapsed=collapsed,
                 omit_empty_directory_marker=True,

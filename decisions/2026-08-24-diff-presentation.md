@@ -6,17 +6,17 @@ Date: 2026-08-24
 
 Diff uses compact textual statuses: `+` create, `~` replace, `-` delete,
 `?` conflict, `r` remote-only retained, `l` local-only retained, `=` unchanged
-file, and `x` excluded. Directories end in `/`; a directory present on both
-sides has no equality marker because its entry says nothing about its contents.
-A trailing `▸` marks a directory whose contents were not traversed.
+file, `x` excluded and absent remotely, and `!` excluded but present remotely.
+Directories end in `/`; a directory present on both sides has no equality
+marker because its entry says nothing about its contents. A trailing `▸` marks
+a directory whose contents were not traversed.
 
 List and diff show excluded entries by default. `-i`, `--inc`, or
 `--included-only` hides them. Diff also shows unchanged entries by default.
 Core synchronization status remains textual. Color respects `NO_COLOR` and
-redirected output and has no command-line override. An `x` path normally uses
-excluded gray or dark-blue styling; when that excluded path exists remotely,
-burnt orange adds advisory remote-presence detail without changing its excluded
-status. That extra detail is intentionally absent from non-color output.
+redirected output and has no command-line override. An `x` path uses excluded
+gray or dark-blue styling. An excluded path that exists remotely uses a
+burnt-orange `!`, preserving the distinction in non-color output as well.
 
 A coherent scope is headed by one full project-relative anchor at column zero.
 Its children begin one indent beneath it, including neutral directories that do

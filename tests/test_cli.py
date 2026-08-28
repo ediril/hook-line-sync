@@ -612,7 +612,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
-    assert "x debug.log\n" in push_comparison[1]
+    assert "! debug.log\n" in push_comparison[1]
     hidden_exclusions = invoke(["diff", "-i"], store)
     assert "debug.log" not in hidden_exclusions[1]
 
@@ -658,7 +658,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_comparison[1]
     )
-    assert "  \033[38;5;166mx debug.log\033[0m" in colored_comparison[1]
+    assert "  \033[38;5;166m! debug.log\033[0m" in colored_comparison[1]
     assert "= same.txt" in colored_comparison[1]
     assert colored_comparison[1].index("node_modules/") < (
         colored_comparison[1].index("src/")

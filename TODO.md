@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Distinguish excluded local-only paths with `x` from excluded paths that
+  exist remotely with a burnt-orange `!`.
 - [x] Separate remote-present exclusions from untraversed directories by using
   burnt orange rather than a cyan adjacent to the directory blues.
 - [x] Detect color capability automatically, honor `NO_COLOR`, remove the
