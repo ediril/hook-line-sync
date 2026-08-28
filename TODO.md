@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Recover HLSync-owned abandoned upload and backup artifacts automatically
+  within push scope without requiring remote-prune authorization.
 - [x] Accept server-specific successful MFMT responses while independently
   verifying the staged timestamp with MDTM before installing an upload.
 - [x] Replace internal push/pull plan terminology in progress output with plain

@@ -1602,6 +1602,17 @@ def _transfer(
     )
     print("Connecting securely over FTPS...", file=progress, flush=True)
     with ExplicitFTPSTransport(project) as transport:
+        if arguments.command == "push":
+            print(
+                "Checking for interrupted uploads...",
+                file=progress,
+                flush=True,
+            )
+            recoveries = transport.recover_artifacts(
+                _file_selection(arguments, root)
+            )
+            for recovery in recoveries:
+                print(f"  {recovery}", file=progress, flush=True)
         local, remote, plan = _build_plan(
             arguments,
             project,

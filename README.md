@@ -493,6 +493,13 @@ as exclusion rules. Connection failures and replacement failures whose prior
 remote file cannot be restored still stop the command because continued remote
 state is not trustworthy.
 
+Before comparing a push, HLSync recovers its own interrupted-transfer files in
+the selected scope. Abandoned `.hls-upload-<token>` files are removed without
+requiring `-p`. An old `.hls-backup-<token>` is removed when its destination
+exists, or restored when the destination is missing. These exact reserved names
+are HLSync internals; ordinary remote-only files remain protected by the normal
+prune policy.
+
 Pruning is limited by the selector and occurs only after all uploads succeed.
 Pull never deletes remote paths. Remote uploads use temporary files and
 recoverable backups; local downloads use atomic replacement. Type conflicts and

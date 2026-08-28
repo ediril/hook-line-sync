@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ftplib
 import os
+import re
 import ssl
 from calendar import timegm
 from dataclasses import dataclass
@@ -22,6 +23,44 @@ class TransportError(RuntimeError):
 
 class PathOperationError(TransportError):
     """Raised when one remote path fails but the FTPS session remains usable."""
+
+
+_HLS_ARTIFACT_NAME = re.compile(
+    r"^\.(?P<destination>.+)\.hls-(?P<kind>upload|backup)-"
+    r"(?P<token>[0-9a-f]{32})$"
+)
+
+
+@dataclass(frozen=True)
+class _HLSArtifact:
+    path: str
+    destination: str
+    kind: str
+
+
+def _hls_artifact(path: str) -> _HLSArtifact | None:
+    remote = PurePosixPath(path)
+    match = _HLS_ARTIFACT_NAME.fullmatch(remote.name)
+    if match is None:
+        return None
+    destination = remote.with_name(match.group("destination")).as_posix()
+    return _HLSArtifact(path, destination, match.group("kind"))
+
+
+@dataclass(frozen=True)
+class _ArtifactRecoverySelection:
+    selected: FileSelection
+
+    @property
+    def pattern(self) -> str:
+        return self.selected.pattern
+
+    def matches(self, path: str) -> bool:
+        artifact = _hls_artifact(path)
+        return self.selected.matches(artifact.destination if artifact else path)
+
+    def may_match_descendant(self, directory: str) -> bool:
+        return self.selected.may_match_descendant(directory)
 
 
 def _parse_modify_timestamp(
@@ -87,6 +126,8 @@ class RemoteTransport(Protocol):
     ) -> TreeSnapshot: ...
 
     def make_directory(self, relative_path: str) -> None: ...
+
+    def recover_artifacts(self, selector: FileSelection) -> tuple[str, ...]: ...
 
     def upload_file(
         self,
@@ -308,6 +349,70 @@ class ExplicitFTPSTransport:
             raise TransportError(
                 f"could not create remote directory '{path}': {error}"
             ) from error
+
+    def recover_artifacts(self, selector: FileSelection) -> tuple[str, ...]:
+        snapshot = self.snapshot(
+            RuleSet(),
+            _ArtifactRecoverySelection(selector),
+            include_excluded=True,
+        )
+        entries = {entry.path: entry for entry in snapshot.entries}
+        artifacts = tuple(
+            artifact
+            for path in sorted(entries)
+            for artifact in (_hls_artifact(path),)
+            if artifact is not None
+        )
+        for artifact in artifacts:
+            if entries[artifact.path].kind != "file":
+                raise TransportError(
+                    f"reserved HLSync artifact is not a file: '{artifact.path}'"
+                )
+
+        messages: list[str] = []
+        for artifact in artifacts:
+            if artifact.kind != "upload":
+                continue
+            self.delete_path(artifact.path, is_directory=False)
+            messages.append(f"Removed abandoned upload '{artifact.path}'.")
+
+        backups_by_destination: dict[str, list[_HLSArtifact]] = {}
+        for artifact in artifacts:
+            if artifact.kind == "backup":
+                backups_by_destination.setdefault(
+                    artifact.destination,
+                    [],
+                ).append(artifact)
+        client = self._connected_client()
+        for destination, backups in sorted(backups_by_destination.items()):
+            if destination not in entries and len(backups) > 1:
+                names = ", ".join(backup.path for backup in backups)
+                raise TransportError(
+                    f"multiple HLSync backups require manual recovery for "
+                    f"'{destination}': {names}"
+                )
+            if destination in entries:
+                for backup in backups:
+                    self.delete_path(backup.path, is_directory=False)
+                    messages.append(f"Removed old backup '{backup.path}'.")
+                continue
+            backup = backups[0]
+            try:
+                client.rename(backup.path, destination)
+            except ftplib.error_perm as error:
+                raise PathOperationError(
+                    f"could not restore HLSync backup '{backup.path}' to "
+                    f"'{destination}': {error}"
+                ) from error
+            except (OSError, ftplib.Error, ssl.SSLError) as error:
+                raise TransportError(
+                    f"could not restore HLSync backup '{backup.path}' to "
+                    f"'{destination}': {error}"
+                ) from error
+            messages.append(
+                f"Restored interrupted replacement '{destination}'."
+            )
+        return tuple(messages)
 
     def upload_file(
         self,

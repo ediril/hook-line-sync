@@ -286,6 +286,68 @@ def test_upload_verifies_timestamp_independently_of_mfmt_response(
     assert mismatched.renamed == []
 
 
+def test_push_artifact_recovery_cleans_staging_and_restores_missing_destination(
+    monkeypatch,
+) -> None:
+    token = "a" * 32
+    upload = f"templates/.about.php.hls-upload-{token}"
+    old_backup = f"templates/.about.php.hls-backup-{token}"
+    missing_backup = f"templates/.missing.php.hls-backup-{'b' * 32}"
+
+    def file_entry(path):
+        return TreeEntry(
+            path,
+            "file",
+            size=5,
+            modified_ns=1_700_000_000_000_000_000,
+            timestamp_precision_ns=1_000_000_000,
+        )
+
+    transport = ExplicitFTPSTransport(
+        ProjectConfiguration(host="ftp.example.com", remote_root="/")
+    )
+
+    class RecoveryClient:
+        def __init__(self):
+            self.deleted = []
+            self.renamed = []
+
+        def delete(self, path):
+            self.deleted.append(path)
+
+        def rename(self, source, destination):
+            self.renamed.append((source, destination))
+
+    client = RecoveryClient()
+    transport._client = client
+
+    def recovery_snapshot(rules, selector, *, include_excluded=False):
+        assert rules == RuleSet()
+        assert include_excluded
+        assert selector.matches(upload)
+        assert selector.matches(missing_backup)
+        assert not selector.matches(f"other/.else.hls-upload-{token}")
+        return TreeSnapshot(
+            (
+                file_entry("templates/about.php"),
+                file_entry(upload),
+                file_entry(old_backup),
+                file_entry(missing_backup),
+            )
+        )
+
+    monkeypatch.setattr(transport, "snapshot", recovery_snapshot)
+    messages = transport.recover_artifacts(FileSelector("templates/*"))
+
+    assert client.deleted == [upload, old_backup]
+    assert client.renamed == [(missing_backup, "templates/missing.php")]
+    assert messages == (
+        f"Removed abandoned upload '{upload}'.",
+        f"Removed old backup '{old_backup}'.",
+        "Restored interrupted replacement 'templates/missing.php'.",
+    )
+
+
 def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
     tls_ftp_server, tmp_path, monkeypatch
 ) -> None:

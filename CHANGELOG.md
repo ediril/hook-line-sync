@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.28.8 — 2026-08-28
+
+### Fixed
+
+- Added scoped pre-push recovery for HLSync-owned interrupted-transfer files:
+  abandoned uploads are removed, obsolete backups are removed, and a sole
+  backup is restored when its destination is missing.
+- Kept internal artifact recovery independent of `--prune-remote`; ordinary
+  remote-only files remain protected.
+
 ## 0.8.28.7 — 2026-08-28
 
 ### Fixed
