@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.28.1 — 2026-08-28
+
+### Changed
+
+- Removed the public `--color` option. HLSync now enables color only for terminal
+  output and honors the conventional `NO_COLOR` environment variable.
+- Kept `x` as the exclusion marker while rendering excluded paths that exist
+  remotely in dark cyan instead of ordinary exclusion gray.
+
 ## 0.8.27.3 — 2026-08-27
 
 ### Changed

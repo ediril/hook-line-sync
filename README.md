@@ -245,8 +245,9 @@ use `x`, and included files leave the status column blank. Use
 `-i`, `--inc`, or `--included-only` to hide excluded paths. Use
 `--project <name>` outside a mapped root, where selection starts at the mapped
 root. On terminals, included directories are bright blue, excluded directories
-are darker blue, and excluded files are gray. Use `--color auto|always|never`
-to control coloring. `hlsync ls` remains an unadvertised compatibility spelling.
+are darker blue, and excluded files are gray. Color is enabled automatically
+for terminal output, disabled for pipes and redirection, and suppressed when
+`NO_COLOR` is set. `hlsync ls` remains an unadvertised compatibility spelling.
 
 Re-include narrower paths later by appending an ordered override:
 
@@ -362,8 +363,9 @@ foreground, excluded paths are gray, and untraversed directory details are
 dark blue and italic. Color is disabled when output is redirected or
 `NO_COLOR` is set.
 Included directory paths are bright blue, excluded directory paths are darker
-blue, and color can be controlled explicitly with
-`--color auto|always|never`.
+blue, and an excluded path that also exists remotely uses dark cyan rather than
+gray. Color is enabled automatically for terminal output and suppressed when
+`NO_COLOR` is set.
 
 Diff applies selectors before remote traversal and requests one MLSD listing per
 relevant local directory. A literal directory scope starts directly at that

@@ -286,12 +286,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="project name; inferred from the current directory when omitted",
     )
     list_parser.add_argument(
-        "--color",
-        choices=("auto", "always", "never"),
-        default="auto",
-        help="color paths; defaults to auto detection",
-    )
-    list_parser.add_argument(
         "-r",
         "--recursive",
         action="store_true",
@@ -305,7 +299,7 @@ def build_parser() -> argparse.ArgumentParser:
         usage=(
             "hlsync diff [PATH ...] [--project PROFILE]\n"
             "       [--pull | --prune-remote] [-r] [-i] [--paged]\n"
-            "       [--resume DIRECTORY] [--color auto|always|never]"
+            "       [--resume DIRECTORY]"
         ),
         description=(
             "Preview file changes without modifying local or remote files. "
@@ -355,13 +349,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="project deletion of remote-only paths in the push view",
     )
-    diff_parser.add_argument(
-        "--color",
-        choices=("auto", "always", "never"),
-        default="auto",
-        help="color status lines; defaults to auto detection",
-    )
-
     transfer_help = {
         "push": "upload local changes to the remote project",
         "pull": "replace changed local files from the remote project",
@@ -797,7 +784,7 @@ def _list_local(
     if not snapshot.entries:
         return f"Local tree for project '{name}' is empty."
     lines = [f"Local tree for project '{name}':"]
-    color = _use_color(arguments.color, output)
+    color = _use_color(output)
     for entry in _file_browser_order(
         snapshot.entries,
         path_of=lambda item: item.path,
@@ -848,10 +835,8 @@ def _comparison_entry_kind(entry: ComparisonEntry, direction: str) -> str:
     return selected or entry.remote_kind or entry.local_kind or "unknown"
 
 
-def _use_color(mode: str, output: TextIO) -> bool:
-    if mode == "always":
-        return True
-    if mode == "never" or "NO_COLOR" in os.environ:
+def _use_color(output: TextIO) -> bool:
+    if "NO_COLOR" in os.environ:
         return False
     is_terminal = getattr(output, "isatty", None)
     return bool(is_terminal and is_terminal())
@@ -868,6 +853,7 @@ def _format_path_line(
     excluded: bool,
     collapsed: bool = False,
     omit_empty_directory_marker: bool = False,
+    path_color: str | None = None,
 ) -> str:
     indent = "  " * depth
     label = f"{path}/" if directory else path
@@ -892,7 +878,9 @@ def _format_path_line(
                 f"{indent}{colored_marker} "
                 f"\033[3;38;5;24m{path}/ ▸\033[0m"
             )
-        directory_color = "\033[38;5;24m" if excluded else "\033[38;5;75m"
+        directory_color = path_color or (
+            "\033[38;5;24m" if excluded else "\033[38;5;75m"
+        )
         if omit_marker:
             return f"{indent}{directory_color}{path}/\033[0m"
         colored_marker = (
@@ -962,6 +950,11 @@ def _format_comparison_entries(
             if directory and entry.action == "unchanged"
             else _comparison_marker(entry, direction)
         )
+        excluded_remote_color = (
+            colors["r"]
+            if entry.action == "excluded" and entry.remote_kind is not None
+            else None
+        )
         depth, path = display_path(entry.path) if display_path else (0, entry.path)
         lines.append(
             _format_path_line(
@@ -970,10 +963,11 @@ def _format_comparison_entries(
                 path=path,
                 depth=depth,
                 color=color,
-                marker_color=colors.get(marker),
+                marker_color=excluded_remote_color or colors.get(marker),
                 excluded=entry.action == "excluded",
                 collapsed=collapsed,
                 omit_empty_directory_marker=True,
+                path_color=excluded_remote_color,
             )
         )
     return tuple(lines)
@@ -1256,8 +1250,6 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
         command.append("--recursive")
     if arguments.included_only:
         command.append("-i")
-    if arguments.color != "auto":
-        command.extend(("--color", arguments.color))
     command.extend(("--paged", "--resume", directory.as_posix()))
     return shlex.join(command)
 
@@ -1312,7 +1304,7 @@ def _diff(
     selector = _file_selection(arguments, root)
     rules = RuleSet(project.rules)
     direction = "pull" if arguments.pull else "push"
-    color = _use_color(arguments.color, output)
+    color = _use_color(output)
     print(f"Checking differences for project '{name}'...", file=progress, flush=True)
     print("Connecting securely over FTPS...", file=progress, flush=True)
     traversal_roots = _diff_traversal_roots(arguments, root)

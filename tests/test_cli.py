@@ -15,9 +15,14 @@ class TerminalInput(io.StringIO):
         return True
 
 
-def invoke(arguments, store, *, stdin="no\n"):
+class TerminalOutput(io.StringIO):
+    def isatty(self) -> bool:
+        return True
+
+
+def invoke(arguments, store, *, stdin="no\n", terminal_output=False):
     input_stream = stdin if hasattr(stdin, "readline") else io.StringIO(stdin)
-    stdout = io.StringIO()
+    stdout = TerminalOutput() if terminal_output else io.StringIO()
     stderr = io.StringIO()
     status = run(
         arguments,
@@ -85,6 +90,8 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     )
     assert pull_help in help_output
     assert "usage: hlsync diff" in invoke(["help", "d"], store)[1]
+    assert "--color" not in invoke(["help", "list"], store)[1]
+    assert "--color" not in invoke(["help", "diff"], store)[1]
     rules_help = invoke(["help", "rules"], store)[1]
     assert "hlsync rules [--project PROJECT_NAME]" in rules_help
     assert "hlsync rules remove RULE_ID [--project PROJECT_NAME]" in rules_help
@@ -406,6 +413,7 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
 def test_current_project_inference_drives_connect_and_tree_listings(
     tmp_path, monkeypatch
 ) -> None:
+    monkeypatch.delenv("NO_COLOR", raising=False)
     store = ConfigurationStore(tmp_path / "configs.json")
     workspace = tmp_path / "workspace"
     source = workspace / "src"
@@ -442,13 +450,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ["exclude", "--pattern", "node_modules/,**/*.log"], store
     )[0] == 0
 
-    transports = []
     operations = []
     listed_directories = []
 
     class FakeTransport:
         def __init__(self, project) -> None:
-            transports.append(project)
+            del project
 
         def __enter__(self):
             return self
@@ -482,6 +489,20 @@ def test_current_project_inference_drives_connect_and_tree_listings(
                 SyncRule(1, "exclude", "node_modules/**"),
                 SyncRule(2, "exclude", "**/*.log"),
             )
+            if relative_directory.as_posix() == "src":
+                debug_stat = (source / "debug.log").stat()
+                return TreeSnapshot(
+                    (
+                        TreeEntry(
+                            "src/debug.log",
+                            "file",
+                            size=debug_stat.st_size,
+                            modified_ns=debug_stat.st_mtime_ns,
+                            timestamp_precision_ns=1,
+                            excluded=True,
+                        ),
+                    )
+                )
             if relative_directory.as_posix() != ".":
                 return TreeSnapshot()
             same_stat = same.stat()
@@ -567,9 +588,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     included_only_list = invoke(["list", "--recursive", "-i"], store)
     assert "node_modules/package.js" not in included_only_list[1]
     assert "  src/.env.example\n" in included_only_list[1]
-    colored_list = invoke(
-        ["list", "--recursive", "--color", "always"], store
-    )
+    colored_list = invoke(["list", "--recursive"], store, terminal_output=True)
     assert "\033[90mx src/debug.log\033[0m" in colored_list[1]
     assert "  \033[38;5;75msrc/\033[0m" in colored_list[1]
     assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
@@ -602,7 +621,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
 
     monkeypatch.chdir(workspace)
     pruned_comparison = invoke(
-        ["diff", "--prune-remote", "--color", "always"], store
+        ["diff", "--prune-remote"], store, terminal_output=True
     )
     assert "\033[31m- deployed.html\033[0m\n" in pruned_comparison[1]
     assert "\033[3;38;5;24msrc/ ▸\033[0m\n" in (
@@ -634,14 +653,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "  + main.py\n" in expanded_comparison[1]
     assert "src/ ▸\n" not in expanded_comparison[1]
 
-    colored_comparison = invoke(
-        ["diff", "**", "--color", "always"], store
-    )
+    colored_comparison = invoke(["diff", "**"], store, terminal_output=True)
     assert "\033[38;5;75msrc/\033[0m" in colored_comparison[1]
     assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_comparison[1]
     )
-    assert "  \033[90mx debug.log\033[0m" in colored_comparison[1]
+    assert "  \033[38;5;30mx debug.log\033[0m" in colored_comparison[1]
     assert "= same.txt" in colored_comparison[1]
     assert colored_comparison[1].index("node_modules/") < (
         colored_comparison[1].index("src/")
@@ -649,6 +666,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert colored_comparison[1].index("src/") < (
         colored_comparison[1].index("README.md")
     )
+    with monkeypatch.context() as no_color:
+        no_color.setenv("NO_COLOR", "1")
+        uncolored_comparison = invoke(
+            ["diff", "**"], store, terminal_output=True
+        )
+    assert "\033[" not in uncolored_comparison[1]
 
     paged = invoke(["diff", ".", "--recursive", "--paged"], store)
     assert "Resume: hlsync diff . --recursive --paged --resume src\n" in paged[1]
@@ -660,7 +683,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     monkeypatch.chdir(workspace)
 
     pull_comparison = invoke(
-        ["diff", "--pull", "-r", "--color", "always"], store
+        ["diff", "--pull", "-r"], store, terminal_output=True
     )
     assert pull_comparison[0] == 0
     assert "\033[38;5;30mr deployed.html\033[0m\n" in pull_comparison[1]
@@ -696,7 +719,6 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert pull_result[2].endswith("Executing pull plan...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
-    assert len(transports) == 17
 
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(

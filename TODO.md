@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Detect color capability automatically, honor `NO_COLOR`, remove the
+  public color override, and use dark cyan for excluded paths present remotely.
 - [x] Align diff hierarchy from a column-zero scope anchor and stop reserving
   an invisible status column for neutral directories.
 - [x] Add `-i`, `--inc`, and `--included-only` to `hlsync list` so its
