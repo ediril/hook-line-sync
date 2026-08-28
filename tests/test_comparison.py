@@ -39,6 +39,14 @@ def test_comparison_projects_push_pull_prune_and_timestamp_precision() -> None:
                 modified_ns=second,
                 timestamp_precision_ns=1,
             ),
+            TreeEntry(
+                "excluded.txt",
+                "file",
+                size=5,
+                modified_ns=second,
+                timestamp_precision_ns=1,
+                excluded=True,
+            ),
         )
     )
     remote = TreeSnapshot(
@@ -66,10 +74,22 @@ def test_comparison_projects_push_pull_prune_and_timestamp_precision() -> None:
                 modified_ns=second,
                 timestamp_precision_ns=1_000_000_000,
             ),
+            TreeEntry(
+                "excluded.txt",
+                "file",
+                size=5,
+                modified_ns=second,
+                timestamp_precision_ns=1_000_000_000,
+                excluded=True,
+            ),
         )
     )
 
     push = {entry.path: entry for entry in build_comparison(local, remote).entries}
+    pruned_push = {
+        entry.path: entry
+        for entry in build_comparison(local, remote, prune_remote=True).entries
+    }
     pull = {
         entry.path: entry
         for entry in build_comparison(
@@ -89,6 +109,11 @@ def test_comparison_projects_push_pull_prune_and_timestamp_precision() -> None:
     assert push["local.txt"].action == "upload"
     assert pull["local.txt"].action == "skip"
     assert push["remote.txt"].action == "skip"
+    assert push["excluded.txt"].action == "excluded"
+    assert (
+        pruned_push["excluded.txt"].state,
+        pruned_push["excluded.txt"].action,
+    ) == ("remote-only", "delete-remote")
     assert pull["remote.txt"].action == "delete-remote"
     assert push["conflict"].action == "conflict"
     assert push["linked"].action == "conflict"
@@ -100,6 +125,7 @@ def test_comparison_projects_push_pull_prune_and_timestamp_precision() -> None:
     )
     assert [entry.path for entry in selected.entries] == [
         "changed.txt",
+        "excluded.txt",
         "local.txt",
         "remote.txt",
     ]

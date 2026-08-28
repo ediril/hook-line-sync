@@ -798,6 +798,7 @@ def _list_local(
         RuleSet(project.rules),
         selector,
         include_excluded=True,
+        traverse_excluded=True,
     )
     if not raw_snapshot.entries:
         raise SelectionError(f"file selector '{selector.pattern}' matched no paths")
@@ -1076,6 +1077,13 @@ def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection:
     )
 
 
+def _recursive_transfer_scope(arguments: argparse.Namespace) -> bool:
+    return arguments.recursive or (
+        arguments.command == "push"
+        and not normalize_pattern_operands(arguments)
+    )
+
+
 def _selection_from_values(
     values: Sequence[str],
     root: Path,
@@ -1178,6 +1186,7 @@ def _descendant_directories(
     selector: FileSelection | None,
     *,
     descend_remote_only: bool,
+    descend_excluded: bool,
 ) -> tuple[tuple[PurePosixPath, bool, bool], ...]:
     local_directories = {
         entry.path: entry for entry in local.entries if entry.kind == "directory"
@@ -1199,6 +1208,7 @@ def _descendant_directories(
         and (
             not entry.excluded
             or rules.may_include_descendant(path)
+            or descend_excluded
         )
     )
 
@@ -1318,12 +1328,22 @@ def _build_plan(
         rules,
         selector,
         include_excluded=include_excluded,
+        traverse_excluded=(
+            include_excluded
+            and arguments.prune_remote
+            and _recursive_transfer_scope(arguments)
+        ),
     )
     print("Reading remote files over FTPS...", file=progress, flush=True)
     remote = transport.snapshot(
         rules,
         selector,
         include_excluded=include_excluded,
+        traverse_excluded=(
+            include_excluded
+            and arguments.prune_remote
+            and _recursive_transfer_scope(arguments)
+        ),
     )
     print("Comparing local and remote files...", file=progress, flush=True)
     plan = build_comparison(
@@ -1427,6 +1447,10 @@ def _diff(
                 rules,
                 selector,
                 descend_remote_only=arguments.prune_remote,
+                descend_excluded=(
+                    arguments.prune_remote
+                    and _recursive_transfer_scope(arguments)
+                ),
             )
             pending_descendants = tuple(
                 _PendingDiffDirectory(
@@ -1589,7 +1613,12 @@ def _format_transfer(name: str, result: TransferResult) -> str:
         lines = [f"{direction} complete: {changes}."]
     skipped = [entry for entry in result.plan.entries if entry.action == "skip"]
     if result.plan.direction == "push":
-        if skipped:
+        retained_remote = any(
+            entry.action == "skip"
+            or (entry.action == "excluded" and entry.remote_kind is not None)
+            for entry in result.plan.entries
+        )
+        if retained_remote:
             lines.append("Remote-only paths retained; use -p to delete them.")
     else:
         if skipped:
@@ -1648,6 +1677,7 @@ def _transfer(
             transport,
             direction=arguments.command,
             progress=progress,
+            include_excluded=arguments.command == "push",
         )
         executable_actions = {
             "create-remote",

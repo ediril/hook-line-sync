@@ -469,6 +469,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
 
     operations = []
     listed_directories = []
+    snapshot_traversal = []
 
     class FakeTransport:
         def __init__(self, project) -> None:
@@ -480,25 +481,45 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         def __exit__(self, *_):
             return None
 
-        def snapshot(self, rules, selector=None, *, include_excluded=False):
+        def snapshot(
+            self,
+            rules,
+            selector=None,
+            *,
+            include_excluded=False,
+            traverse_excluded=False,
+        ):
+            snapshot_traversal.append(traverse_excluded)
             assert rules.rules == (
                 SyncRule(1, "exclude", "node_modules/**"),
                 SyncRule(2, "exclude", "**/*.log"),
             )
-            snapshot = TreeSnapshot(
-                (
+            entries = []
+            if selector is None or selector.matches("deployed.html"):
+                entries.append(
                     TreeEntry(
                         "deployed.html",
                         "file",
                         size=8,
                         modified_ns=1_700_000_000_000_000_000,
                         timestamp_precision_ns=1_000_000_000,
-                    ),
+                    )
                 )
-            )
-            if selector is None or selector.matches("deployed.html"):
-                return snapshot
-            return TreeSnapshot()
+            if include_excluded and (
+                selector is None or selector.matches("src/debug.log")
+            ):
+                entries.append(
+                    TreeEntry(
+                        "src/debug.log",
+                        "file",
+                        size=7,
+                        modified_ns=1_700_000_000_000_000_000,
+                        timestamp_precision_ns=1_000_000_000,
+                        excluded=True,
+                    )
+                )
+            assert not traverse_excluded or include_excluded
+            return TreeSnapshot(tuple(entries))
 
         def list_directory(self, relative_directory, rules):
             listed_directories.append(relative_directory.as_posix())
@@ -734,12 +755,31 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "  Adding   src/.env.example\n"
         "  Adding   src/main.py\n"
     )
-    assert push_result[1] == "Push complete: 3 changes.\n"
+    assert push_result[1] == (
+        "Push complete: 3 changes.\n"
+        "Remote-only paths retained; use -p to delete them.\n"
+    )
     assert operations == [
         ("mkdir", "src"),
         ("upload", "src/.env.example", b"KEY=value", 9, False),
         ("upload", "src/main.py", b"print('hello')", 14, False),
     ]
+    operations.clear()
+    pruned_exclusion = invoke(["push", "src/debug.log", "-p"], store)
+    assert pruned_exclusion[0] == 0
+    assert snapshot_traversal[-1] is False
+    assert operations == [("delete", "src/debug.log", False)]
+    assert "  Deleting src/debug.log\n" in pruned_exclusion[2]
+    assert pruned_exclusion[1] == "Push complete: 1 change.\n"
+    operations.clear()
+    recursive_pruned_exclusion = invoke(
+        ["push", "src/debug.log", "-p", "-r"],
+        store,
+    )
+    assert recursive_pruned_exclusion[0] == 0
+    assert snapshot_traversal[-1] is True
+    assert operations == [("delete", "src/debug.log", False)]
+    operations.clear()
     retained_push = invoke(["push", "deployed.html"], store)
     assert "Pushing changes..." not in retained_push[2]
     assert retained_push[1] == (
@@ -845,7 +885,15 @@ def test_push_reports_partial_failure_after_continuing_independent_paths(
         def __exit__(self, *_):
             return None
 
-        def snapshot(self, rules, selector=None, *, include_excluded=False):
+        def snapshot(
+            self,
+            rules,
+            selector=None,
+            *,
+            include_excluded=False,
+            traverse_excluded=False,
+        ):
+            del traverse_excluded
             return TreeSnapshot()
 
         def make_directory(self, path):

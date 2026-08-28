@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.8.28.15 — 2026-08-28
+
+### Fixed
+
+- Kept `-p` as deletion authorization only; it no longer enables excluded-tree
+  traversal unless the push scope is recursive through `-r` or bare push.
+- Applied the same depth boundary to diff projection so shallow `diff -p` and
+  shallow `push -p` remain aligned.
+
+## 0.8.28.14 — 2026-08-28
+
+### Changed
+
+- Treated excluded local paths as absent for push authority: remote copies are
+  retained with a `-p` hint by default and deleted when pruning is authorized.
+- Separated excluded-entry visibility from excluded-directory traversal, so an
+  ordinary push can detect retained excluded paths without recursively scanning
+  their subtrees; recursive pruning traverses them for safe deepest-first
+  deletion.
+
 ## 0.8.28.13 — 2026-08-28
 
 ### Changed

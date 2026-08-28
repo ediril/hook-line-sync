@@ -107,6 +107,17 @@ def build_comparison(
             entry is not None and entry.excluded
             for entry in (local_entry, remote_entry)
         ):
+            if direction == "push" and prune_remote and remote_entry is not None:
+                comparison.append(
+                    ComparisonEntry(
+                        path=path,
+                        state="remote-only",
+                        action="delete-remote",
+                        local_kind=None,
+                        remote_kind=remote_entry.kind,
+                    )
+                )
+                continue
             comparison.append(
                 ComparisonEntry(
                     path=path,

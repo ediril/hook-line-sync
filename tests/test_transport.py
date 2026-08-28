@@ -106,11 +106,14 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
     port, certificate, root = tls_ftp_server
     assets = root / "assets"
     cache = root / "cache"
+    opaque = root / "opaque"
     assets.mkdir()
     cache.mkdir()
+    opaque.mkdir()
     (assets / "logo.svg").write_text("logo", encoding="utf-8")
     (cache / "index.bin").write_bytes(b"ignored")
     (cache / "keep.bin").write_bytes(b"included")
+    (opaque / "hidden.bin").write_bytes(b"ignored")
     (root / "debug.log").write_text("ignored", encoding="utf-8")
     local_root = root.parent / "local-root"
     local_root.mkdir()
@@ -128,32 +131,37 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
         ),
         ssl_context=context,
     )
+    rules = RuleSet(
+        (
+            SyncRule(1, "exclude", "cache/**"),
+            SyncRule(2, "exclude", "*.log"),
+            SyncRule(3, "include", "cache/keep.bin"),
+            SyncRule(4, "exclude", "opaque/**"),
+        )
+    )
     with transport:
         # The fixture refuses unprotected data connections, so recursive MLSD
         # success proves that PROT P was negotiated rather than merely called.
-        snapshot = transport.snapshot(
-            RuleSet(
-                (
-                    SyncRule(1, "exclude", "cache/**"),
-                    SyncRule(2, "exclude", "*.log"),
-                    SyncRule(3, "include", "cache/keep.bin"),
-                )
-            )
-        )
+        snapshot = transport.snapshot(rules)
         assert [(entry.path, entry.kind) for entry in snapshot.entries] == [
             ("assets", "directory"),
             ("assets/logo.svg", "file"),
             ("cache/keep.bin", "file"),
         ]
-        diagnostic = transport.snapshot(
-            RuleSet(
-                (
-                    SyncRule(1, "exclude", "cache/**"),
-                    SyncRule(2, "exclude", "*.log"),
-                    SyncRule(3, "include", "cache/keep.bin"),
-                )
-            ),
+        shallow_diagnostic = transport.snapshot(
+            rules,
             include_excluded=True,
+        )
+        assert "opaque" in {
+            entry.path for entry in shallow_diagnostic.entries
+        }
+        assert "opaque/hidden.bin" not in {
+            entry.path for entry in shallow_diagnostic.entries
+        }
+        diagnostic = transport.snapshot(
+            rules,
+            include_excluded=True,
+            traverse_excluded=True,
         )
         assert {
             entry.path: entry.excluded for entry in diagnostic.entries
@@ -164,6 +172,8 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
             "cache/index.bin": True,
             "cache/keep.bin": False,
             "debug.log": True,
+            "opaque": True,
+            "opaque/hidden.bin": True,
         }
         local = snapshot_local(local_root, RuleSet())
         comparison = {

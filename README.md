@@ -190,6 +190,9 @@ hlsync diff --prune-remote
 remote pruning. Diff shows unchanged and excluded entries by default;
 `-i`/`--inc`/`--included-only` hides exclusions.
 
+For push authority, an excluded local path is treated as absent. If it exists
+remotely, ordinary diff marks it `!`; `diff -p` projects its deletion as `-`.
+
 Show the current status and directory notation without connecting:
 
 ```console
@@ -220,7 +223,10 @@ hlsync pull templates -r
 
 Push uploads local-only files and replaces changed remote files. Pull replaces
 changed existing local files but never restores a missing local path. Excluded
-paths never enter a transfer or prune operation.
+paths are never uploaded or pulled. A remote copy of an excluded path is
+retained normally and becomes pruneable only with explicit `-p` authorization.
+Pruning does not add traversal depth: an explicit directory remains shallow
+unless `-r` is supplied. Bare `push` remains recursive by definition.
 
 Transfers print `Adding`, `Updating`, `Creating`, or `Deleting` with the path
 immediately before each operation begins, then finish with a compact count.

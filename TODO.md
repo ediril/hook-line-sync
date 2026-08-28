@@ -1,5 +1,10 @@
 # Work Queue
 
+- [x] Keep pruning authorization independent from traversal depth so excluded
+  directories are entered only within an explicitly recursive scope.
+- [x] Treat excluded local paths as absent for push authority so remote copies
+  produce the pruning hint and are deleted only when `-p` is supplied, without
+  traversing excluded directories during an ordinary push.
 - [x] Collapse the post-push remote-only report to one pruning hint instead of
   repeating paths already available through `diff`.
 - [x] Report an empty transfer plainly and point push users to `-p` when

@@ -22,7 +22,10 @@ directly at that directory; a wildcard starts at its narrowest fixed prefix.
 Local traversal leads the default comparison, and the corresponding remote
 directory is queried after local scope is known. Remote-only subtrees are not
 entered unless explicit pruning needs them. Excluded directories are not
-entered unless a narrower inclusion can match beneath them.
+entered unless a narrower inclusion can match beneath them or push pruning is
+authorized within a recursive scope. `-p` authorizes deletion but never expands
+traversal depth; `-r` controls recursion independently. Bare push is already a
+recursive scope by definition.
 
 An immediate directory outside the selected traversal depth is a diagnostic
 boundary, not an executable transfer action. It may be displayed with `▸`, but
@@ -44,3 +47,4 @@ overwritten locally.
 - Letting selection broaden configured synchronization rules.
 - Persisting selection or traversal state between commands.
 - Treating a visible untraversed directory as authorization to mutate it.
+- Treating pruning authorization as recursive selection.

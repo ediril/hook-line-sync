@@ -17,6 +17,8 @@ Core synchronization status remains textual. Color respects `NO_COLOR` and
 redirected output and has no command-line override. An `x` path uses excluded
 gray or dark-blue styling. An excluded path that exists remotely uses a
 burnt-orange `!`, preserving the distinction in non-color output as well.
+When push pruning is projected, that `!` becomes `-` because the remote copy is
+now an authorized deletion rather than a retained exclusion.
 `hlsync --legend` renders the current symbol and color reference without loading
 a profile or connecting to FTPS.
 

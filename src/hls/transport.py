@@ -117,6 +117,7 @@ class RemoteTransport(Protocol):
         selector: FileSelection | None = None,
         *,
         include_excluded: bool = False,
+        traverse_excluded: bool = False,
     ) -> TreeSnapshot: ...
 
     def list_directory(
@@ -207,6 +208,7 @@ class ExplicitFTPSTransport:
         selector: FileSelection | None = None,
         *,
         include_excluded: bool = False,
+        traverse_excluded: bool = False,
     ) -> TreeSnapshot:
         if self._client is None:
             raise TransportError("FTPS transport is not connected")
@@ -230,7 +232,7 @@ class ExplicitFTPSTransport:
                     or selector.may_match_descendant(relative_path)
                 )
                 exclusion_may_descend = (
-                    include_excluded
+                    traverse_excluded
                     or not excluded
                     or rules.may_include_descendant(relative_path)
                 )

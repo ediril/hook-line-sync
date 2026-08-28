@@ -70,6 +70,7 @@ def snapshot_local(
     selector: FileSelection | None = None,
     *,
     include_excluded: bool = False,
+    traverse_excluded: bool = False,
 ) -> TreeSnapshot:
     if not root.is_dir():
         raise SnapshotError(f"local root is not an accessible directory: {root}")
@@ -92,7 +93,7 @@ def snapshot_local(
                 selector is None or selector.may_match_descendant(relative_path)
             )
             exclusion_may_descend = (
-                include_excluded
+                traverse_excluded
                 or not excluded
                 or rules.may_include_descendant(relative_path)
             )
