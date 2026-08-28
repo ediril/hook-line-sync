@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.28.7 — 2026-08-28
+
+### Fixed
+
+- Accepted successful server-specific MFMT replies such as `213 UTIME OK`
+  instead of requiring one response phrase.
+- Added independent MDTM read-back verification before installing an upload and
+  cleanup of staged files when size, timestamp, or local-source validation
+  fails.
+
+## 0.8.28.6 — 2026-08-28
+
+### Changed
+
+- Replaced internal “building/executing plan” progress with “Comparing local
+  and remote files” followed by “Pushing changes” or “Pulling changes.”
+
 ## 0.8.28.5 — 2026-08-28
 
 ### Changed

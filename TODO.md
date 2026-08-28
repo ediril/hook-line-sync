@@ -1,5 +1,9 @@
 # Work Queue
 
+- [x] Accept server-specific successful MFMT responses while independently
+  verifying the staged timestamp with MDTM before installing an upload.
+- [x] Replace internal push/pull plan terminology in progress output with plain
+  comparison and transfer phases.
 - [x] Make shallow child directories diagnostic-only so push does not create an
   untraversed directory while synchronizing its parent's immediate files.
 - [x] Add an offline top-level `hlsync --legend` reference for diff symbols and

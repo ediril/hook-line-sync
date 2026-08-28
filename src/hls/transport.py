@@ -24,24 +24,42 @@ class PathOperationError(TransportError):
     """Raised when one remote path fails but the FTPS session remains usable."""
 
 
-def _parse_mlsd_modify(value: str, path: str) -> tuple[int, int]:
+def _parse_modify_timestamp(
+    value: str,
+    path: str,
+    *,
+    source: str,
+) -> tuple[int, int]:
     base, separator, fraction = value.partition(".")
     if len(base) != 14 or not base.isdigit() or (
         separator and (not fraction or not fraction.isdigit())
     ):
         raise TransportError(
-            f"invalid MLSD modify timestamp {value!r} for '{path}'"
+            f"invalid {source} timestamp {value!r} for '{path}'"
         )
     try:
         timestamp = datetime.strptime(base, "%Y%m%d%H%M%S")
     except ValueError as error:
         raise TransportError(
-            f"invalid MLSD modify timestamp {value!r} for '{path}'"
+            f"invalid {source} timestamp {value!r} for '{path}'"
         ) from error
     fraction_digits = min(len(fraction), 9)
     fractional_ns = int(fraction[:9].ljust(9, "0")) if fraction else 0
     precision_ns = 10 ** (9 - fraction_digits) if fraction else 1_000_000_000
     return timegm(timestamp.timetuple()) * 1_000_000_000 + fractional_ns, precision_ns
+
+
+def _parse_mlsd_modify(value: str, path: str) -> tuple[int, int]:
+    return _parse_modify_timestamp(value, path, source="MLSD modify")
+
+
+def _parse_mdtm_response(response: str, path: str) -> tuple[int, int]:
+    code, separator, value = response.partition(" ")
+    if code != "213" or not separator or not value.strip():
+        raise TransportError(
+            f"invalid MDTM response for '{path}': {response}"
+        )
+    return _parse_modify_timestamp(value.strip(), path, source="MDTM")
 
 
 def _relative_remote_path(value: str) -> str:
@@ -326,10 +344,31 @@ class ExplicitFTPSTransport:
                     f"expected {size}, got {uploaded_size}"
                 )
             response = client.sendcmd(f"MFMT {timestamp} {temporary}")
-            if not response.startswith(f"213 Modify={timestamp};"):
+            if len(response) < 3 or not response[:3].isdigit() or response[0] != "2":
                 raise TransportError(
-                    f"remote server did not verify modification time for "
+                    f"remote server did not accept modification time for "
                     f"'{path}': {response}"
+                )
+            verification = client.sendcmd(f"MDTM {temporary}")
+            remote_modified_ns, remote_precision_ns = _parse_mdtm_response(
+                verification,
+                path,
+            )
+            expected_modified_ns = (
+                modified_ns // 1_000_000_000 * 1_000_000_000
+            )
+            comparison_precision_ns = max(
+                remote_precision_ns,
+                1_000_000_000,
+            )
+            if (
+                remote_modified_ns // comparison_precision_ns
+                != expected_modified_ns // comparison_precision_ns
+            ):
+                raise TransportError(
+                    f"remote modification time verification failed for "
+                    f"'{path}': expected {timestamp}, got "
+                    f"{verification.partition(' ')[2]}"
                 )
             current_source = os.fstat(local_path.fileno())
             if (
@@ -339,6 +378,9 @@ class ExplicitFTPSTransport:
                 raise TransportError(
                     f"local source changed while staging remote file '{path}'"
                 )
+        except TransportError:
+            discard(temporary)
+            raise
         except ftplib.error_perm as error:
             discard(temporary)
             raise PathOperationError(

@@ -215,6 +215,77 @@ def test_rejects_an_inaccessible_project_root(tls_ftp_server, monkeypatch) -> No
         transport.connect()
 
 
+def test_upload_verifies_timestamp_independently_of_mfmt_response(
+    tmp_path,
+) -> None:
+    source_path = tmp_path / "asset.txt"
+    source_path.write_text("asset", encoding="utf-8")
+    modified_ns = 1_700_000_000_000_000_000
+    os.utime(source_path, ns=(modified_ns, modified_ns))
+
+    class TimestampClient:
+        def __init__(self, mdtm_timestamp):
+            self.mdtm_timestamp = mdtm_timestamp
+            self.staged_path = None
+            self.commands = []
+            self.deleted = []
+            self.renamed = []
+
+        def storbinary(self, command, source):
+            self.staged_path = command.removeprefix("STOR ")
+            assert source.read() == b"asset"
+
+        def size(self, path):
+            assert path == self.staged_path
+            return 5
+
+        def sendcmd(self, command):
+            self.commands.append(command)
+            if command.startswith("MFMT "):
+                return "213 UTIME OK"
+            assert command == f"MDTM {self.staged_path}"
+            return f"213 {self.mdtm_timestamp}"
+
+        def delete(self, path):
+            self.deleted.append(path)
+
+        def rename(self, source, destination):
+            self.renamed.append((source, destination))
+
+    transport = ExplicitFTPSTransport(
+        ProjectConfiguration(host="ftp.example.com", remote_root="/")
+    )
+    matching = TimestampClient("20231114221320")
+    transport._client = matching
+    with source_path.open("rb") as source:
+        transport.upload_file(
+            source,
+            "asset.txt",
+            size=5,
+            modified_ns=modified_ns,
+            replace=False,
+        )
+    assert matching.commands == [
+        f"MFMT 20231114221320 {matching.staged_path}",
+        f"MDTM {matching.staged_path}",
+    ]
+    assert matching.renamed == [(matching.staged_path, "asset.txt")]
+
+    mismatched = TimestampClient("20231114221321")
+    transport._client = mismatched
+    with source_path.open("rb") as source:
+        with pytest.raises(TransportError, match="verification failed"):
+            transport.upload_file(
+                source,
+                "asset.txt",
+                size=5,
+                modified_ns=modified_ns,
+                replace=False,
+            )
+    assert mismatched.deleted == [mismatched.staged_path]
+    assert mismatched.renamed == []
+
+
 def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
     tls_ftp_server, tmp_path, monkeypatch
 ) -> None:

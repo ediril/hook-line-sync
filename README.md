@@ -33,6 +33,8 @@ subscription channel will be announced separately.
 - An FTPS server supporting explicit TLS (`AUTH TLS`) and protected data
   connections (`PROT P`)
 - MLSD support for structured remote directory listings
+- MFMT support to apply uploaded-file timestamps and MDTM support to verify
+  them independently
 
 ## Development installation
 
@@ -494,9 +496,13 @@ state is not trustworthy.
 Pruning is limited by the selector and occurs only after all uploads succeed.
 Pull never deletes remote paths. Remote uploads use temporary files and
 recoverable backups; local downloads use atomic replacement. Type conflicts and
-symlinks abort the entire plan before mutation. Each file replacement is atomic,
-but FTPS cannot provide a transaction across the complete project, so an
-operation that fails later does not roll back earlier completed files.
+symlinks abort the entire operation before mutation. Each staged upload applies
+the local whole-second UTC modification time with MFMT, then reads it back with
+MDTM before installing the file. HLSync accepts server-specific successful MFMT
+messages, but never treats their wording as proof that the requested time was
+applied. Each file replacement is atomic, but FTPS cannot provide a transaction
+across the complete project, so an operation that fails later does not roll back
+earlier completed files.
 
 ## Versioning
 

@@ -1320,7 +1320,7 @@ def _build_plan(
         selector,
         include_excluded=include_excluded,
     )
-    print(f"Building {direction} plan...", file=progress, flush=True)
+    print("Comparing local and remote files...", file=progress, flush=True)
     plan = build_comparison(
         local,
         remote,
@@ -1610,7 +1610,8 @@ def _transfer(
             direction=arguments.command,
             progress=progress,
         )
-        print(f"Executing {arguments.command} plan...", file=progress, flush=True)
+        progress_action = "Pushing" if arguments.command == "push" else "Pulling"
+        print(f"{progress_action} changes...", file=progress, flush=True)
         result = execute_transfer(
             plan,
             local_root=root,

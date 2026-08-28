@@ -723,7 +723,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     push_result = invoke(["push", "src"], store)
     assert push_result[0] == 0
     assert push_result[2].startswith("Preparing push for project 'prod'...\n")
-    assert push_result[2].endswith("Executing push plan...\n")
+    assert "Comparing local and remote files...\n" in push_result[2]
+    assert push_result[2].endswith("Pushing changes...\n")
     assert "Push completed for project 'prod': 3 change(s)." in push_result[1]
     assert "untraversed" in push_result[1]
     assert "src/nested" in push_result[1]
@@ -735,7 +736,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     pull_result = invoke(["pull", "deployed.html"], store)
     assert pull_result[0] == 0
     assert pull_result[2].startswith("Preparing pull for project 'prod'...\n")
-    assert pull_result[2].endswith("Executing pull plan...\n")
+    assert "Comparing local and remote files...\n" in pull_result[2]
+    assert pull_result[2].endswith("Pulling changes...\n")
     assert "Pull completed for project 'prod': 0 change(s)." in pull_result[1]
     assert "skip           remote-only" in pull_result[1]
 

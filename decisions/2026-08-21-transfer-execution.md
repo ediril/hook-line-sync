@@ -6,8 +6,10 @@ Date: 2026-08-21
 
 Push creates required remote parents and uploads local-only or changed files.
 Each upload uses a unique temporary name, verifies size, applies the local
-whole-second UTC timestamp with MFMT, and renames into place. Replacement keeps
-a temporary backup until installation succeeds.
+whole-second UTC timestamp with MFMT, reads it back independently with MDTM at
+the server's reported precision, and only then renames into place. A successful
+MFMT reply acknowledges the command but is not itself timestamp verification.
+Replacement keeps a temporary backup until installation succeeds.
 
 Pull replaces changed local files but never downloads remote-only paths. Each
 download is written and synced beside its destination, verifies size, preserves
@@ -34,3 +36,4 @@ new content is safely present.
 - Continuing after the session or replacement state becomes untrustworthy.
 - Persistently excluding a path merely because one transfer lacked permission.
 - Pruning after any upload failure.
+- Trusting server-specific MFMT response text as evidence of the applied time.
