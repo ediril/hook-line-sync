@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Rewrite the README as a concise but complete current-user guide and
+  document why safe FTPS replacement requires staging files.
 - [x] Recover HLSync-owned abandoned upload and backup artifacts automatically
   within push scope without requiring remote-prune authorization.
 - [x] Accept server-specific successful MFMT responses while independently

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.28.9 — 2026-08-28
+
+### Changed
+
+- Reworked the README into a shorter current-user guide covering setup,
+  selection, rules, listing, diff, transfer safety, and release maintenance.
+- Documented why pushes use verified staging files instead of writing directly
+  over live destinations, including automatic interrupted-transfer recovery.
+
 ## 0.8.28.8 — 2026-08-28
 
 ### Fixed
