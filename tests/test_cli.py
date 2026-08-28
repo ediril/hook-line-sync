@@ -73,6 +73,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.password_env == "PROD_FTPS_PASSWORD"
 
     help_output = invoke(["help"], store)[1]
+    assert "--legend" in help_output
     assert "diff                preview file changes without modifying anything" in (
         help_output
     )
@@ -99,6 +100,22 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert "profile             show details for one profile" in help_output
     assert "profiles            list configured profiles" in help_output
     assert "list                list the current local directory" in help_output
+    assert invoke(["--legend"], store) == (
+        0,
+        "Diff legend:\n"
+        "  +  new locally\n"
+        "  ~  modified\n"
+        "  -  remote deletion authorized\n"
+        "  r  remote-only, retained\n"
+        "  l  local-only, retained\n"
+        "  ?  conflict\n"
+        "  =  unchanged file\n"
+        "  x  excluded, absent remotely\n"
+        "  !  excluded, present remotely\n"
+        "  /  directory\n"
+        "  ▸  contents not inspected\n",
+        "",
+    )
     for command in ("exclude", "include"):
         rule_help = invoke(["help", command], store)[1]
         assert f"hlsync {command} [PATH ...]" in rule_help

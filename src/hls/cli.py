@@ -53,6 +53,22 @@ from hls.transport import ExplicitFTPSTransport, PathOperationError, TransportEr
 
 _EntryT = TypeVar("_EntryT")
 
+_RESET = "\033[0m"
+_DIRECTORY_COLOR = "\033[38;5;75m"
+_EXCLUDED_DIRECTORY_COLOR = "\033[38;5;24m"
+_COLLAPSED_DIRECTORY_COLOR = "\033[3;38;5;24m"
+_EXCLUDED_REMOTE_COLOR = "\033[38;5;166m"
+_DIFF_MARKER_COLORS = {
+    "+": "\033[38;5;82m",
+    "~": "\033[33m",
+    "-": "\033[31m",
+    "?": "\033[35m",
+    "x": "\033[90m",
+    "!": _EXCLUDED_REMOTE_COLOR,
+    "r": "\033[38;5;30m",
+    "l": "\033[38;5;51m",
+}
+
 
 @dataclass(frozen=True)
 class _DiffTraversalRoot:
@@ -154,7 +170,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--version", action="version", version=__version__)
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    parser.add_argument(
+        "--legend",
+        action="store_true",
+        help="show diff symbols and exit",
+    )
+    subparsers = parser.add_subparsers(dest="command")
 
     add_parser = subparsers.add_parser(
         "add", help="add an FTPS project and offer to map the current directory"
@@ -842,6 +863,28 @@ def _use_color(output: TextIO) -> bool:
     return bool(is_terminal and is_terminal())
 
 
+def _format_legend(output: TextIO) -> str:
+    color = _use_color(output)
+    entries = (
+        ("+", "new locally", _DIFF_MARKER_COLORS["+"]),
+        ("~", "modified", _DIFF_MARKER_COLORS["~"]),
+        ("-", "remote deletion authorized", _DIFF_MARKER_COLORS["-"]),
+        ("r", "remote-only, retained", _DIFF_MARKER_COLORS["r"]),
+        ("l", "local-only, retained", _DIFF_MARKER_COLORS["l"]),
+        ("?", "conflict", _DIFF_MARKER_COLORS["?"]),
+        ("=", "unchanged file", None),
+        ("x", "excluded, absent remotely", _DIFF_MARKER_COLORS["x"]),
+        ("!", "excluded, present remotely", _DIFF_MARKER_COLORS["!"]),
+        ("/", "directory", _DIRECTORY_COLOR),
+        ("▸", "contents not inspected", _COLLAPSED_DIRECTORY_COLOR),
+    )
+    lines = ["Diff legend:"]
+    for marker, meaning, style in entries:
+        rendered = f"{style}{marker}{_RESET}" if color and style else marker
+        lines.append(f"  {rendered}  {meaning}")
+    return "\n".join(lines)
+
+
 def _format_path_line(
     marker: str,
     *,
@@ -870,25 +913,25 @@ def _format_path_line(
     if directory:
         if collapsed:
             if omit_marker:
-                return f"{indent}\033[3;38;5;24m{path}/ ▸\033[0m"
+                return f"{indent}{_COLLAPSED_DIRECTORY_COLOR}{path}/ ▸{_RESET}"
             colored_marker = (
-                f"{marker_color}{marker}\033[0m" if marker_color else marker
+                f"{marker_color}{marker}{_RESET}" if marker_color else marker
             )
             return (
                 f"{indent}{colored_marker} "
-                f"\033[3;38;5;24m{path}/ ▸\033[0m"
+                f"{_COLLAPSED_DIRECTORY_COLOR}{path}/ ▸{_RESET}"
             )
         directory_color = path_color or (
-            "\033[38;5;24m" if excluded else "\033[38;5;75m"
+            _EXCLUDED_DIRECTORY_COLOR if excluded else _DIRECTORY_COLOR
         )
         if omit_marker:
-            return f"{indent}{directory_color}{path}/\033[0m"
+            return f"{indent}{directory_color}{path}/{_RESET}"
         colored_marker = (
-            f"{marker_color}{marker}\033[0m" if marker_color else marker
+            f"{marker_color}{marker}{_RESET}" if marker_color else marker
         )
-        return f"{indent}{colored_marker} {directory_color}{path}/\033[0m"
+        return f"{indent}{colored_marker} {directory_color}{path}/{_RESET}"
     if marker_color:
-        return f"{indent}{marker_color}{body}\033[0m"
+        return f"{indent}{marker_color}{body}{_RESET}"
     return line
 
 
@@ -928,17 +971,6 @@ def _format_comparison_entries(
     display_path: Callable[[str], tuple[int, str]] | None = None,
 ) -> tuple[str, ...]:
     lines: list[str] = []
-    excluded_remote_color = "\033[38;5;166m"
-    colors = {
-        "+": "\033[38;5;82m",
-        "~": "\033[33m",
-        "-": "\033[31m",
-        "?": "\033[35m",
-        "x": "\033[90m",
-        "!": excluded_remote_color,
-        "r": "\033[38;5;30m",
-        "l": "\033[38;5;51m",
-    }
     for entry in _file_browser_order(
         entries,
         path_of=lambda item: item.path,
@@ -953,7 +985,7 @@ def _format_comparison_entries(
             else _comparison_marker(entry, direction)
         )
         remote_exclusion_color = (
-            excluded_remote_color
+            _EXCLUDED_REMOTE_COLOR
             if entry.action == "excluded" and entry.remote_kind is not None
             else None
         )
@@ -965,7 +997,7 @@ def _format_comparison_entries(
                 path=path,
                 depth=depth,
                 color=color,
-                marker_color=colors.get(marker),
+                marker_color=_DIFF_MARKER_COLORS.get(marker),
                 excluded=entry.action == "excluded",
                 collapsed=collapsed,
                 omit_empty_directory_marker=True,
@@ -1610,6 +1642,13 @@ def run(
         except ConfigurationError as error:
             parser.error(str(error))
     arguments = parser.parse_args(raw_arguments)
+    if arguments.legend:
+        if arguments.command is not None:
+            parser.error("--legend cannot be combined with a command")
+        print(_format_legend(stdout), file=stdout)
+        return 0
+    if arguments.command is None:
+        parser.error("a command is required unless --legend is supplied")
     configuration_store = store or ConfigurationStore()
     exit_status = 0
     try:

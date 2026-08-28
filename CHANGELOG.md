@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.28.4 — 2026-08-28
+
+### Added
+
+- Added `hlsync --legend` as an offline, automatically colored reference for
+  diff markers, directory notation, and untraversed-directory notation.
+
 ## 0.8.28.3 — 2026-08-28
 
 ### Changed

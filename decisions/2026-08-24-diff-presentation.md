@@ -17,6 +17,8 @@ Core synchronization status remains textual. Color respects `NO_COLOR` and
 redirected output and has no command-line override. An `x` path uses excluded
 gray or dark-blue styling. An excluded path that exists remotely uses a
 burnt-orange `!`, preserving the distinction in non-color output as well.
+`hlsync --legend` renders the current symbol and color reference without loading
+a profile or connecting to FTPS.
 
 A coherent scope is headed by one full project-relative anchor at column zero.
 Its children begin one indent beneath it, including neutral directories that do
@@ -40,3 +42,4 @@ stateless paging keep a slow FTPS comparison reviewable and interruptible.
 - Using color as the only status signal.
 - Persisting a paging session or cached comparison cursor.
 - Displaying redundant direction and per-directory progress headings on stdout.
+- Repeating the complete legend in each command's help.

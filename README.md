@@ -113,6 +113,12 @@ means `hlsync connect`, while `hlsync d` means `hlsync diff`. An ambiguous prefi
 rejected and lists its candidates. The established `ls` compatibility spelling
 for `list` remains available but is intentionally omitted from the help menu.
 
+Show the compact diff symbol and color reference without connecting to FTPS:
+
+```console
+hlsync --legend
+```
+
 Every path-accepting command supports multiple operands and comma-separated
 groups. List, diff, push, and pull interpret wildcards as selectors. Bare push
 uses the complete current subtree; list and diff use the current directory's
