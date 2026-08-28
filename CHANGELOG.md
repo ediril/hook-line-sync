@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.28.5 — 2026-08-28
+
+### Changed
+
+- Made untraversed child directories diagnostic-only. A shallow push no longer
+  creates a visible `directory/ ▸`; `-r` is required to synchronize it.
+- Kept creation of the explicitly selected directory when it is required as a
+  parent for selected files.
+
 ## 0.8.28.4 — 2026-08-28
 
 ### Added

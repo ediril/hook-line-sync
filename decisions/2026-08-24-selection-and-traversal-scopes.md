@@ -24,6 +24,11 @@ directory is queried after local scope is known. Remote-only subtrees are not
 entered unless explicit pruning needs them. Excluded directories are not
 entered unless a narrower inclusion can match beneath them.
 
+An immediate directory outside the selected traversal depth is a diagnostic
+boundary, not an executable transfer action. It may be displayed with `▸`, but
+push and pull do not create, replace, or delete it. A selected directory itself
+may still be created as a required parent of selected files.
+
 ## Rationale
 
 Shallow explicit scopes make ordinary inspection predictable and avoid needless
@@ -38,3 +43,4 @@ overwritten locally.
 - Walking ancestor directories merely to reach an exact selected directory.
 - Letting selection broaden configured synchronization rules.
 - Persisting selection or traversal state between commands.
+- Treating a visible untraversed directory as authorization to mutate it.

@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Make shallow child directories diagnostic-only so push does not create an
+  untraversed directory while synchronizing its parent's immediate files.
 - [x] Add an offline top-level `hlsync --legend` reference for diff symbols and
   their terminal colors without duplicating it across command help.
 - [x] Distinguish excluded local-only paths with `x` from excluded paths that

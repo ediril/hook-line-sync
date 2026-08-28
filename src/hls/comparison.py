@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from hls.selection import FileSelection, SelectionError
@@ -26,6 +26,7 @@ PlanAction = Literal[
     "delete-remote",
     "conflict",
     "excluded",
+    "untraversed",
 ]
 
 
@@ -47,6 +48,22 @@ class ComparisonPlan:
     @property
     def differences(self) -> tuple[ComparisonEntry, ...]:
         return tuple(entry for entry in self.entries if entry.action != "unchanged")
+
+
+def mark_untraversed_directories(
+    plan: ComparisonPlan,
+    paths: frozenset[str],
+) -> ComparisonPlan:
+    """Make directory boundaries visible without making them executable."""
+    return replace(
+        plan,
+        entries=tuple(
+            replace(entry, action="untraversed")
+            if entry.path in paths and entry.action != "excluded"
+            else entry
+            for entry in plan.entries
+        ),
+    )
 
 
 def _files_identical(local: TreeEntry, remote: TreeEntry) -> bool:

@@ -619,8 +619,9 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert "+ main.py\n" in push_comparison[1]
-    assert "+ nested/ ▸\n" in push_comparison[1]
-    assert push_comparison[1].index("+ nested/ ▸\n") < (
+    assert "nested/ ▸\n" in push_comparison[1]
+    assert "+ nested/ ▸\n" not in push_comparison[1]
+    assert push_comparison[1].index("nested/ ▸\n") < (
         push_comparison[1].index("+ .env.example\n")
     )
     assert "src/nested/child.py" not in push_comparison[1]
@@ -655,7 +656,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     directory_comparison = invoke(["diff", "src"], store)
     assert "= src/\n" not in directory_comparison[1]
     assert directory_comparison[1].startswith("src/\n")
-    assert "  + nested/ ▸\n" in directory_comparison[1]
+    assert "  nested/ ▸\n" in directory_comparison[1]
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
     assert "    + child.py\n" in recursive_directory_comparison[1]
@@ -723,10 +724,11 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert push_result[0] == 0
     assert push_result[2].startswith("Preparing push for project 'prod'...\n")
     assert push_result[2].endswith("Executing push plan...\n")
-    assert "Push completed for project 'prod': 4 change(s)." in push_result[1]
+    assert "Push completed for project 'prod': 3 change(s)." in push_result[1]
+    assert "untraversed" in push_result[1]
+    assert "src/nested" in push_result[1]
     assert operations == [
         ("mkdir", "src"),
-        ("mkdir", "src/nested"),
         ("upload", "src/.env.example", b"KEY=value", 9, False),
         ("upload", "src/main.py", b"print('hello')", 14, False),
     ]

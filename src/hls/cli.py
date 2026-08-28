@@ -10,7 +10,12 @@ from pathlib import Path, PurePosixPath
 from typing import TextIO, TypeVar
 
 from hls import __version__
-from hls.comparison import ComparisonEntry, ComparisonPlan, build_comparison
+from hls.comparison import (
+    ComparisonEntry,
+    ComparisonPlan,
+    build_comparison,
+    mark_untraversed_directories,
+)
 from hls.config import (
     DEFAULT_PASSWORD_ENV,
     DEFAULT_USERNAME_ENV,
@@ -842,6 +847,8 @@ def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
         return "?"
     if entry.action == "unchanged":
         return "="
+    if entry.action == "untraversed":
+        return " "
     if entry.action == "skip":
         return "r" if entry.state == "remote-only" else "l"
     if entry.state == "changed":
@@ -1321,6 +1328,14 @@ def _build_plan(
         prune_remote=arguments.prune_remote,
         selector=selector if arguments.pattern_operands else None,
     )
+    untraversed_directories = frozenset(
+        entry.path
+        for entry in plan.entries
+        if _comparison_entry_kind(entry, direction) == "directory"
+        and not selector.may_match_descendant(entry.path)
+        and entry.action != "excluded"
+    )
+    plan = mark_untraversed_directories(plan, untraversed_directories)
     return local, remote, plan
 
 
@@ -1504,6 +1519,7 @@ def _diff(
                 and entry.path != directory.as_posix()
                 and entry.action != "excluded"
             )
+            plan = mark_untraversed_directories(plan, collapsed_paths)
             shown = tuple(
                 entry
                 for entry in plan.entries

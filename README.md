@@ -463,6 +463,12 @@ selects `app` and its immediate contents, while `hlsync pull app -r` selects its
 complete subtree. Preview bare push with `hlsync diff -r`; explicitly scoped push
 and pull commands retain the same scope as their corresponding diff.
 
+An immediate child directory outside that traversal depth is diagnostic-only:
+HLSync displays it with `▸` but does not create, replace, or delete it. The
+explicitly selected directory itself may still be created when it is required
+as the parent of selected files. Add `-r` to synchronize child directories and
+their contents.
+
 Use `--project <name>` outside a mapped project. Push uploads local-only files
 and replaces changed remote files. Pull replaces changed local files, but it
 does not restore remote-only files because missing local paths are treated as
