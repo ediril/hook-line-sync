@@ -45,6 +45,13 @@ class TransferResult:
         return len(self.completed_paths)
 
     @property
+    def unchanged_file_count(self) -> int:
+        return sum(
+            entry.action == "unchanged" and entry.local_kind == "file"
+            for entry in self.plan.entries
+        )
+
+    @property
     def failed_count(self) -> int:
         return sum(issue.status == "failed" for issue in self.issues)
 

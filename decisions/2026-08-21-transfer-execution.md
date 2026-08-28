@@ -28,9 +28,11 @@ a semantic operation event. The CLI renders these as plain-language `Adding`,
 successful command ends with a compact count and reports retained remote-only
 paths, but does not repeat the complete comparison model. A command with no
 executable actions reports that there is nothing to push or pull and omits the
-empty transfer-phase heading. Push-only retained paths include an explicit
-`-p` pruning hint without enumerating the paths again; pull never suggests
-remote deletion.
+empty transfer-phase heading. The zero-action result is indented like streamed
+operations; push also reports the number of unchanged included files in the
+selected scope, without implying that an uninspected project is synchronized.
+Push-only retained paths include an explicit `-p` pruning hint without
+enumerating the paths again; pull never suggests remote deletion.
 
 Explicit push pruning deletes remote-only files and then directories deepest
 first, only after every planned upload succeeds. Type and symlink conflicts

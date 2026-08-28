@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.28.16 — 2026-08-28
+
+### Changed
+
+- Indented `Nothing to push` and `Nothing to pull` like streamed transfer
+  operations.
+- Added the unchanged included-file count to an empty push result, scoped to
+  exactly what the command inspected.
+
 ## 0.8.28.15 — 2026-08-28
 
 ### Fixed

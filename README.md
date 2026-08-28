@@ -231,9 +231,10 @@ unless `-r` is supplied. Bare `push` remains recursive by definition.
 Transfers print `Adding`, `Updating`, `Creating`, or `Deleting` with the path
 immediately before each operation begins, then finish with a compact count.
 When no operation is needed, HLSync prints `Nothing to push` or `Nothing to
-pull` without announcing an empty transfer phase. A push that retains
-remote-only paths points to `-p` for explicit deletion without repeating the
-paths already available through `diff`.
+pull` without announcing an empty transfer phase. An empty push also reports
+how many included files are up to date in the selected scope. A push that
+retains remote-only paths points to `-p` for explicit deletion without
+repeating the paths already available through `diff`.
 
 Remote-only paths remain untouched unless a push explicitly authorizes pruning:
 

@@ -505,6 +505,17 @@ def test_current_project_inference_drives_connect_and_tree_listings(
                         timestamp_precision_ns=1_000_000_000,
                     )
                 )
+            if selector is None or selector.matches("same.txt"):
+                same_stat = same.stat()
+                entries.append(
+                    TreeEntry(
+                        "same.txt",
+                        "file",
+                        size=same_stat.st_size,
+                        modified_ns=same_stat.st_mtime_ns,
+                        timestamp_precision_ns=1,
+                    )
+                )
             if include_excluded and (
                 selector is None or selector.matches("src/debug.log")
             ):
@@ -764,6 +775,11 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         ("upload", "src/.env.example", b"KEY=value", 9, False),
         ("upload", "src/main.py", b"print('hello')", 14, False),
     ]
+    unchanged_push = invoke(["push", "same.txt"], store)
+    assert "Pushing changes..." not in unchanged_push[2]
+    assert unchanged_push[1] == (
+        "  Nothing to push; 1 file is up to date in this scope.\n"
+    )
     operations.clear()
     pruned_exclusion = invoke(["push", "src/debug.log", "-p"], store)
     assert pruned_exclusion[0] == 0
@@ -783,7 +799,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     retained_push = invoke(["push", "deployed.html"], store)
     assert "Pushing changes..." not in retained_push[2]
     assert retained_push[1] == (
-        "Nothing to push.\n"
+        "  Nothing to push.\n"
         "Remote-only paths retained; use -p to delete them.\n"
     )
     pull_result = invoke(["pull", "deployed.html"], store)
@@ -792,7 +808,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "Comparing local and remote files...\n" in pull_result[2]
     assert "Pulling changes..." not in pull_result[2]
     assert pull_result[1] == (
-        "Nothing to pull.\n"
+        "  Nothing to pull.\n"
         "Remote-only paths not restored:\n"
         "  deployed.html\n"
     )

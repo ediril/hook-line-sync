@@ -1607,7 +1607,12 @@ def _format_transfer(name: str, result: TransferResult) -> str:
         return "\n".join(lines)
     count = result.changed_count
     if count == 0:
-        lines = [f"Nothing to {result.plan.direction}."]
+        nothing = f"  Nothing to {result.plan.direction}"
+        if result.plan.direction == "push" and result.unchanged_file_count:
+            files = result.unchanged_file_count
+            noun = "file is" if files == 1 else "files are"
+            nothing += f"; {files} {noun} up to date in this scope"
+        lines = [f"{nothing}."]
     else:
         changes = f"{count} change{'s' if count != 1 else ''}"
         lines = [f"{direction} complete: {changes}."]

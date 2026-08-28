@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Indent zero-action transfer results and report the number of unchanged
+  included files in an empty push's selected scope.
 - [x] Keep pruning authorization independent from traversal depth so excluded
   directories are entered only within an explicitly recursive scope.
 - [x] Treat excluded local paths as absent for push authority so remote copies
