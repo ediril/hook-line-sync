@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.28.2 — 2026-08-28
+
+### Changed
+
+- Changed excluded paths that exist remotely from dark cyan to burnt orange so
+  they remain distinct from dark-blue untraversed directories.
+
 ## 0.8.28.1 — 2026-08-28
 
 ### Changed

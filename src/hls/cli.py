@@ -937,6 +937,7 @@ def _format_comparison_entries(
         "r": "\033[38;5;30m",
         "l": "\033[38;5;51m",
     }
+    excluded_remote_color = "\033[38;5;166m"
     for entry in _file_browser_order(
         entries,
         path_of=lambda item: item.path,
@@ -950,8 +951,8 @@ def _format_comparison_entries(
             if directory and entry.action == "unchanged"
             else _comparison_marker(entry, direction)
         )
-        excluded_remote_color = (
-            colors["r"]
+        remote_exclusion_color = (
+            excluded_remote_color
             if entry.action == "excluded" and entry.remote_kind is not None
             else None
         )
@@ -963,11 +964,11 @@ def _format_comparison_entries(
                 path=path,
                 depth=depth,
                 color=color,
-                marker_color=excluded_remote_color or colors.get(marker),
+                marker_color=remote_exclusion_color or colors.get(marker),
                 excluded=entry.action == "excluded",
                 collapsed=collapsed,
                 omit_empty_directory_marker=True,
-                path_color=excluded_remote_color,
+                path_color=remote_exclusion_color,
             )
         )
     return tuple(lines)

@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Separate remote-present exclusions from untraversed directories by using
+  burnt orange rather than a cyan adjacent to the directory blues.
 - [x] Detect color capability automatically, honor `NO_COLOR`, remove the
   public color override, and use dark cyan for excluded paths present remotely.
 - [x] Align diff hierarchy from a column-zero scope anchor and stop reserving

@@ -658,7 +658,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_comparison[1]
     )
-    assert "  \033[38;5;30mx debug.log\033[0m" in colored_comparison[1]
+    assert "  \033[38;5;166mx debug.log\033[0m" in colored_comparison[1]
     assert "= same.txt" in colored_comparison[1]
     assert colored_comparison[1].index("node_modules/") < (
         colored_comparison[1].index("src/")

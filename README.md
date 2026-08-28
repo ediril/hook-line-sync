@@ -363,9 +363,9 @@ foreground, excluded paths are gray, and untraversed directory details are
 dark blue and italic. Color is disabled when output is redirected or
 `NO_COLOR` is set.
 Included directory paths are bright blue, excluded directory paths are darker
-blue, and an excluded path that also exists remotely uses dark cyan rather than
-gray. Color is enabled automatically for terminal output and suppressed when
-`NO_COLOR` is set.
+blue, and an excluded path that also exists remotely uses burnt orange rather
+than gray. Color is enabled automatically for terminal output and suppressed
+when `NO_COLOR` is set.
 
 Diff applies selectors before remote traversal and requests one MLSD listing per
 relevant local directory. A literal directory scope starts directly at that

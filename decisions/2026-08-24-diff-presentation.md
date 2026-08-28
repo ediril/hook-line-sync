@@ -15,7 +15,7 @@ List and diff show excluded entries by default. `-i`, `--inc`, or
 Core synchronization status remains textual. Color respects `NO_COLOR` and
 redirected output and has no command-line override. An `x` path normally uses
 excluded gray or dark-blue styling; when that excluded path exists remotely,
-dark cyan adds advisory remote-presence detail without changing its excluded
+burnt orange adds advisory remote-presence detail without changing its excluded
 status. That extra detail is intentionally absent from non-color output.
 
 A coherent scope is headed by one full project-relative anchor at column zero.
