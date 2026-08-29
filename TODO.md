@@ -1,5 +1,6 @@
 # Work Queue
 
+- [x] Add a script-friendly command that prints a profile's mapped local root.
 - [x] Frame mapped-directory inference as the normal workflow and improve the
   outside-root profile-override diagnostic.
 - [x] Make routine diff output compact by default and retain the complete

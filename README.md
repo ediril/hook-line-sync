@@ -92,8 +92,16 @@ local scope automatically:
 hlsync profiles          # all profiles; * marks the current one
 hlsync profile           # current profile details
 hlsync profile staging   # named profile details
+hlsync root staging      # print the mapped local root only
 hlsync connect            # verify FTPS, then disconnect
 hlsync remove staging    # remove local configuration only
+```
+
+Because `root` writes only the canonical path, it can be composed with the
+shell when you want to switch directories:
+
+```console
+cd "$(hlsync root staging)"
 ```
 
 An unqualified profile-aware command fails outside every mapped root. When you

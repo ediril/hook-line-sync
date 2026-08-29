@@ -107,6 +107,7 @@ CANONICAL_COMMANDS = (
     "connect",
     "map",
     "remove",
+    "root",
     "profile",
     "profiles",
     "list",
@@ -125,6 +126,7 @@ PROFILE_AWARE_COMMANDS = frozenset(
         "connect",
         "map",
         "remove",
+        "root",
         "profile",
         "list",
         "diff",
@@ -368,6 +370,18 @@ def build_parser() -> argparse.ArgumentParser:
         usage="hlsync remove [PROFILE]\n       hlsync PROFILE remove",
     )
     remove_parser.add_argument("project_name", nargs="?")
+
+    root_parser = subparsers.add_parser(
+        "root",
+        help="print a profile's mapped local root",
+        usage="hlsync root [PROFILE]\n       hlsync PROFILE root",
+    )
+    root_parser.add_argument(
+        "project_name",
+        nargs="?",
+        metavar="PROFILE",
+        help="profile name; inferred from the current directory when omitted",
+    )
 
     profile_parser = subparsers.add_parser(
         "profile",
@@ -879,6 +893,14 @@ def _show_profile(
             f"  Rules: {len(project.rules)}",
         )
     )
+
+
+def _show_root(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+) -> str:
+    _, name, project = _resolve_project(arguments, store)
+    return os.fspath(_require_local_root(name, project))
 
 
 def _require_local_root(name: str, project: ProjectConfiguration) -> Path:
@@ -2092,6 +2114,8 @@ def run(
             message = _manage_rules(arguments, configuration_store)
         elif arguments.command == "remove":
             message = _remove(arguments, configuration_store)
+        elif arguments.command == "root":
+            message = _show_root(arguments, configuration_store)
         elif arguments.command == "profile":
             message = _show_profile(arguments, configuration_store)
         elif arguments.command == "profiles":

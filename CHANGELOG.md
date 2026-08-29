@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.29.8 — 2026-08-29
+
+### Added
+
+- Add `hlsync root [PROFILE]` to print only the canonical mapped local root for
+  shell composition such as `cd "$(hlsync root staging)"`.
+
 ## 0.8.29.7 — 2026-08-29
 
 ### Changed

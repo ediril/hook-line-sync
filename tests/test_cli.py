@@ -89,6 +89,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert "push                upload local changes to the remote project" in (
         help_output
     )
+    assert "root                print a profile's mapped local root" in help_output
     pull_help = (
         "pull                replace changed local files from the remote project"
     )
@@ -152,6 +153,11 @@ def test_project_lifecycle_uses_production_credentials_and_version(
         "  Password env: PROD_FTPS_PASSWORD\n"
         "  Rules: 0\n",
         "",
+    )
+    assert invoke(["root", "client-site"], store) == (
+        1,
+        "",
+        "hlsync: error: project 'client-site' has not been mapped\n",
     )
 
     assert invoke(["remove", "client-site"], store) == (
@@ -425,6 +431,7 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     profile_stdout = invoke(["profile"], store)[1]
     assert f"  Local root: {workspace}\n" in profile_stdout
     assert "  Rules: 9\n" in profile_stdout
+    assert invoke(["root"], store) == (0, f"{workspace}\n", "")
     assert invoke(["rules", "remove", "8"], store) == (
         0,
         "Removed rule 8 from project 'prod': include node_modules/package/**\n",
@@ -865,6 +872,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
 
     monkeypatch.chdir(outside)
+    assert invoke(["root", "prod"], store) == (0, f"{workspace}\n", "")
     outside_status, _, outside_error = invoke(["list"], store)
     assert outside_status == 1
     assert outside_error == (
