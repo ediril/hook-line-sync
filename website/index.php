@@ -1,9 +1,29 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.28.20';
+$version = '0.8.28.21';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
+$title = 'Hook Line Sync — a better way to "just FTP it"';
+$description = 'Map your local project once. Preview the diff. Push exactly what you intend to shared hosting over FTPS.';
+$requestHost = (string) ($_SERVER['HTTP_HOST'] ?? '');
+$validHost = preg_match('/\A[a-z0-9.-]+(?::[0-9]+)?\z/i', $requestHost) === 1;
+$forwardedProtocol = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+$secureRequest = (
+    strtolower((string) ($_SERVER['HTTPS'] ?? '')) === 'on'
+    || $forwardedProtocol === 'https'
+);
+$requestPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+$pagePath = is_string($requestPath) && str_starts_with($requestPath, '/')
+    ? $requestPath
+    : '/';
+$origin = $validHost
+    ? ($secureRequest ? 'https://' : 'http://') . $requestHost
+    : null;
+$canonicalUrl = $origin === null ? null : $origin . $pagePath;
+$socialImageUrl = $origin === null
+    ? null
+    : $origin . '/assets/social-preview.jpg';
 
 function h(string $value): string
 {
@@ -16,8 +36,31 @@ function h(string $value): string
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080b10">
-    <meta name="description" content="HLS adds project mapping, readable diffs, and deliberate pushes to a simple FTPS workflow.">
-    <title>Hook Line Sync — a better way to "just FTP it"</title>
+    <meta name="description" content="<?= h($description) ?>">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Hook Line Sync">
+    <meta property="og:title" content="<?= h($title) ?>">
+    <meta property="og:description" content="<?= h($description) ?>">
+<?php if ($canonicalUrl !== null && $socialImageUrl !== null): ?>
+    <link rel="canonical" href="<?= h($canonicalUrl) ?>">
+    <meta property="og:url" content="<?= h($canonicalUrl) ?>">
+    <meta property="og:image" content="<?= h($socialImageUrl) ?>">
+<?php if ($secureRequest): ?>
+    <meta property="og:image:secure_url" content="<?= h($socialImageUrl) ?>">
+<?php endif; ?>
+<?php endif; ?>
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Hook Line Sync terminal workflow: diff local files, then push over FTPS.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?= h($title) ?>">
+    <meta name="twitter:description" content="<?= h($description) ?>">
+<?php if ($socialImageUrl !== null): ?>
+    <meta name="twitter:image" content="<?= h($socialImageUrl) ?>">
+    <meta name="twitter:image:alt" content="Hook Line Sync terminal workflow: diff local files, then push over FTPS.">
+<?php endif; ?>
+    <title><?= h($title) ?></title>
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -13,3 +13,6 @@ Deploy the contents of `website/`, including `.htaccess`, directly into the
 site's configured remote document root. The page uses Google Fonts for Space
 Mono and IBM Plex Mono; Apache's content security policy permits only those
 font resources in addition to same-origin assets.
+
+The page derives its canonical URL from the validated request host and exposes
+Open Graph and Twitter large-image metadata for `assets/social-preview.jpg`.

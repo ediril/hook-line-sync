@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.28.21 — 2026-08-28
+
+### Added
+
+- Added a branded 1200-by-630 social preview image matching the website's
+  terminal design.
+- Added Open Graph, Twitter large-image card, canonical URL, image dimensions,
+  and accessible image-description metadata using absolute request-host URLs.
+
 ## 0.8.28.20 — 2026-08-28
 
 ### Changed

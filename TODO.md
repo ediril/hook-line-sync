@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Add a branded 1200-by-630 social preview and absolute Open Graph and
+  Twitter card metadata to the project website.
 - [x] Add a concise user-audience section near the top of the README using the
   website's manual-FTP versus deployment-stack positioning.
 - [x] Recommend uv's isolated tool installation for the CLI and retain plain
