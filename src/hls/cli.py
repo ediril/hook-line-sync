@@ -114,6 +114,21 @@ CANONICAL_COMMANDS = (
     "version",
 )
 COMMAND_ALIASES = {"ls": "list"}
+PROFILE_AWARE_COMMANDS = frozenset(
+    {
+        "connect",
+        "map",
+        "remove",
+        "profile",
+        "list",
+        "diff",
+        "push",
+        "pull",
+        "exclude",
+        "include",
+        "rules",
+    }
+)
 
 
 def _add_included_only_argument(parser: argparse.ArgumentParser) -> None:
@@ -195,12 +210,54 @@ def _resolve_command_name(
     return matches[0]
 
 
+def _could_be_command(value: str) -> bool:
+    return value in COMMAND_ALIASES or any(
+        command.startswith(value) for command in CANONICAL_COMMANDS
+    )
+
+
+def _resolve_invocation(
+    raw_arguments: list[str],
+    *,
+    stdin: TextIO,
+    stdout: TextIO,
+) -> tuple[list[str], str | None]:
+    if not raw_arguments or raw_arguments[0].startswith("-"):
+        return raw_arguments, None
+    first = raw_arguments[0]
+    if (
+        first not in CANONICAL_COMMANDS
+        and first not in COMMAND_ALIASES
+        and len(raw_arguments) > 1
+        and not raw_arguments[1].startswith("-")
+        and _could_be_command(raw_arguments[1])
+    ):
+        profile_name = validate_project_name(first)
+        raw_arguments = raw_arguments[1:]
+        raw_arguments[0] = _resolve_command_name(
+            raw_arguments[0], stdin=stdin, stdout=stdout
+        )
+        return raw_arguments, profile_name
+    raw_arguments[0] = _resolve_command_name(first, stdin=stdin, stdout=stdout)
+    return raw_arguments, None
+
+
+def _validate_profile_prefix(arguments: argparse.Namespace) -> None:
+    profile_name = getattr(arguments, "profile_prefix", None)
+    if profile_name is not None and arguments.command not in PROFILE_AWARE_COMMANDS:
+        raise ConfigurationError(
+            f"profile prefix '{profile_name}' cannot be used with "
+            f"'{arguments.command}'"
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hlsync",
         description=(
-            "Transfer mapped files over explicit FTP over TLS. Commands may be "
-            "shortened to any unique prefix."
+            "Transfer mapped files over explicit FTP over TLS. Prefix a command "
+            "with a profile to use that profile's local root as the working "
+            "directory. Commands may be shortened to any unique prefix."
         ),
     )
     parser.add_argument("--version", action="version", version=__version__)
@@ -223,14 +280,18 @@ def build_parser() -> argparse.ArgumentParser:
     add_parser.add_argument("--password-env")
 
     connect_parser = subparsers.add_parser(
-        "connect", help="verify a project's FTPS connection"
+        "connect",
+        help="verify a project's FTPS connection",
+        usage="hlsync connect [PROFILE]\n       hlsync PROFILE connect",
     )
     connect_parser.add_argument("project_name", nargs="?")
 
     map_parser = subparsers.add_parser(
-        "map", help="map or remap the current directory to a project"
+        "map",
+        help="map or remap the current directory to a project",
+        usage="hlsync map [PROFILE]\n       hlsync PROFILE map",
     )
-    map_parser.add_argument("project_name")
+    map_parser.add_argument("project_name", nargs="?")
 
     for command, help_text, rule_name in (
         (
@@ -248,9 +309,8 @@ def build_parser() -> argparse.ArgumentParser:
             command,
             help=help_text,
             usage=(
-                f"hlsync {command} [PATH ...] [--project PROJECT_NAME]\n"
-                f"       hlsync {command} --pattern PATTERN ... "
-                "[--project PROJECT_NAME]"
+                f"hlsync [PROFILE] {command} [PATH ...]\n"
+                f"       hlsync [PROFILE] {command} --pattern PATTERN ..."
             ),
         )
         add_pattern_operands(
@@ -267,18 +327,13 @@ def build_parser() -> argparse.ArgumentParser:
             action="store_true",
             help="record operands as reusable wildcard patterns",
         )
-        rules_parser.add_argument(
-            "--project",
-            dest="project_name",
-            help="project name; inferred from the current directory when omitted",
-        )
 
     rules_parser = subparsers.add_parser(
         "rules",
         help="list or remove synchronization rules",
         usage=(
-            "hlsync rules [--project PROJECT_NAME]\n"
-            "       hlsync rules remove RULE_ID [--project PROJECT_NAME]"
+            "hlsync [PROFILE] rules\n"
+            "       hlsync [PROFILE] rules remove RULE_ID"
         ),
         description=(
             "List synchronization rules, or remove one rule by its numeric ID."
@@ -298,17 +353,17 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="RULE_ID",
         help="numeric rule ID required by remove",
     )
-    rules_parser.add_argument(
-        "--project",
-        dest="project_name",
-        help="project name; inferred from the current directory when omitted",
+    remove_parser = subparsers.add_parser(
+        "remove",
+        help="remove a project",
+        usage="hlsync remove [PROFILE]\n       hlsync PROFILE remove",
     )
-
-    remove_parser = subparsers.add_parser("remove", help="remove a project")
-    remove_parser.add_argument("project_name")
+    remove_parser.add_argument("project_name", nargs="?")
 
     profile_parser = subparsers.add_parser(
-        "profile", help="show details for one profile"
+        "profile",
+        help="show details for one profile",
+        usage="hlsync profile [PROFILE]\n       hlsync PROFILE profile",
     )
     profile_parser.add_argument(
         "project_name",
@@ -322,6 +377,7 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser = subparsers.add_parser(
         "list",
         help="list the current local directory and exclusion status",
+        usage="hlsync [PROFILE] list [-r] [-i] [PATH ...]",
         description=(
             "List selected paths in the current mapped local directory, "
             "including dotfiles and exclusion status, without connecting to FTPS."
@@ -336,11 +392,6 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     list_parser.add_argument(
-        "--project",
-        dest="project_name",
-        help="project name; inferred from the current directory when omitted",
-    )
-    list_parser.add_argument(
         "-r",
         "--recursive",
         action="store_true",
@@ -352,7 +403,7 @@ def build_parser() -> argparse.ArgumentParser:
         "diff",
         help="preview file changes without modifying anything",
         usage=(
-            "hlsync diff [PATH ...] [--project PROFILE]\n"
+            "hlsync [PROFILE] diff [PATH ...]\n"
             "       [--pull | --prune-remote] [-r] [-i] [--paged]\n"
             "       [--resume DIRECTORY]"
         ),
@@ -369,11 +420,6 @@ def build_parser() -> argparse.ArgumentParser:
             "relative file paths or wildcard patterns; defaults to immediate "
             "contents of the current directory"
         ),
-    )
-    diff_parser.add_argument(
-        "--project",
-        dest="project_name",
-        help="project name; inferred from the current directory when omitted",
     )
     diff_direction = diff_parser.add_mutually_exclusive_group()
     diff_direction.add_argument(
@@ -423,6 +469,10 @@ def build_parser() -> argparse.ArgumentParser:
             command,
             help=transfer_help[command],
             description=transfer_description[command],
+            usage=(
+                f"hlsync [PROFILE] {command} [PATH ...] [-r]"
+                + (" [-p]" if command == "push" else "")
+            ),
         )
         add_pattern_operands(
             transfer_parser,
@@ -434,11 +484,6 @@ def build_parser() -> argparse.ArgumentParser:
                 if command == "push"
                 else "required relative file paths or wildcard patterns"
             ),
-        )
-        transfer_parser.add_argument(
-            "--project",
-            dest="project_name",
-            help="project name; inferred from the current directory when omitted",
         )
         transfer_parser.add_argument(
             "-r",
@@ -537,7 +582,13 @@ def _resolve_project(
     arguments: argparse.Namespace, store: ConfigurationStore
 ) -> tuple[ApplicationConfiguration, str, ProjectConfiguration]:
     configuration = store.load()
-    supplied_name = getattr(arguments, "project_name", None)
+    prefix_name = getattr(arguments, "profile_prefix", None)
+    positional_name = getattr(arguments, "project_name", None)
+    if prefix_name is not None and positional_name is not None:
+        raise ConfigurationError(
+            "profile was specified both before the command and as an argument"
+        )
+    supplied_name = prefix_name or positional_name
     if supplied_name is None:
         active = configuration.project_for_path(Path.cwd().resolve(strict=True))
         if active is None:
@@ -550,6 +601,15 @@ def _resolve_project(
     if name not in configuration.projects:
         raise ConfigurationError(f"project '{name}' does not exist")
     return configuration, name, configuration.projects[name]
+
+
+def _effective_current_directory(
+    arguments: argparse.Namespace,
+    project_root: Path,
+) -> Path:
+    if getattr(arguments, "profile_prefix", None) is not None:
+        return project_root.resolve(strict=True)
+    return Path.cwd().resolve(strict=True)
 
 
 def _connect(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
@@ -682,7 +742,7 @@ def _change_rules(
         kind = "Inclusion" if include else "Exclusion"
         return _format_rules(name, rules, heading=f"{kind} rules", grouped=True)
     root = _require_local_root(name, project)
-    current_directory = Path.cwd().resolve(strict=True)
+    current_directory = _effective_current_directory(arguments, root)
     operands = (
         patterns
         if arguments.pattern
@@ -1094,12 +1154,18 @@ def _scope_header_lines(
 
 def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection:
     operands = list(normalize_pattern_operands(arguments))
+    current_directory = _effective_current_directory(arguments, root)
     if not operands:
         recursive = arguments.recursive or arguments.command == "push"
-        return _current_directory_selection(root, recursive=recursive)
+        return _current_directory_selection(
+            root,
+            current_directory=current_directory,
+            recursive=recursive,
+        )
     return _directory_contents_selection(
         operands,
         root,
+        current_directory=current_directory,
         recursive=arguments.recursive,
     )
 
@@ -1134,11 +1200,17 @@ def _list_selection(
     root: Path,
 ) -> DirectoryContentsSelection:
     operands = list(normalize_pattern_operands(arguments))
+    current_directory = _effective_current_directory(arguments, root)
     if not operands:
-        return _current_directory_selection(root, recursive=arguments.recursive)
+        return _current_directory_selection(
+            root,
+            current_directory=current_directory,
+            recursive=arguments.recursive,
+        )
     return _directory_contents_selection(
         operands,
         root,
+        current_directory=current_directory,
         recursive=arguments.recursive,
     )
 
@@ -1146,6 +1218,7 @@ def _list_selection(
 def _current_directory_selection(
     root: Path,
     *,
+    current_directory: Path,
     recursive: bool,
 ) -> DirectoryContentsSelection:
     pattern = "**" if recursive else "*"
@@ -1153,7 +1226,7 @@ def _current_directory_selection(
         _selection_from_values(
             (pattern,),
             root,
-            Path.cwd().resolve(strict=True),
+            current_directory,
         )
     )
 
@@ -1162,10 +1235,9 @@ def _directory_contents_selection(
     operands: Sequence[str],
     root: Path,
     *,
+    current_directory: Path,
     recursive: bool,
 ) -> DirectoryContentsSelection:
-    current_directory = Path.cwd().resolve(strict=True)
-
     traversal_patterns: list[str] = []
     container_patterns: list[str] = []
     for operand in operands:
@@ -1240,8 +1312,11 @@ def _descendant_directories(
     )
 
 
-def _project_relative_current_directory(root: Path) -> PurePosixPath:
-    current = Path.cwd().resolve(strict=True)
+def _project_relative_current_directory(
+    arguments: argparse.Namespace,
+    root: Path,
+) -> PurePosixPath:
+    current = _effective_current_directory(arguments, root)
     try:
         relative = current.relative_to(root)
     except ValueError:
@@ -1254,7 +1329,7 @@ def _diff_traversal_roots(
     root: Path,
 ) -> tuple[_DiffTraversalRoot, ...]:
     """Find the narrowest deterministic directories needed by the selection."""
-    base = _project_relative_current_directory(root)
+    base = _project_relative_current_directory(arguments, root)
     operands = normalize_pattern_operands(arguments)
     if not operands:
         return (_DiffTraversalRoot(base),)
@@ -1322,9 +1397,10 @@ def _resume_directory(value: str | None) -> PurePosixPath | None:
 
 
 def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> str:
-    command = ["hlsync", "diff", *arguments.pattern_operands]
-    if arguments.project_name is not None:
-        command.extend(("--project", arguments.project_name))
+    command = ["hlsync"]
+    if arguments.profile_prefix is not None:
+        command.append(arguments.profile_prefix)
+    command.extend(("diff", *arguments.pattern_operands))
     if arguments.pull:
         command.append("--pull")
     if arguments.prune_remote:
@@ -1770,16 +1846,16 @@ def run(
 ) -> int:
     parser = build_parser()
     raw_arguments = list(sys.argv[1:] if argv is None else argv)
-    if raw_arguments and not raw_arguments[0].startswith("-"):
-        try:
-            raw_arguments[0] = _resolve_command_name(
-                raw_arguments[0],
-                stdin=stdin,
-                stdout=stdout,
-            )
-        except ConfigurationError as error:
-            parser.error(str(error))
+    try:
+        raw_arguments, profile_prefix = _resolve_invocation(
+            raw_arguments,
+            stdin=stdin,
+            stdout=stdout,
+        )
+    except ConfigurationError as error:
+        parser.error(str(error))
     arguments = parser.parse_args(raw_arguments)
+    arguments.profile_prefix = profile_prefix
     if arguments.legend:
         if arguments.command is not None:
             parser.error("--legend cannot be combined with a command")
@@ -1790,6 +1866,7 @@ def run(
     configuration_store = store or ConfigurationStore()
     exit_status = 0
     try:
+        _validate_profile_prefix(arguments)
         if arguments.command == "add":
             message = _save_project(arguments, configuration_store, stdin, stdout)
         elif arguments.command == "connect":

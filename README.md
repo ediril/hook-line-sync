@@ -94,7 +94,18 @@ hlsync connect            # verify FTPS, then disconnect
 hlsync remove staging    # remove local configuration only
 ```
 
-Use `--project <name>` where supported when running outside a mapped root.
+When you are outside a mapped root, put the profile before the command. HLSync
+then uses that profile's local root as the working directory for paths and
+selection:
+
+```console
+hlsync staging list
+hlsync staging diff templates
+hlsync staging push templates -r
+```
+
+The prefix is unnecessary while your real current directory is already inside
+the intended profile.
 
 ## Synchronization rules
 

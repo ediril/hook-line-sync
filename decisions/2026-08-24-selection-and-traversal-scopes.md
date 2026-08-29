@@ -12,8 +12,10 @@ A selected directory is a container: it includes its immediate contents and
 adds descendants only with `-r` / `--recursive`. `.` explicitly selects the
 current directory. Multiple path or wildcard operands form a deterministic
 union. Operands are relative to the current directory inside the mapped root,
-or to the selected profile's root when used outside it with `--project`.
-Absolute paths, parent traversal, and paths escaping the root are rejected.
+or to the selected profile's root when the command has a leading profile such
+as `hlsync staging diff`. The profile prefix is an explicit virtual working
+directory; it does not change the process working directory. Absolute paths,
+parent traversal, and paths escaping the root are rejected.
 A union that matches no eligible path on either side is an error; one unmatched
 operand does not invalidate an otherwise matched union.
 
@@ -48,3 +50,5 @@ overwritten locally.
 - Persisting selection or traversal state between commands.
 - Treating a visible untraversed directory as authorization to mutate it.
 - Treating pruning authorization as recursive selection.
+- Applying the virtual working directory to `map`, whose purpose is to map the
+  real current directory.

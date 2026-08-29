@@ -74,6 +74,8 @@ def test_project_lifecycle_uses_production_credentials_and_version(
 
     help_output = invoke(["help"], store)[1]
     assert "--legend" in help_output
+    assert "Prefix a command" in help_output
+    assert "profile to use" in help_output
     assert "diff                preview file changes without modifying anything" in (
         help_output
     )
@@ -90,12 +92,13 @@ def test_project_lifecycle_uses_production_credentials_and_version(
         "pull                replace changed local files from the remote project"
     )
     assert pull_help in help_output
-    assert "usage: hlsync diff" in invoke(["help", "d"], store)[1]
+    assert "usage: hlsync [PROFILE] diff" in invoke(["help", "d"], store)[1]
     assert "--color" not in invoke(["help", "list"], store)[1]
     assert "--color" not in invoke(["help", "diff"], store)[1]
     rules_help = invoke(["help", "rules"], store)[1]
-    assert "hlsync rules [--project PROJECT_NAME]" in rules_help
-    assert "hlsync rules remove RULE_ID [--project PROJECT_NAME]" in rules_help
+    assert "hlsync [PROFILE] rules" in rules_help
+    assert "hlsync [PROFILE] rules remove RULE_ID" in rules_help
+    assert "--project" not in rules_help
     assert "[{remove}] [rule_id]" not in rules_help
     assert "profile             show details for one profile" in help_output
     assert "profiles            list configured profiles" in help_output
@@ -118,8 +121,19 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     )
     for command in ("exclude", "include"):
         rule_help = invoke(["help", command], store)[1]
-        assert f"hlsync {command} [PATH ...]" in rule_help
-        assert f"hlsync {command} --pattern PATTERN ..." in rule_help
+        assert f"hlsync [PROFILE] {command} [PATH ...]" in rule_help
+        assert f"hlsync [PROFILE] {command} --pattern PATTERN ..." in rule_help
+    project_selection_commands = (
+        "exclude",
+        "include",
+        "rules",
+        "list",
+        "diff",
+        "push",
+        "pull",
+    )
+    for command in project_selection_commands:
+        assert "--project" not in invoke(["help", command], store)[1]
 
     list_status, list_stdout, list_stderr = invoke(["profiles"], store)
     assert (list_status, list_stderr) == (0, "")
@@ -425,6 +439,17 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert not any(rule.pattern == "composer.json" for rule in updated.rules)
     assert updated.next_rule_id == 10
     assert "project mapped to the current directory" not in profile_stdout
+
+    (workspace / "root.env").write_text("ROOT=1", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    monkeypatch.chdir(outside)
+    assert invoke(["prod", "exclude", "*.env"], store) == (
+        0,
+        "Recorded exclusion rules for project 'prod':\n"
+        "  10  exclude ./root.env\n",
+        "",
+    )
 
 
 def test_current_project_inference_drives_connect_and_tree_listings(
@@ -823,6 +848,20 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "  deployed.html\n"
     )
 
+    monkeypatch.chdir(outside)
+    prefixed_list = invoke(["prod", "list"], store)
+    assert prefixed_list[0] == 0
+    assert "  README.md\n" in prefixed_list[1]
+    assert "secret.txt" not in prefixed_list[1]
+    prefixed_diff = invoke(["prod", "diff", "src"], store)
+    assert prefixed_diff[0] == 0
+    assert prefixed_diff[1].startswith("src/\n")
+    assert "  + main.py\n" in prefixed_diff[1]
+    prefixed_page = invoke(["prod", "diff", ".", "-r", "--paged"], store)
+    assert "Resume: hlsync prod diff . --recursive --paged --resume src\n" in (
+        prefixed_page[1]
+    )
+
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
     tmp_path, monkeypatch
@@ -852,7 +891,7 @@ def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
     monkeypatch.chdir(child)
     overlap_status, _, overlap_error = invoke(["map", "staging"], store)
     monkeypatch.chdir(separate)
-    declined = invoke(["map", "prod"], store)
+    declined = invoke(["prod", "map"], store)
     remapped = invoke(["map", "prod"], store, stdin="yes\n")
 
     assert overlap_status == 1

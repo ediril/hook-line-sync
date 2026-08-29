@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.29.3 — 2026-08-29
+
+### Changed
+
+- Replaced command-level `--project` options with a leading profile syntax,
+  such as `hlsync dengine list`, which uses the mapped local root as an
+  explicit virtual working directory for path-oriented commands.
+- Preserve the selected profile in stateless paged-diff resume commands.
+
 ## 0.8.29.2 — 2026-08-29
 
 ### Changed

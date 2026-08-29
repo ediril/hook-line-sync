@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Replace `--project` with a leading profile that establishes an explicit
+  virtual working directory for path-oriented commands.
 - [x] Report active behavioral options in inspection and transfer command output.
 - [x] Add a v2 `llms.txt` project summary and strengthen website search metadata
   with explicit robots directives, locale, and SoftwareApplication JSON-LD.
