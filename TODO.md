@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Add concise next-step guidance when no profile is active.
+- [x] Treat an unmapped `hlsync profile` lookup as informational.
 - [x] Add a script-friendly command that prints a profile's mapped local root.
 - [x] Frame mapped-directory inference as the normal workflow and improve the
   outside-root profile-override diagnostic.

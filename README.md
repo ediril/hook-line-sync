@@ -97,6 +97,10 @@ hlsync connect            # verify FTPS, then disconnect
 hlsync remove staging    # remove local configuration only
 ```
 
+Outside every mapped root, `hlsync profile` reports that no profile is active
+and suggests `hlsync PROFILE COMMAND`. Commands that require a profile need
+that explicit profile prefix.
+
 Because `root` writes only the canonical path, it can be composed with the
 shell when you want to switch directories:
 

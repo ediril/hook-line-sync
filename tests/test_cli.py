@@ -873,6 +873,11 @@ def test_current_project_inference_drives_connect_and_tree_listings(
 
     monkeypatch.chdir(outside)
     assert invoke(["root", "prod"], store) == (0, f"{workspace}\n", "")
+    assert invoke(["profile"], store) == (
+        0,
+        "No active profile. Use hlsync PROFILE COMMAND.\n",
+        "",
+    )
     outside_status, _, outside_error = invoke(["list"], store)
     assert outside_status == 1
     assert outside_error == (

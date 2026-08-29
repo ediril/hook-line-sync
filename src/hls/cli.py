@@ -880,6 +880,14 @@ def _show_profile(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
 ) -> str:
+    if (
+        getattr(arguments, "profile_prefix", None) is None
+        and arguments.project_name is None
+    ):
+        configuration = store.load()
+        active = configuration.project_for_path(Path.cwd().resolve(strict=True))
+        if active is None:
+            return "No active profile. Use hlsync PROFILE COMMAND."
     _, name, project = _resolve_project(arguments, store)
     return "\n".join(
         (

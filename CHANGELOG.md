@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.29.10 — 2026-08-29
+
+### Changed
+
+- Add concise profile-prefix guidance when `hlsync profile` finds no active
+  profile.
+
+## 0.8.29.9 — 2026-08-29
+
+### Changed
+
+- Make `hlsync profile` report `No active profile.` outside mapped roots
+  instead of treating the absence of an active profile as an error.
+
 ## 0.8.29.8 — 2026-08-29
 
 ### Added
