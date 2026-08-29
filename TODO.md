@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Reorder the README around installation and tool usage, moving contributor
+  setup and release-maintenance details to the end.
 - [x] Indent zero-action transfer results and report the number of unchanged
   included files in an empty push's selected scope.
 - [x] Keep pruning authorization independent from traversal depth so excluded

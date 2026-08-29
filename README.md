@@ -4,31 +4,29 @@ Hook Line Sync (`hlsync`) is a command-line workflow for deploying local
 projects to shared hosting over explicit FTP over TLS (FTPS): map once, preview
 the diff, then push the intended files.
 
-HLSync is in pre-alpha development. Configuration, rules, local listings,
-remote comparison, push, pull, and release packaging are implemented. See
-[`TODO.md`](TODO.md) for upcoming work and [`CHANGELOG.md`](CHANGELOG.md) for
-completed changes.
+HLSync is pre-alpha software. Commands and configuration may change before a
+stable release.
 
-## Requirements and installation
+## Installation
 
-- Python 3.10 or newer.
-- Explicit FTPS with protected data connections (`AUTH TLS` and `PROT P`).
-- MLSD for structured remote listings.
-- For push, MFMT and MDTM to apply and verify uploaded-file timestamps.
-
-For development:
+HLSync requires Python 3.10 or newer. Until its first PyPI release, install it
+from a source checkout:
 
 ```console
-python -m pip install -e '.[dev]'
-pytest
+git clone https://github.com/ediril/hook-line-sync.git
+cd hook-line-sync
+python -m pip install .
 ```
 
-The PyPI distribution is `hook-line-sync`, the installed command is `hlsync`,
-and the internal Python package remains `hls`. After the first PyPI release:
+After the first PyPI release:
 
 ```console
 python -m pip install hook-line-sync
 ```
+
+The FTPS server must support explicit TLS with protected data connections
+(`AUTH TLS` and `PROT P`) plus MLSD directory listings. Push additionally
+requires MFMT and MDTM to apply and verify uploaded-file timestamps.
 
 ## Quick start
 
@@ -284,11 +282,24 @@ the candidate list in noninteractive use.
 Use `hlsync help [command]`, `hlsync --version`, and `hlsync --legend` for
 built-in reference.
 
-## License and maintenance
+## License
 
 HLSync is available under the [MIT License](LICENSE) for personal and commercial
 use. A future voluntary Business subscription may fund development and provide
 support or services; it is not required for commercial use.
+
+## Development and maintenance
+
+Install the development environment and run the test suite:
+
+```console
+python -m pip install -e '.[dev]'
+pytest
+```
+
+The PyPI distribution is `hook-line-sync`, the installed command is `hlsync`,
+and the internal Python package remains `hls`. See [`TODO.md`](TODO.md) for the
+ordered work queue and [`CHANGELOG.md`](CHANGELOG.md) for completed changes.
 
 Maintainer release instructions are in [`RELEASING.md`](RELEASING.md). The
 self-contained PHP 8.3 project site is in [`website/`](website/README.md).

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.28.17 — 2026-08-28
+
+### Changed
+
+- Reordered the README as a user-first guide and moved development setup,
+  package internals, work tracking, and release maintenance to the end.
+- Added current source-checkout installation instructions.
+
 ## 0.8.28.16 — 2026-08-28
 
 ### Changed
