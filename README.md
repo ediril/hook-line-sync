@@ -7,6 +7,14 @@ the diff, then push the intended files.
 HLSync is pre-alpha software. Commands and configuration may change before a
 stable release.
 
+## Who is it for?
+
+HLSync is for people who still deploy websites or small projects to shared hosting over FTP.
+
+If your current process is basically “figure out which files changed and upload them,” HLSync gives you a safer, more repeatable version of that workflow without requiring a full deployment system.
+
+It works best when your local project is the source of truth and the remote server is simply where the project gets deployed.
+
 ## Installation
 
 HLSync requires Python 3.10 or newer. Install it from PyPI as an isolated

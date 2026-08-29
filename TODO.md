@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Add a concise user-audience section near the top of the README using the
+  website's manual-FTP versus deployment-stack positioning.
 - [x] Recommend uv's isolated tool installation for the CLI and retain plain
   `pip install` as the user-facing alternative.
 - [x] Present PyPI as the user installation path and keep source-checkout setup

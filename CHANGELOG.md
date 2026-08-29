@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.28.20 — 2026-08-28
+
+### Changed
+
+- Added a user-focused README introduction for developers who want a safer FTPS
+  workflow without adopting a full deployment stack.
+- Made the local-source-of-truth assumption explicit before installation.
+
 ## 0.8.28.19 — 2026-08-28
 
 ### Changed
