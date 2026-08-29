@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.29.7 — 2026-08-29
+
+### Changed
+
+- Clarify that mapped-directory inference is the normal workflow and a leading
+  profile is a non-persistent one-command override.
+- Make outside-root failures suggest the explicit `hlsync PROFILE COMMAND`
+  form instead of referring to an unmapped project without guidance.
+
 ## 0.8.29.6 — 2026-08-29
 
 ### Changed

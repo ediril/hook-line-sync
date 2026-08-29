@@ -84,7 +84,9 @@ HLSync stores the canonical absolute local root and maps every descendant to
 the same relative path under the remote root. Roots may not overlap across
 profiles. Remapping requires confirmation and defaults to no.
 
-The current directory selects the containing profile automatically:
+The normal workflow is to run HLSync inside a mapped root or one of its
+descendants. The current directory selects the containing profile and relative
+local scope automatically:
 
 ```console
 hlsync profiles          # all profiles; * marks the current one
@@ -94,9 +96,11 @@ hlsync connect            # verify FTPS, then disconnect
 hlsync remove staging    # remove local configuration only
 ```
 
-When you are outside a mapped root, put the profile before the command. HLSync
-then uses that profile's local root as the working directory for paths and
-selection:
+An unqualified profile-aware command fails outside every mapped root. When you
+intentionally need to operate from elsewhere—or override the profile inferred
+from the current directory—put the profile before the command. The override
+lasts for that command only and uses the selected profile's local root as its
+working directory:
 
 ```console
 hlsync staging list
@@ -104,8 +108,7 @@ hlsync staging diff templates
 hlsync staging push templates -r
 ```
 
-The prefix is unnecessary while your real current directory is already inside
-the intended profile.
+No profile selection is persisted between commands.
 
 ## Synchronization rules
 

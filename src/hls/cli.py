@@ -263,9 +263,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hlsync",
         description=(
-            "Transfer mapped files over explicit FTP over TLS. Prefix a command "
-            "with a profile to use that profile's local root as the working "
-            "directory. Commands may be shortened to any unique prefix."
+            "Transfer mapped files over explicit FTP over TLS. Run commands "
+            "inside a mapped profile; prefix a command with a profile only for "
+            "a one-command override. Commands may be shortened to any unique "
+            "prefix."
         ),
     )
     parser.add_argument("--version", action="version", version=__version__)
@@ -609,7 +610,8 @@ def _resolve_project(
         active = configuration.project_for_path(Path.cwd().resolve(strict=True))
         if active is None:
             raise ConfigurationError(
-                "current directory is not inside a mapped project"
+                "current directory is not inside a mapped profile; prefix the "
+                "command with a profile (hlsync PROFILE COMMAND)"
             )
         name, project = active
         return configuration, name, project

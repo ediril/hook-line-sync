@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Frame mapped-directory inference as the normal workflow and improve the
+  outside-root profile-override diagnostic.
 - [x] Make routine diff output compact by default and retain the complete
   exploratory comparison behind `-a`/`--all`.
 - [x] Render recursive local listings as a properly indented tree without

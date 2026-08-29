@@ -11,11 +11,12 @@ equivalent to `push -r`. Pull requires at least one explicit operand.
 A selected directory is a container: it includes its immediate contents and
 adds descendants only with `-r` / `--recursive`. `.` explicitly selects the
 current directory. Multiple path or wildcard operands form a deterministic
-union. Operands are relative to the current directory inside the mapped root,
-or to the selected profile's root when the command has a leading profile such
-as `hlsync staging diff`. The profile prefix is an explicit virtual working
-directory; it does not change the process working directory. Absolute paths,
-parent traversal, and paths escaping the root are rejected.
+union. An unqualified command infers its profile and relative scope from the
+current directory and fails outside every mapped root. A leading profile, such
+as `hlsync staging diff`, is an explicit one-command override whose virtual
+working directory is that profile's root; it does not change the process
+working directory or persist selection. Absolute paths, parent traversal, and
+paths escaping the root are rejected.
 A union that matches no eligible path on either side is an error; one unmatched
 operand does not invalidate an otherwise matched union.
 
@@ -39,7 +40,9 @@ may still be created as a required parent of selected files.
 Shallow explicit scopes make ordinary inspection predictable and avoid needless
 FTP listings. Recursive transfer of the current tree remains convenient for the
 primary deployment operation, while pull requires the user to name what may be
-overwritten locally.
+overwritten locally. Requiring either mapped-directory context or an explicit
+per-command profile prevents hidden state from directing work at an unintended
+project.
 
 ## Intentionally excluded
 
@@ -48,6 +51,7 @@ overwritten locally.
 - Walking ancestor directories merely to reach an exact selected directory.
 - Letting selection broaden configured synchronization rules.
 - Persisting selection or traversal state between commands.
+- Falling back to a previously selected profile outside mapped roots.
 - Treating a visible untraversed directory as authorization to mutate it.
 - Treating pruning authorization as recursive selection.
 - Applying the virtual working directory to `map`, whose purpose is to map the

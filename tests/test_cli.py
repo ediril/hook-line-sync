@@ -74,8 +74,9 @@ def test_project_lifecycle_uses_production_credentials_and_version(
 
     help_output = invoke(["help"], store)[1]
     assert "--legend" in help_output
-    assert "Prefix a command" in help_output
-    assert "profile to use" in help_output
+    assert "inside a mapped" in help_output
+    assert "profile; prefix a command" in help_output
+    assert "one-command override" in help_output
     assert "diff                preview file changes without modifying anything" in (
         help_output
     )
@@ -864,6 +865,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
 
     monkeypatch.chdir(outside)
+    outside_status, _, outside_error = invoke(["list"], store)
+    assert outside_status == 1
+    assert outside_error == (
+        "hlsync: error: current directory is not inside a mapped profile; "
+        "prefix the command with a profile (hlsync PROFILE COMMAND)\n"
+    )
     prefixed_list = invoke(["prod", "list"], store)
     assert prefixed_list[0] == 0
     assert "  README.md\n" in prefixed_list[1]
