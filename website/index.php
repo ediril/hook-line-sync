@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.28.22';
+$version = '0.8.29.1';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 $title = 'Hook Line Sync — a better way to "just FTP it"';
@@ -24,6 +24,36 @@ $canonicalUrl = $origin === null ? null : $origin . $pagePath;
 $socialImageUrl = $origin === null
     ? null
     : $origin . '/assets/social-preview.jpg';
+$structuredData = [
+    '@context' => 'https://schema.org',
+    '@type' => 'SoftwareApplication',
+    'name' => 'Hook Line Sync',
+    'alternateName' => 'HLSync',
+    'description' => $description,
+    'applicationCategory' => 'DeveloperApplication',
+    'operatingSystem' => 'Any operating system with Python 3.10+',
+    'softwareVersion' => $version,
+    'url' => $canonicalUrl ?? $repository,
+    'downloadUrl' => 'https://pypi.org/project/hook-line-sync/',
+    'sameAs' => $repository,
+    'license' => 'https://opensource.org/license/mit',
+    'offers' => [
+        '@type' => 'Offer',
+        'price' => '0',
+        'priceCurrency' => 'USD',
+    ],
+];
+if ($socialImageUrl !== null) {
+    $structuredData['image'] = $socialImageUrl;
+}
+$structuredDataJson = json_encode(
+    $structuredData,
+    JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+);
+if ($structuredDataJson === false) {
+    throw new RuntimeException('Could not encode website structured data.');
+}
 
 function h(string $value): string
 {
@@ -37,7 +67,10 @@ function h(string $value): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080b10">
     <meta name="description" content="<?= h($description) ?>">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="author" content="Hook Line Sync contributors">
     <meta property="og:type" content="website">
+    <meta property="og:locale" content="en_US">
     <meta property="og:site_name" content="Hook Line Sync">
     <meta property="og:title" content="<?= h($title) ?>">
     <meta property="og:description" content="<?= h($description) ?>">
@@ -60,7 +93,9 @@ function h(string $value): string
     <meta name="twitter:image" content="<?= h($socialImageUrl) ?>">
     <meta name="twitter:image:alt" content="Hook Line Sync terminal workflow: diff local files, then push over FTPS.">
 <?php endif; ?>
+    <script type="application/ld+json"><?= $structuredDataJson ?></script>
     <title><?= h($title) ?></title>
+    <link rel="describedby" href="/llms.txt" type="text/markdown">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="assets/favicon-32x32.png" type="image/png" sizes="32x32">
     <link rel="shortcut icon" href="favicon.ico">

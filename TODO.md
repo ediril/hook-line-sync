@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Add a v2 `llms.txt` project summary and strengthen website search metadata
+  with explicit robots directives, locale, and SoftwareApplication JSON-LD.
 - [x] Complete the website favicon set from the existing hook mark with SVG,
   PNG, ICO, and Apple touch formats.
 - [x] Add a branded 1200-by-630 social preview and absolute Open Graph and

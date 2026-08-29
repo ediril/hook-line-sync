@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.29.1 — 2026-08-29
+
+### Added
+
+- Added a v2 `llms.txt` project summary with curated links to the README,
+  changelog, license, source, and work queue.
+- Added explicit search robots directives, Open Graph locale, author metadata,
+  SoftwareApplication JSON-LD, and `rel="describedby"` discovery for llms.txt.
+
 ## 0.8.28.22 — 2026-08-28
 
 ### Added

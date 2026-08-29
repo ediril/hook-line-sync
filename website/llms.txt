@@ -1,0 +1,19 @@
+# Hook Line Sync
+
+> Hook Line Sync (HLSync) is a command-line workflow for deploying local projects to shared hosting over explicit FTP over TLS (FTPS): map once, preview the diff, then push the intended files.
+
+HLSync is for developers who want a safer, repeatable alternative to manual FTP without adopting a full deployment stack. The local project is authoritative; the remote server is a deployment target. Excluded local paths are never uploaded, and remote deletion requires explicit pruning authorization.
+
+## Documentation
+
+- [README](https://github.com/ediril/hook-line-sync/blob/main/README.md): Installation, configuration, synchronization rules, traversal, diff, push, pull, and transfer guarantees.
+- [Changelog](https://github.com/ediril/hook-line-sync/blob/main/CHANGELOG.md): Current version history and completed behavior changes.
+- [License](https://github.com/ediril/hook-line-sync/blob/main/LICENSE): MIT license terms.
+
+## Source
+
+- [GitHub repository](https://github.com/ediril/hook-line-sync): Source code, issue tracker, and project files.
+
+## Optional
+
+- [Work queue](https://github.com/ediril/hook-line-sync/blob/main/TODO.md): Planned scalability and rule-matching work.
