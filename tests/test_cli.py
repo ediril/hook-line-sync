@@ -702,6 +702,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     recursive_comparison = invoke(["diff", "-r"], store)
     assert "Options: recursive (-r).\n" in recursive_comparison[2]
     assert "  + child.py\n" in recursive_comparison[1]
+    assert recursive_comparison[1].index("nested/\n") < (
+        recursive_comparison[1].index("  + child.py\n")
+    )
+    assert recursive_comparison[1].index("  + child.py\n") < (
+        recursive_comparison[1].index("+ .env.example\n")
+    )
 
     monkeypatch.chdir(workspace)
     pruned_comparison = invoke(

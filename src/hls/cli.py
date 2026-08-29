@@ -96,6 +96,12 @@ class _PendingDiffDirectory:
     display_root: PurePosixPath | None
     display_anchor: bool
 
+
+@dataclass(frozen=True)
+class _PendingDiffOutput:
+    lines: tuple[str, ...]
+
+
 CANONICAL_COMMANDS = (
     "add",
     "connect",
@@ -1501,7 +1507,7 @@ def _diff(
         if root_index is None:
             raise SelectionError(f"resume directory '{resume}' is not reachable")
         traversal_roots = traversal_roots[root_index:]
-    pending = [
+    pending: list[_PendingDiffDirectory | _PendingDiffOutput] = [
         _PendingDiffDirectory(
             path=traversal_root.path,
             has_local=root.joinpath(*traversal_root.path.parts).is_dir(),
@@ -1528,6 +1534,11 @@ def _diff(
                 print(line, file=output, flush=True)
         while pending:
             current = pending.pop()
+            if isinstance(current, _PendingDiffOutput):
+                for line in current.lines:
+                    print(line, file=output, flush=True)
+                displayed_count += len(current.lines)
+                continue
             directory = current.path
             display_directory = directory.as_posix()
             local_listing = (
@@ -1602,7 +1613,6 @@ def _diff(
                 continue
 
             seeking = False
-            pending.extend(reversed(pending_descendants))
             local = _filtered_listing(
                 local_listing,
                 selector,
@@ -1660,21 +1670,27 @@ def _diff(
                 for entry in plan.entries
                 if not arguments.included_only or entry.action != "excluded"
             )
-            lines = _format_comparison_entries(
-                shown,
-                direction,
-                color=color,
-                collapsed_paths=collapsed_paths,
-                display_path=lambda path: _scoped_display_path(
-                    path,
-                    display_root=current.display_root,
-                ),
-            )
-            for line in lines:
-                print(line, file=output, flush=True)
-            displayed_count += len(lines)
+            def format_entries(
+                entries: Sequence[ComparisonEntry],
+            ) -> tuple[str, ...]:
+                return _format_comparison_entries(
+                    entries,
+                    direction,
+                    color=color,
+                    collapsed_paths=collapsed_paths,
+                    display_path=lambda path: _scoped_display_path(
+                        path,
+                        display_root=current.display_root,
+                    ),
+                )
+
+            lines = format_entries(shown)
 
             if arguments.paged:
+                pending.extend(reversed(pending_descendants))
+                for line in lines:
+                    print(line, file=output, flush=True)
+                displayed_count += len(lines)
                 if not lines:
                     print(
                         f"  no entries in {display_directory}",
@@ -1688,6 +1704,53 @@ def _diff(
                         flush=True,
                     )
                 return
+
+            descendants_by_path = {
+                descendant.path.as_posix(): descendant
+                for descendant in pending_descendants
+            }
+            events: list[_PendingDiffDirectory | _PendingDiffOutput] = []
+            ordered_entries = _file_browser_order(
+                shown,
+                path_of=lambda item: item.path,
+                directory_of=lambda item: (
+                    _comparison_entry_kind(item, direction) == "directory"
+                ),
+            )
+            directory_entries = tuple(
+                entry
+                for entry in ordered_entries
+                if _comparison_entry_kind(entry, direction) == "directory"
+            )
+            file_entries = tuple(
+                entry
+                for entry in ordered_entries
+                if _comparison_entry_kind(entry, direction) != "directory"
+            )
+            for entry in directory_entries:
+                entry_lines = format_entries((entry,))
+                if entry_lines:
+                    events.append(_PendingDiffOutput(entry_lines))
+                descendant = descendants_by_path.get(entry.path)
+                if descendant is not None:
+                    events.append(descendant)
+            scheduled_paths = {
+                event.path.as_posix()
+                for event in events
+                if isinstance(event, _PendingDiffDirectory)
+            }
+            events.extend(
+                descendant
+                for descendant in pending_descendants
+                if descendant.path.as_posix() not in scheduled_paths
+            )
+            events.extend(
+                _PendingDiffOutput(entry_lines)
+                for entry in file_entries
+                for entry_lines in (format_entries((entry,)),)
+                if entry_lines
+            )
+            pending.extend(reversed(events))
 
     if seeking:
         assert resume is not None

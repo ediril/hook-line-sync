@@ -27,9 +27,10 @@ Its children begin one indent beneath it, including neutral directories that do
 not reserve an invisible status column. Children use basenames and hierarchy
 indentation; disjoint roots keep full paths to avoid ambiguity. Entries use
 file-browser order at every level: directories first by name, then files by
-name. Diff flushes results after each compared directory. `--paged` exits after
-one directory and prints an exact stateless `--resume` command for the next
-deterministic directory.
+name. A recursive stream completes each directory subtree immediately after
+its parent entry before returning to sibling files. Diff flushes results as
+each entry becomes available. `--paged` exits after one directory and prints an
+exact stateless `--resume` command for the next deterministic directory.
 
 ## Rationale
 
@@ -43,5 +44,6 @@ stateless paging keep a slow FTPS comparison reviewable and interruptible.
 - Repeating the complete parent path on every child.
 - Using color as the only status signal.
 - Persisting a paging session or cached comparison cursor.
+- Flattening entries from different directory levels into one global sort.
 - Displaying redundant direction and per-directory progress headings on stdout.
 - Repeating the complete legend in each command's help.

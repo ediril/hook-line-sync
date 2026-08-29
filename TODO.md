@@ -1,5 +1,6 @@
 # Work Queue
 
+- [x] Preserve parent-child adjacency while streaming recursive diff output.
 - [x] Replace `--project` with a leading profile that establishes an explicit
   virtual working directory for path-oriented commands.
 - [x] Report active behavioral options in inspection and transfer command output.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.29.4 — 2026-08-29
+
+### Fixed
+
+- Keep recursively diffed directory contents directly beneath their parent
+  instead of printing root files between a directory and its children.
+
 ## 0.8.29.3 — 2026-08-29
 
 ### Changed
