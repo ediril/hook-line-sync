@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Render recursive local listings as a properly indented tree without
+  repeated parent prefixes.
 - [x] Preserve parent-child adjacency while streaming recursive diff output.
 - [x] Replace `--project` with a leading profile that establishes an explicit
   virtual working directory for path-oriented commands.

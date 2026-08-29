@@ -31,6 +31,10 @@ name. A recursive stream completes each directory subtree immediately after
 its parent entry before returning to sibling files. Diff flushes results as
 each entry becomes available. `--paged` exits after one directory and prints an
 exact stateless `--resume` command for the next deterministic directory.
+Local list output follows the same hierarchy: it renders names relative to the
+effective current directory, shows each ancestor once, and synthesizes a
+neutral directory node when a filter selects descendants without selecting
+their parent entry.
 
 ## Rationale
 

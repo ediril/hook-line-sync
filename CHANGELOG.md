@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.29.5 — 2026-08-29
+
+### Fixed
+
+- Render recursive local listings as an indented tree with each directory name
+  shown once instead of repeating project-relative parent prefixes on children.
+- Preserve directory-first ordering when a filtered selection requires HLSync
+  to synthesize an omitted ancestor for display.
+
 ## 0.8.29.4 — 2026-08-29
 
 ### Fixed

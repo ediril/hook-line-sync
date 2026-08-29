@@ -910,22 +910,51 @@ def _list_local(
     if options is not None:
         lines.append(options)
     color = _use_color(output)
+    display_base = _project_relative_current_directory(arguments, root)
+    emitted_directories: set[str] = set()
     for entry in _file_browser_order(
         snapshot.entries,
         path_of=lambda item: item.path,
         directory_of=lambda item: item.kind == "directory",
     ):
+        project_path = PurePosixPath(entry.path)
+        try:
+            relative = project_path.relative_to(display_base)
+        except ValueError as error:
+            raise SelectionError(
+                f"selected path '{entry.path}' is outside the display scope"
+            ) from error
+        for index, part in enumerate(relative.parts[:-1]):
+            ancestor = (display_base / PurePosixPath(*relative.parts[: index + 1]))
+            ancestor_path = ancestor.as_posix()
+            if ancestor_path in emitted_directories:
+                continue
+            lines.append(
+                _format_path_line(
+                    " ",
+                    directory=True,
+                    path=part,
+                    depth=index,
+                    color=color,
+                    marker_color=None,
+                    excluded=False,
+                )
+            )
+            emitted_directories.add(ancestor_path)
         marker = "x" if entry.excluded else " "
         lines.append(
             _format_path_line(
                 marker,
                 directory=entry.kind == "directory",
-                path=entry.path,
+                path=relative.name,
+                depth=max(len(relative.parts) - 1, 0),
                 color=color,
                 marker_color="\033[90m" if entry.excluded else None,
                 excluded=entry.excluded,
             )
         )
+        if entry.kind == "directory":
+            emitted_directories.add(entry.path)
     return "\n".join(lines)
 
 
@@ -1050,6 +1079,12 @@ def _file_browser_order(
     directory_paths = {
         path_of(entry) for entry in entries if directory_of(entry)
     }
+    for entry in entries:
+        parts = PurePosixPath(path_of(entry)).parts
+        directory_paths.update(
+            PurePosixPath(*parts[:index]).as_posix()
+            for index in range(1, len(parts))
+        )
 
     def order_key(entry: _EntryT) -> tuple[tuple[int, str, str], ...]:
         parts = PurePosixPath(path_of(entry)).parts

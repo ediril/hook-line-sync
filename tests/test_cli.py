@@ -362,19 +362,20 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     ]
     local_view = invoke(["list", "--recursive"], store)
     assert local_view[0] == 0 and local_view[2] == ""
-    assert "  node_modules/keep.js\n" in local_view[1]
+    assert "    keep.js\n" in local_view[1]
     assert "x composer.json\n" in local_view[1]
-    assert "x docs/note.txt\n" in local_view[1]
+    assert "  x note.txt\n" in local_view[1]
     directory_view = invoke(["list", "node_modules"], store)
-    assert "x node_modules/drop.js\n" in directory_view[1]
-    assert "  node_modules/keep.js\n" in directory_view[1]
-    assert "  node_modules/package/\n" in directory_view[1]
-    assert "node_modules/package/nested.js" not in directory_view[1]
+    assert "  node_modules/\n" in directory_view[1]
+    assert "  x drop.js\n" in directory_view[1]
+    assert "    keep.js\n" in directory_view[1]
+    assert "    package/\n" in directory_view[1]
+    assert "nested.js" not in directory_view[1]
     assert "x node_modules/\n" not in directory_view[1]
     recursive_directory_view = invoke(
         ["list", "node_modules", "--recursive"], store
     )
-    assert "  node_modules/package/nested.js\n" in recursive_directory_view[1]
+    assert "      nested.js\n" in recursive_directory_view[1]
     assert invoke(["exc"], store) == (
         0,
         "Exclusion rules for project 'prod':\n"
@@ -636,10 +637,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     local_listing = (
         0,
         "Local tree for project 'prod':\n"
-        "  src/nested/\n"
-        "  src/.env.example\n"
-        "x src/debug.log\n"
-        "  src/main.py\n",
+        "  nested/\n"
+        "  .env.example\n"
+        "x debug.log\n"
+        "  main.py\n",
         "",
     )
     assert invoke(["list"], store) == local_listing
@@ -647,16 +648,17 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert invoke(["list", "*"], store) == (
         0,
         "Local tree for project 'prod':\n"
-        "  src/.env.example\n"
-        "x src/debug.log\n"
-        "  src/main.py\n"
-        "  src/nested/child.py\n",
+        "  nested/\n"
+        "    child.py\n"
+        "  .env.example\n"
+        "x debug.log\n"
+        "  main.py\n",
         "",
     )
     monkeypatch.chdir(workspace)
     recursive_list = invoke(["list", "--recursive"], store)
-    assert "x node_modules/package.js\n" in recursive_list[1]
-    assert "  src/.env.example\n" in recursive_list[1]
+    assert "  x package.js\n" in recursive_list[1]
+    assert "    .env.example\n" in recursive_list[1]
     assert recursive_list[1].index("x node_modules/\n") < (
         recursive_list[1].index("  src/\n")
     )
@@ -668,10 +670,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "Options: recursive (-r); included paths only (-i).\n"
         in included_only_list[1]
     )
-    assert "node_modules/package.js" not in included_only_list[1]
-    assert "  src/.env.example\n" in included_only_list[1]
+    assert "package.js" not in included_only_list[1]
+    assert "    .env.example\n" in included_only_list[1]
     colored_list = invoke(["list", "--recursive"], store, terminal_output=True)
-    assert "\033[90mx src/debug.log\033[0m" in colored_list[1]
+    assert "  \033[90mx debug.log\033[0m" in colored_list[1]
     assert "  \033[38;5;75msrc/\033[0m" in colored_list[1]
     assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_list[1]
