@@ -154,6 +154,8 @@ def _active_options(arguments: argparse.Namespace) -> str | None:
         options.append("pull perspective (--pull)")
     if getattr(arguments, "recursive", False):
         options.append("recursive (-r)")
+    if getattr(arguments, "show_all", False):
+        options.append("all entries (-a)")
     if getattr(arguments, "included_only", False):
         options.append("included paths only (-i)")
     if getattr(arguments, "prune_remote", False):
@@ -410,13 +412,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="preview file changes without modifying anything",
         usage=(
             "hlsync [PROFILE] diff [PATH ...]\n"
-            "       [--pull | --prune-remote] [-r] [-i] [--paged]\n"
+            "       [--pull | --prune-remote] [-r] [-a] [-i] [--paged]\n"
             "       [--resume DIRECTORY]"
         ),
         description=(
             "Preview file changes without modifying local or remote files. "
-            "Shows the local perspective by default; use --pull for the remote "
-            "perspective."
+            "Shows actionable differences from the local perspective by "
+            "default; use --all for the complete comparison or --pull for the "
+            "remote perspective."
         ),
     )
     add_pattern_operands(
@@ -440,6 +443,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="include descendants of selected directories",
     )
     _add_included_only_argument(diff_parser)
+    diff_parser.add_argument(
+        "-a",
+        "--all",
+        dest="show_all",
+        action="store_true",
+        help="also show unchanged and excluded paths",
+    )
     diff_parser.add_argument(
         "--paged",
         action="store_true",
@@ -1170,6 +1180,73 @@ def _scoped_display_path(
     return depth, relative.name
 
 
+def _comparison_ancestors(
+    path: str,
+    *,
+    display_root: PurePosixPath | None,
+) -> tuple[PurePosixPath, ...]:
+    project_path = PurePosixPath(path)
+    start = len(display_root.parts) if display_root is not None else 1
+    start = max(start, 1)
+    return tuple(
+        PurePosixPath(*project_path.parts[:length])
+        for length in range(start, len(project_path.parts))
+        if display_root is None
+        or project_path.parts[: len(display_root.parts)] == display_root.parts
+    )
+
+
+def _format_compact_comparison_entry(
+    entry: ComparisonEntry,
+    direction: str,
+    *,
+    color: bool,
+    collapsed: bool,
+    display_root: PurePosixPath | None,
+    emitted_directories: set[str],
+) -> tuple[str, ...]:
+    lines: list[str] = []
+    for ancestor in _comparison_ancestors(
+        entry.path,
+        display_root=display_root,
+    ):
+        ancestor_path = ancestor.as_posix()
+        if ancestor_path in emitted_directories:
+            continue
+        depth, label = _scoped_display_path(
+            ancestor_path,
+            display_root=display_root,
+        )
+        lines.append(
+            _format_path_line(
+                " ",
+                directory=True,
+                path=label,
+                depth=depth,
+                color=color,
+                marker_color=None,
+                excluded=False,
+                omit_empty_directory_marker=True,
+            )
+        )
+        emitted_directories.add(ancestor_path)
+    lines.extend(
+        _format_comparison_entries(
+            (entry,),
+            direction,
+            color=color,
+            collapsed_paths=frozenset((entry.path,)) if collapsed else frozenset(),
+            display_path=lambda path: _scoped_display_path(
+                path,
+                display_root=display_root,
+            ),
+        )
+    )
+    if _comparison_entry_kind(entry, direction) == "directory":
+        emitted_directories.add(entry.path)
+    return tuple(lines)
+
+
 def _scope_header_lines(
     display_root: PurePosixPath | None,
     *,
@@ -1450,6 +1527,8 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
         command.append("--recursive")
     if arguments.included_only:
         command.append("-i")
+    if arguments.show_all:
+        command.append("--all")
     command.extend(("--paged", "--resume", directory.as_posix()))
     return shlex.join(command)
 
@@ -1559,14 +1638,16 @@ def _diff(
     seeking = resume is not None
     selected_count = 0
     displayed_count = 0
+    emitted_directories: set[str] = set()
     with ExplicitFTPSTransport(project) as transport:
-        if pending:
+        if pending and arguments.show_all:
             for line in _scope_header_lines(
                 pending[-1].display_root,
                 anchored=pending[-1].display_anchor,
                 color=color,
             ):
                 print(line, file=output, flush=True)
+                displayed_count += 1
         while pending:
             current = pending.pop()
             if isinstance(current, _PendingDiffOutput):
@@ -1703,11 +1784,38 @@ def _diff(
             shown = tuple(
                 entry
                 for entry in plan.entries
-                if not arguments.included_only or entry.action != "excluded"
+                if (
+                    (
+                        arguments.show_all
+                        and (
+                            not arguments.included_only
+                            or entry.action != "excluded"
+                        )
+                    )
+                    or (
+                        not arguments.show_all
+                        and entry.action
+                        not in {"unchanged", "excluded", "untraversed"}
+                    )
+                )
             )
+
             def format_entries(
                 entries: Sequence[ComparisonEntry],
             ) -> tuple[str, ...]:
+                if not arguments.show_all:
+                    return tuple(
+                        line
+                        for entry in entries
+                        for line in _format_compact_comparison_entry(
+                            entry,
+                            direction,
+                            color=color,
+                            collapsed=entry.path in collapsed_paths,
+                            display_root=current.display_root,
+                            emitted_directories=emitted_directories,
+                        )
+                    )
                 return _format_comparison_entries(
                     entries,
                     direction,
@@ -1719,16 +1827,15 @@ def _diff(
                     ),
                 )
 
-            lines = format_entries(shown)
-
             if arguments.paged:
                 pending.extend(reversed(pending_descendants))
+                lines = format_entries(shown)
                 for line in lines:
                     print(line, file=output, flush=True)
                 displayed_count += len(lines)
                 if not lines:
                     print(
-                        f"  no entries in {display_directory}",
+                        f"  no differences in {display_directory}",
                         file=output,
                         flush=True,
                     )
@@ -1746,7 +1853,7 @@ def _diff(
             }
             events: list[_PendingDiffDirectory | _PendingDiffOutput] = []
             ordered_entries = _file_browser_order(
-                shown,
+                plan.entries,
                 path_of=lambda item: item.path,
                 directory_of=lambda item: (
                     _comparison_entry_kind(item, direction) == "directory"
@@ -1761,11 +1868,13 @@ def _diff(
                 entry
                 for entry in ordered_entries
                 if _comparison_entry_kind(entry, direction) != "directory"
+                and entry in shown
             )
             for entry in directory_entries:
-                entry_lines = format_entries((entry,))
-                if entry_lines:
-                    events.append(_PendingDiffOutput(entry_lines))
+                if entry in shown:
+                    entry_lines = format_entries((entry,))
+                    if entry_lines:
+                        events.append(_PendingDiffOutput(entry_lines))
                 descendant = descendants_by_path.get(entry.path)
                 if descendant is not None:
                     events.append(descendant)

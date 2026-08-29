@@ -202,8 +202,10 @@ hlsync diff --prune-remote
 ```
 
 `--pull` changes the perspective for changed existing files. Pull rejects
-remote pruning. Diff shows unchanged and excluded entries by default;
-`-i`/`--inc`/`--included-only` hides exclusions.
+remote pruning. Diff normally shows only actionable differences, retained
+one-sided paths, and conflicts. Use `-a`/`--all` to restore the exploratory
+view with unchanged and excluded paths. Combine `--all` with
+`-i`/`--inc`/`--included-only` to keep unchanged paths while hiding exclusions.
 
 For push authority, an excluded local path is treated as absent. If it exists
 remotely, ordinary diff marks it `!`; `diff -p` projects its deletion as `-`.

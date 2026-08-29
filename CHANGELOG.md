@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.29.6 — 2026-08-29
+
+### Changed
+
+- Make `diff` show only actions, retained one-sided paths, and conflicts by
+  default; add `-a`/`--all` for the previous complete exploratory view.
+- Emit compact-mode directory ancestors only when they contain a visible
+  result, preserving progressive hierarchy without empty directory noise.
+
 ## 0.8.29.5 — 2026-08-29
 
 ### Fixed

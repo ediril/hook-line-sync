@@ -171,7 +171,6 @@ function h(string $value): string
                         <p><span class="prompt">❯</span> <b>hlsync diff -r</b></p>
                         <p class="muted">Checking differences for project 'discovery'...</p>
                         <p><span class="directory">&nbsp; assets/</span></p>
-                        <p class="excluded"><span>x</span> <span class="directory-dark">vendor/</span></p>
                         <p><span class="added">+</span> &nbsp; index.php</p>
                         <p class="remote-only"><span>r</span> &nbsp; legacy.php</p>
                         <p>&nbsp; <span class="changed">~</span> &nbsp; site.css</p>
@@ -224,7 +223,7 @@ function h(string $value): string
                     <span class="step-number">03</span>
                     <div class="step-icon" aria-hidden="true">∆</div>
                     <h3>Read the diff</h3>
-                    <p>Compare local and remote files before changing either side. Unchanged and excluded paths stay visible by default.</p>
+                    <p>Compare local and remote files before changing either side. Routine output stays focused on paths that differ; <code>--all</code> reveals the complete comparison.</p>
                     <code>hlsync diff -r</code>
                 </li>
                 <li>

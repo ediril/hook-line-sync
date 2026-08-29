@@ -94,7 +94,9 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert pull_help in help_output
     assert "usage: hlsync [PROFILE] diff" in invoke(["help", "d"], store)[1]
     assert "--color" not in invoke(["help", "list"], store)[1]
-    assert "--color" not in invoke(["help", "diff"], store)[1]
+    diff_help = invoke(["help", "diff"], store)[1]
+    assert "--color" not in diff_help
+    assert "-a, --all" in diff_help
     rules_help = invoke(["help", "rules"], store)[1]
     assert "hlsync [PROFILE] rules" in rules_help
     assert "hlsync [PROFILE] rules remove RULE_ID" in rules_help
@@ -685,21 +687,21 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         "Connecting securely over FTPS...\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
+    assert push_comparison[1].startswith("src/\n")
     assert "+ main.py\n" in push_comparison[1]
-    assert "nested/ ▸\n" in push_comparison[1]
-    assert "+ nested/ ▸\n" not in push_comparison[1]
-    assert push_comparison[1].index("nested/ ▸\n") < (
-        push_comparison[1].index("+ .env.example\n")
-    )
+    assert "nested" not in push_comparison[1]
     assert "src/nested/child.py" not in push_comparison[1]
     assert "README.md" not in push_comparison[1]
     assert "deployed.html" not in push_comparison[1]
     assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
-    assert "! debug.log\n" in push_comparison[1]
+    assert "debug.log" not in push_comparison[1]
     hidden_exclusions = invoke(["diff", "-i"], store)
     assert "debug.log" not in hidden_exclusions[1]
+    assert invoke(["prod", "diff", "same.txt"], store)[1] == (
+        "  no differences\n"
+    )
 
     recursive_comparison = invoke(["diff", "-r"], store)
     assert "Options: recursive (-r).\n" in recursive_comparison[2]
@@ -717,9 +719,8 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
     assert "Options: preview remote pruning (-p).\n" in pruned_comparison[2]
     assert "\033[31m- deployed.html\033[0m\n" in pruned_comparison[1]
-    assert "\033[3;38;5;24msrc/ ▸\033[0m\n" in (
-        pruned_comparison[1]
-    )
+    assert "src/" not in pruned_comparison[1]
+    assert "same.txt" not in pruned_comparison[1]
     monkeypatch.chdir(source)
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
@@ -731,7 +732,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     directory_comparison = invoke(["diff", "src"], store)
     assert "= src/\n" not in directory_comparison[1]
     assert directory_comparison[1].startswith("src/\n")
-    assert "  nested/ ▸\n" in directory_comparison[1]
+    assert "nested" not in directory_comparison[1]
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
     assert "    + child.py\n" in recursive_directory_comparison[1]
@@ -746,7 +747,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "  + main.py\n" in expanded_comparison[1]
     assert "src/ ▸\n" not in expanded_comparison[1]
 
-    colored_comparison = invoke(["diff", "**"], store, terminal_output=True)
+    colored_comparison = invoke(
+        ["diff", "**", "--all"], store, terminal_output=True
+    )
+    assert "Options: all entries (-a).\n" in colored_comparison[2]
     assert "\033[38;5;75msrc/\033[0m" in colored_comparison[1]
     assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_comparison[1]
@@ -759,10 +763,13 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert colored_comparison[1].index("src/") < (
         colored_comparison[1].index("README.md")
     )
+    all_included = invoke(["diff", "**", "--all", "-i"], store)
+    assert "= same.txt" in all_included[1]
+    assert "debug.log" not in all_included[1]
     with monkeypatch.context() as no_color:
         no_color.setenv("NO_COLOR", "1")
         uncolored_comparison = invoke(
-            ["diff", "**"], store, terminal_output=True
+            ["diff", "**", "--all"], store, terminal_output=True
         )
     assert "\033[" not in uncolored_comparison[1]
 

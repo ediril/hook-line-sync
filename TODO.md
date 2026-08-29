@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Make routine diff output compact by default and retain the complete
+  exploratory comparison behind `-a`/`--all`.
 - [x] Render recursive local listings as a properly indented tree without
   repeated parent prefixes.
 - [x] Preserve parent-child adjacency while streaming recursive diff output.

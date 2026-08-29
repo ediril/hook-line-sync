@@ -11,9 +11,12 @@ Directories end in `/`; a directory present on both sides has no equality
 marker because its entry says nothing about its contents. A trailing `▸` marks
 a directory whose contents were not traversed.
 
-List and diff show excluded entries by default. `-i`, `--inc`, or
-`--included-only` hides them. Diff also shows unchanged entries by default.
-Core synchronization status remains textual. Color respects `NO_COLOR` and
+List shows excluded entries by default, and `-i`, `--inc`, or
+`--included-only` hides them. Diff defaults to an operational view containing
+actions, retained one-sided paths, and conflicts; it omits unchanged,
+excluded, and untraversed neutral entries. `-a`/`--all` restores the complete
+exploratory comparison, where `-i` can still hide exclusions. Core
+synchronization status remains textual. Color respects `NO_COLOR` and
 redirected output and has no command-line override. An `x` path uses excluded
 gray or dark-blue styling. An excluded path that exists remotely uses a
 burnt-orange `!`, preserving the distinction in non-color output as well.
@@ -39,8 +42,10 @@ their parent entry.
 ## Rationale
 
 The display must distinguish action, retention, exclusion, and unknown depth at
-a glance without claiming that an unvisited subtree is equal. Progressive and
-stateless paging keep a slow FTPS comparison reviewable and interruptible.
+a glance without claiming that an unvisited subtree is equal. A complete view
+helps initial project exploration, while an actionable default keeps routine
+checks quiet after the user understands the tree. Progressive and stateless
+paging keep a slow FTPS comparison reviewable and interruptible.
 
 ## Intentionally excluded
 
