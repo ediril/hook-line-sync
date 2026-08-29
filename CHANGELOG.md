@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.28.19 — 2026-08-28
+
+### Changed
+
+- Recommended `uv tool install hook-line-sync` for an isolated CLI installation
+  and simplified the alternative to `pip install hook-line-sync`.
+
+## 0.8.28.18 — 2026-08-28
+
+### Fixed
+
+- Made PyPI the sole user-facing installation path in the README; cloning the
+  repository remains unnecessary outside development.
+
 ## 0.8.28.17 — 2026-08-28
 
 ### Changed

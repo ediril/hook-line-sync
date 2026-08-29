@@ -9,19 +9,17 @@ stable release.
 
 ## Installation
 
-HLSync requires Python 3.10 or newer. Until its first PyPI release, install it
-from a source checkout:
+HLSync requires Python 3.10 or newer. Install it from PyPI as an isolated
+command-line tool with uv:
 
 ```console
-git clone https://github.com/ediril/hook-line-sync.git
-cd hook-line-sync
-python -m pip install .
+uv tool install hook-line-sync
 ```
 
-After the first PyPI release:
+Or install it with pip:
 
 ```console
-python -m pip install hook-line-sync
+pip install hook-line-sync
 ```
 
 The FTPS server must support explicit TLS with protected data connections

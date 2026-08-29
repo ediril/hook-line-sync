@@ -1,5 +1,9 @@
 # Work Queue
 
+- [x] Recommend uv's isolated tool installation for the CLI and retain plain
+  `pip install` as the user-facing alternative.
+- [x] Present PyPI as the user installation path and keep source-checkout setup
+  exclusively in the development section.
 - [x] Reorder the README around installation and tool usage, moving contributor
   setup and release-maintenance details to the end.
 - [x] Indent zero-action transfer results and report the number of unchanged
