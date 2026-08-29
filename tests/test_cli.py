@@ -639,6 +639,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         recursive_list[1].index("  README.md\n")
     )
     included_only_list = invoke(["list", "--recursive", "-i"], store)
+    assert (
+        "Options: recursive (-r); included paths only (-i).\n"
+        in included_only_list[1]
+    )
     assert "node_modules/package.js" not in included_only_list[1]
     assert "  src/.env.example\n" in included_only_list[1]
     colored_list = invoke(["list", "--recursive"], store, terminal_output=True)
@@ -671,12 +675,14 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert "debug.log" not in hidden_exclusions[1]
 
     recursive_comparison = invoke(["diff", "-r"], store)
+    assert "Options: recursive (-r).\n" in recursive_comparison[2]
     assert "  + child.py\n" in recursive_comparison[1]
 
     monkeypatch.chdir(workspace)
     pruned_comparison = invoke(
         ["diff", "--prune-remote"], store, terminal_output=True
     )
+    assert "Options: preview remote pruning (-p).\n" in pruned_comparison[2]
     assert "\033[31m- deployed.html\033[0m\n" in pruned_comparison[1]
     assert "\033[3;38;5;24msrc/ ▸\033[0m\n" in (
         pruned_comparison[1]
@@ -793,6 +799,10 @@ def test_current_project_inference_drives_connect_and_tree_listings(
         store,
     )
     assert recursive_pruned_exclusion[0] == 0
+    assert (
+        "Options: recursive (-r); remote pruning (-p).\n"
+        in recursive_pruned_exclusion[2]
+    )
     assert snapshot_traversal[-1] is True
     assert operations == [("delete", "src/debug.log", False)]
     operations.clear()

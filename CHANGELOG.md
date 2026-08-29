@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.29.2 — 2026-08-29
+
+### Changed
+
+- Report explicitly enabled scope, visibility, perspective, paging, and pruning
+  options in `list`, `diff`, `push`, and `pull` output.
+
 ## 0.8.29.1 — 2026-08-29
 
 ### Added

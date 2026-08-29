@@ -127,6 +127,30 @@ def _add_included_only_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _active_options(arguments: argparse.Namespace) -> str | None:
+    options: list[str] = []
+    if getattr(arguments, "pull", False):
+        options.append("pull perspective (--pull)")
+    if getattr(arguments, "recursive", False):
+        options.append("recursive (-r)")
+    if getattr(arguments, "included_only", False):
+        options.append("included paths only (-i)")
+    if getattr(arguments, "prune_remote", False):
+        label = (
+            "preview remote pruning (-p)"
+            if arguments.command == "diff"
+            else "remote pruning (-p)"
+        )
+        options.append(label)
+    if getattr(arguments, "paged", False):
+        options.append("paged output (--paged)")
+    if getattr(arguments, "resume", None) is not None:
+        options.append(f"resume at {arguments.resume!r} (--resume)")
+    if not options:
+        return None
+    return f"Options: {'; '.join(options)}."
+
+
 def _resolve_command_name(
     value: str,
     *,
@@ -816,6 +840,9 @@ def _list_local(
     if not snapshot.entries:
         return f"Local tree for project '{name}' is empty."
     lines = [f"Local tree for project '{name}':"]
+    options = _active_options(arguments)
+    if options is not None:
+        lines.append(options)
     color = _use_color(output)
     for entry in _file_browser_order(
         snapshot.entries,
@@ -1380,6 +1407,9 @@ def _diff(
     direction = "pull" if arguments.pull else "push"
     color = _use_color(output)
     print(f"Checking differences for project '{name}'...", file=progress, flush=True)
+    options = _active_options(arguments)
+    if options is not None:
+        print(options, file=progress, flush=True)
     print("Connecting securely over FTPS...", file=progress, flush=True)
     traversal_roots = _diff_traversal_roots(arguments, root)
     if resume is not None:
@@ -1662,6 +1692,9 @@ def _transfer(
         file=progress,
         flush=True,
     )
+    options = _active_options(arguments)
+    if options is not None:
+        print(options, file=progress, flush=True)
     print("Connecting securely over FTPS...", file=progress, flush=True)
     with ExplicitFTPSTransport(project) as transport:
         if arguments.command == "push":
