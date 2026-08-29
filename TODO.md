@@ -1,5 +1,8 @@
 # Work Queue
 
+- [x] Clarify the alternate local-folder prompt in `add`.
+- [x] Make `add` always establish a local root, with an explicit option and an
+  alternate-folder prompt.
 - [x] Add concise next-step guidance when no profile is active.
 - [x] Treat an unmapped `hlsync profile` lookup as informational.
 - [x] Add a script-friendly command that prints a profile's mapped local root.

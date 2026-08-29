@@ -54,12 +54,14 @@ hlsync push
 ```
 
 `add` proposes the current directory as the local root; pressing Enter accepts
-it. Bare `push` is recursive, so `diff -r` is its matching preview.
+it. Declining prompts for another local folder. Use `--local-root PATH` to
+provide one directly. Bare `push` is recursive, so `diff -r` is its matching
+preview.
 
 ## Profiles and mapping
 
 A profile identifies one deployment target: protocol, host, port, remote root,
-credential environment-variable names, and one optional local root. Multiple
+credential environment-variable names, and one local root. Multiple
 profiles may use the same server. Credential values are never stored in
 `~/.hls/configs.json`.
 
@@ -70,14 +72,9 @@ variable names when adding a profile if needed:
 hlsync add staging \
   --host ftp.example.com \
   --remote-root /public_html/staging \
+  --local-root /path/to/project \
   --username-env STAGING_FTPS_USERNAME \
   --password-env STAGING_FTPS_PASSWORD
-```
-
-If mapping was declined during `add`, map the current directory later:
-
-```console
-hlsync map staging
 ```
 
 HLSync stores the canonical absolute local root and maps every descendant to

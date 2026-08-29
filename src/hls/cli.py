@@ -280,7 +280,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     add_parser = subparsers.add_parser(
-        "add", help="add an FTPS project and offer to map the current directory"
+        "add", help="add an FTPS project with a mapped local root"
     )
     add_parser.add_argument("project_name")
     add_parser.add_argument("--host", required=True)
@@ -289,6 +289,14 @@ def build_parser() -> argparse.ArgumentParser:
     add_parser.add_argument("--port", type=int, default=21)
     add_parser.add_argument("--username-env")
     add_parser.add_argument("--password-env")
+    add_parser.add_argument(
+        "--local-root",
+        metavar="PATH",
+        help=(
+            "local project directory; when omitted, offer the current "
+            "directory and prompt for another if declined"
+        ),
+    )
 
     connect_parser = subparsers.add_parser(
         "connect",
@@ -592,19 +600,32 @@ def _save_project(
         ),
     )
     configuration.projects[name] = project
-    local_root = canonical_local_root(Path.cwd())
-    prompt = (
-        f"Map current directory '{local_root}' to "
-        f"'{name}:{project.remote_root}'? [Y/n] "
-    )
-    if _confirm(prompt, stdin, stdout, default=True):
-        configuration.map_project(name, local_root)
-        message = (
-            f"Added FTPS project '{name}'.\n"
-            f"Mapped '{local_root}' to '{name}:{project.remote_root}'."
-        )
+    if arguments.local_root is not None:
+        local_root = canonical_local_root(arguments.local_root)
     else:
-        message = f"Added FTPS project '{name}' without a local mapping."
+        current_root = canonical_local_root(Path.cwd())
+        prompt = (
+            f"Map current directory '{current_root}' to "
+            f"'{name}:{project.remote_root}'? [Y/n] "
+        )
+        if _confirm(prompt, stdin, stdout, default=True):
+            local_root = current_root
+        else:
+            print(
+                "What local folder should be mapped instead? ",
+                end="",
+                file=stdout,
+                flush=True,
+            )
+            supplied_root = stdin.readline()
+            if supplied_root == "" or not supplied_root.strip():
+                raise ConfigurationError("a local folder is required")
+            local_root = canonical_local_root(supplied_root.strip())
+    configuration.map_project(name, local_root)
+    message = (
+        f"Added FTPS project '{name}'.\n"
+        f"Mapped '{local_root}' to '{name}:{project.remote_root}'."
+    )
     store.save(configuration)
     return message
 

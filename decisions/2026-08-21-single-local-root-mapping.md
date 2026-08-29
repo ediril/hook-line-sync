@@ -9,9 +9,11 @@ to the identical project-relative path beneath the profile's remote root.
 Local roots belonging to different profiles may not equal, contain, or be
 contained by one another.
 
-`hlsync add` proposes the current directory as the local root and defaults its
-confirmation to yes. `hlsync map <profile>` maps the current directory later;
-replacing an existing root requires confirmation and defaults to no.
+`hlsync add` always records a local root. `--local-root PATH` supplies it
+directly. Otherwise, `add` proposes the current directory and defaults its
+confirmation to yes; declining prompts for another local folder. `hlsync map
+<profile>` maps older unmapped configurations or replaces an existing root;
+replacement requires confirmation and defaults to no.
 
 ## Rationale
 
@@ -22,5 +24,6 @@ invariant across every command.
 ## Intentionally excluded
 
 - Multiple local mappings within one profile.
+- Creating an unmapped profile through `hlsync add`.
 - Persisted current-profile or directory-context state.
 - Silently replacing a mapping or accepting overlapping roots.

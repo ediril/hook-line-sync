@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.29.12 — 2026-08-29
+
+### Changed
+
+- Clarify the alternate local-root prompt shown by `hlsync add`.
+
+## 0.8.29.11 — 2026-08-29
+
+### Changed
+
+- Require every newly added profile to have a local mapping: `--local-root`
+  supplies it directly, while declining the offered current directory now
+  prompts for another local folder.
+
 ## 0.8.29.10 — 2026-08-29
 
 ### Changed

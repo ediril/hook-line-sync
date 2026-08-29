@@ -48,6 +48,8 @@ def test_project_lifecycle_uses_production_credentials_and_version(
             "ftp.example.com",
             "--remote-root",
             "/public_html/site",
+            "--local-root",
+            str(tmp_path),
         ],
         store,
     )
@@ -55,9 +57,8 @@ def test_project_lifecycle_uses_production_credentials_and_version(
 
     assert (add_status, add_stdout, add_stderr) == (
         0,
-        f"Map current directory '{tmp_path}' to "
-        "'client-site:/public_html/site'? [Y/n] "
-        "Added FTPS project 'client-site' without a local mapping.\n",
+        "Added FTPS project 'client-site'.\n"
+        f"Mapped '{tmp_path}' to 'client-site:/public_html/site'.\n",
         "",
     )
     assert (version_status, version_stdout, version_stderr) == (
@@ -68,7 +69,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     project = store.load().projects["client-site"]
     assert project.host == "ftp.example.com"
     assert project.remote_root == "/public_html/site"
-    assert project.local_root is None
+    assert project.local_root == str(tmp_path)
     assert project.username_env == "PROD_FTPS_USERNAME"
     assert project.password_env == "PROD_FTPS_PASSWORD"
 
@@ -141,24 +142,20 @@ def test_project_lifecycle_uses_production_credentials_and_version(
 
     list_status, list_stdout, list_stderr = invoke(["profiles"], store)
     assert (list_status, list_stderr) == (0, "")
-    assert list_stdout == "  client-site\n"
+    assert list_stdout == "* client-site\n"
     assert invoke(["profile", "client-site"], store) == (
         0,
         "Profile 'client-site':\n"
         "  Protocol: FTPS\n"
         "  Host: ftp.example.com:21\n"
         "  Remote root: /public_html/site\n"
-        "  Local root: not mapped\n"
+        f"  Local root: {tmp_path}\n"
         "  Username env: PROD_FTPS_USERNAME\n"
         "  Password env: PROD_FTPS_PASSWORD\n"
         "  Rules: 0\n",
         "",
     )
-    assert invoke(["root", "client-site"], store) == (
-        1,
-        "",
-        "hlsync: error: project 'client-site' has not been mapped\n",
-    )
+    assert invoke(["root", "client-site"], store) == (0, f"{tmp_path}\n", "")
 
     assert invoke(["remove", "client-site"], store) == (
         0,
@@ -199,6 +196,40 @@ def test_add_maps_the_current_directory_after_confirmation(
     assert store.load().projects["prod"].local_root == str(workspace)
 
 
+def test_add_prompts_for_another_local_root_when_current_is_declined(
+    tmp_path, monkeypatch
+) -> None:
+    store = ConfigurationStore(tmp_path / "configs.json")
+    current = tmp_path / "current"
+    selected = tmp_path / "selected"
+    current.mkdir()
+    selected.mkdir()
+    monkeypatch.chdir(current)
+
+    result = invoke(
+        [
+            "add",
+            "prod",
+            "--host",
+            "ftp.example.com",
+            "--remote-root",
+            "/public_html",
+        ],
+        store,
+        stdin=f"no\n{selected}\n",
+    )
+
+    assert result == (
+        0,
+        f"Map current directory '{current}' to 'prod:/public_html'? [Y/n] "
+        "What local folder should be mapped instead? "
+        "Added FTPS project 'prod'.\n"
+        f"Mapped '{selected}' to 'prod:/public_html'.\n",
+        "",
+    )
+    assert store.load().projects["prod"].local_root == str(selected)
+
+
 def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
     store = ConfigurationStore(tmp_path / "configs.json")
     arguments = [
@@ -208,6 +239,8 @@ def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
         "ftp.example.com",
         "--remote-root",
         "/public_html/site",
+        "--local-root",
+        str(tmp_path),
     ]
     assert invoke(arguments, store)[0] == 0
 
@@ -251,6 +284,8 @@ def test_add_supports_explicit_protocol_port_and_environment_names(tmp_path) -> 
             "SHARED_USER",
             "--password-env",
             "STAGING_SECRET",
+            "--local-root",
+            str(tmp_path),
         ],
         store,
     )
@@ -265,7 +300,7 @@ def test_add_supports_explicit_protocol_port_and_environment_names(tmp_path) -> 
     )
 
 
-def test_map_and_ordered_exclusion_commands_persist_reinclusion(
+def test_ordered_exclusion_commands_persist_reinclusion(
     tmp_path, monkeypatch
 ) -> None:
     store = ConfigurationStore(tmp_path / "configs.json")
@@ -279,6 +314,8 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
             "ftp.example.com",
             "--remote-root",
             "/public_html",
+            "--local-root",
+            str(workspace),
         ],
         store,
     )
@@ -297,7 +334,6 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     (workspace / "composer.lock").write_text("{}", encoding="utf-8")
     (docs / "note.txt").write_text("note", encoding="utf-8")
 
-    status, stdout, stderr = invoke(["m", "prod"], store)
     exclude_result = invoke(
         ["exc", "--pattern", ".git/, node_modules/,*.log,**/.cache/"], store
     )
@@ -310,8 +346,6 @@ def test_map_and_ordered_exclusion_commands_persist_reinclusion(
     assert invoke(["exc", "note.txt"], store)[0] == 0
     monkeypatch.chdir(workspace)
 
-    assert status == 0 and stderr == ""
-    assert stdout == f"Mapped '{workspace}' to 'prod:/public_html'.\n"
     assert exclude_result == (
         0,
         "Recorded exclusion rules for project 'prod':\n"
@@ -494,11 +528,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
             "ftp.example.com",
             "--remote-root",
             "/public_html",
+            "--local-root",
+            str(workspace),
         ],
         store,
     )
     monkeypatch.chdir(workspace)
-    assert invoke(["map", "prod"], store)[0] == 0
     assert invoke(
         ["exclude", "--pattern", "node_modules/,**/*.log"], store
     )[0] == 0
@@ -905,9 +940,11 @@ def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
     root = tmp_path / "root"
     child = root / "child"
     separate = tmp_path / "separate"
+    staging_root = tmp_path / "staging"
     child.mkdir(parents=True)
     separate.mkdir()
-    for name in ("prod", "staging"):
+    staging_root.mkdir()
+    for name, local_root in (("prod", root), ("staging", staging_root)):
         invoke(
             [
                 "add",
@@ -916,15 +953,18 @@ def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
                 "ftp.example.com",
                 "--remote-root",
                 f"/{name}",
+                "--local-root",
+                str(local_root),
             ],
             store,
         )
 
     monkeypatch.chdir(root)
-    assert invoke(["map", "prod"], store)[0] == 0
     assert invoke(["exclude", "--pattern", "*.log"], store)[0] == 0
     monkeypatch.chdir(child)
-    overlap_status, _, overlap_error = invoke(["map", "staging"], store)
+    overlap_status, _, overlap_error = invoke(
+        ["map", "staging"], store, stdin="yes\n"
+    )
     monkeypatch.chdir(separate)
     declined = invoke(["prod", "map"], store)
     remapped = invoke(["map", "prod"], store, stdin="yes\n")
@@ -947,7 +987,7 @@ def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
     remapped_project = store.load().projects["prod"]
     assert remapped_project.local_root == str(separate)
     assert remapped_project.rules == (SyncRule(1, "exclude", "*.log"),)
-    assert store.load().projects["staging"].local_root is None
+    assert store.load().projects["staging"].local_root == str(staging_root)
 
 
 def test_push_reports_partial_failure_after_continuing_independent_paths(
