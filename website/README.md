@@ -16,3 +16,5 @@ font resources in addition to same-origin assets.
 
 The page derives its canonical URL from the validated request host and exposes
 Open Graph and Twitter large-image metadata for `assets/social-preview.jpg`.
+The existing hook mark is provided as SVG and 32-pixel PNG favicons, a
+multi-size root `favicon.ico`, and a 180-pixel Apple touch icon.

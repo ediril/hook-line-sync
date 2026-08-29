@@ -13,3 +13,5 @@ venv/
 *.bak
 
 *.png
+!website/assets/favicon-32x32.png
+!website/assets/apple-touch-icon.png

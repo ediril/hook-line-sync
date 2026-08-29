@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.28.22 — 2026-08-28
+
+### Added
+
+- Completed the website favicon set from the existing hook mark with an SVG
+  primary icon, 32-pixel PNG fallback, multi-size root ICO, and 180-pixel Apple
+  touch icon.
+
 ## 0.8.28.21 — 2026-08-28
 
 ### Added
