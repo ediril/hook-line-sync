@@ -40,6 +40,7 @@ from hlsync.rules import (
     expand_path_operands,
     patterns_from_global_operands,
     patterns_from_operands,
+    patterns_from_remote_operands,
 )
 from hlsync.selection import (
     DirectoryContentsSelection,
@@ -342,6 +343,7 @@ def build_parser() -> argparse.ArgumentParser:
             usage=(
                 f"hlsync [PROFILE] {command} [PATH ...]\n"
                 f"       hlsync [PROFILE] {command} --pattern PATTERN ...\n"
+                f"       hlsync [PROFILE] {command} --remote PATH ...\n"
                 f"       hlsync {command} -g [PATTERN ...]"
             ),
         )
@@ -350,10 +352,15 @@ def build_parser() -> argparse.ArgumentParser:
             required=False,
             metavar="PATH",
             help_text=(
-                "local paths, wildcard expressions, or comma-separated groups; "
+                "paths, wildcard expressions, or comma-separated groups; "
                 f"omit to list {rule_name} rules; with -g, operands are "
                 "reusable profile-root patterns"
             ),
+        )
+        rules_parser.add_argument(
+            "--remote",
+            action="store_true",
+            help="apply rules to remote paths that must be left untouched",
         )
         rules_parser.add_argument(
             "--pattern",
@@ -782,6 +789,7 @@ def _format_rules(
     heading: str,
     grouped: bool = False,
     global_scope: bool = False,
+    show_targets: bool = False,
 ) -> str:
     scope_heading = (
         f"Global {heading.lower()}"
@@ -795,21 +803,32 @@ def _format_rules(
     }
     width = max(len(identifier) for identifier in identifiers.values())
     if grouped:
-        groups: dict[str, list[tuple[SyncRule, str]]] = {}
-        for rule in rules:
-            group, expression = _rule_display_location(rule)
-            groups.setdefault(group, []).append((rule, expression))
+        target_groups = (
+            (("Local", tuple(rule for rule in rules if rule.target == "local")),
+             ("Remote", tuple(rule for rule in rules if rule.target == "remote")))
+            if show_targets
+            else (("", rules),)
+        )
         lines = [f"{scope_heading}:"]
-        for group in sorted(groups, key=_rule_group_key):
-            lines.extend(("", group))
-            for rule, expression in sorted(
-                groups[group],
-                key=lambda item: (item[1].casefold(), item[1], item[0].id),
-            ):
-                lines.append(
-                    f"  {identifiers[rule.id]:>{width}}  "
-                    f"{rule.action:<7} {expression}"
-                )
+        for target_heading, target_rules in target_groups:
+            if not target_rules:
+                continue
+            if target_heading:
+                lines.extend(("", target_heading))
+            groups: dict[str, list[tuple[SyncRule, str]]] = {}
+            for rule in target_rules:
+                group, expression = _rule_display_location(rule)
+                groups.setdefault(group, []).append((rule, expression))
+            for group in sorted(groups, key=_rule_group_key):
+                lines.extend(("", group))
+                for rule, expression in sorted(
+                    groups[group],
+                    key=lambda item: (item[1].casefold(), item[1], item[0].id),
+                ):
+                    lines.append(
+                        f"  {identifiers[rule.id]:>{width}}  "
+                        f"{rule.action:<7} {expression}"
+                    )
         if _rules_need_precedence_note(rules):
             lines.extend(("", "Higher rule IDs take precedence when rules overlap."))
         return "\n".join(lines)
@@ -857,7 +876,10 @@ def _rule_group_key(group: str) -> tuple[int, str, str]:
 
 
 def _rules_need_precedence_note(rules: tuple[SyncRule, ...]) -> bool:
-    return len({rule.action for rule in rules}) > 1
+    return any(
+        len({rule.action for rule in rules if rule.target == target}) > 1
+        for target in ("local", "remote")
+    )
 
 
 def _format_rule_expression(rule: SyncRule) -> str:
@@ -884,16 +906,19 @@ def _change_rules(
     include: bool,
 ) -> str:
     patterns = normalize_pattern_operands(arguments)
+    target = "remote" if arguments.remote else "local"
     if not patterns:
         if arguments.pattern:
             raise ConfigurationError("--pattern requires at least one operand")
         action = "include" if include else "exclude"
         kind = "Inclusion" if include else "Exclusion"
+        if arguments.remote:
+            kind = f"Remote {kind.lower()}"
         if arguments.global_rules:
             rules = tuple(
                 rule
                 for rule in _global_rule_store(store).load().rules
-                if rule.action == action
+                if rule.action == action and rule.target == target
             )
             return _format_rules(
                 "",
@@ -903,15 +928,23 @@ def _change_rules(
                 global_scope=True,
             )
         _, name, profile = _resolve_profile(arguments, store)
-        rules = tuple(rule for rule in profile.rules if rule.action == action)
+        rules = tuple(
+            rule
+            for rule in profile.rules
+            if rule.action == action and rule.target == target
+        )
         return _format_rules(name, rules, heading=f"{kind} rules", grouped=True)
     if arguments.global_rules:
         global_store = _global_rule_store(store)
         configuration = global_store.load()
-        normalized = patterns_from_global_operands(patterns)
+        normalized = patterns_from_global_operands(
+            patterns,
+            trailing_slash_tree=not arguments.remote,
+        )
         configuration, update = configuration.with_appended_rules(
             "include" if include else "exclude",
             normalized,
+            target=target,
         )
         global_store.save(configuration)
         return _format_rule_update(
@@ -919,32 +952,37 @@ def _change_rules(
             update,
             include=include,
             global_scope=True,
+            target=target,
         )
     configuration, name, profile = _resolve_profile(arguments, store)
     root = _require_local_root(name, profile)
     current_directory = _effective_current_directory(arguments, root)
     operands = (
         patterns
-        if arguments.pattern
+        if arguments.pattern or arguments.remote
         else expand_path_operands(
             patterns,
             profile_root=root,
             current_directory=current_directory,
         )
     )
-    normalized = patterns_from_operands(
-        operands,
-        profile_root=root,
-        current_directory=current_directory,
+    normalizer = (
+        patterns_from_remote_operands
+        if arguments.remote
+        else patterns_from_operands
+    )
+    normalized = normalizer(
+        operands, profile_root=root, current_directory=current_directory
     )
     update = configuration.append_rules(
         name,
         "include" if include else "exclude",
         normalized,
+        target=target,
         base_rules=_global_rule_store(store).load().rules,
     )
     store.save(configuration)
-    return _format_rule_update(name, update, include=include)
+    return _format_rule_update(name, update, include=include, target=target)
 
 
 def _format_rule_update(
@@ -953,6 +991,7 @@ def _format_rule_update(
     *,
     include: bool,
     global_scope: bool = False,
+    target: str = "local",
 ) -> str:
     scope = "global synchronization policy" if global_scope else f"profile '{name}'"
     if update.added and update.removed:
@@ -970,6 +1009,8 @@ def _format_rule_update(
         return "\n".join(lines)
     if update.added:
         action = "Inclusion" if include else "Exclusion"
+        if target == "remote":
+            action = f"Remote {action.lower()}"
         if global_scope:
             identifiers = tuple(
                 _format_rule_id(rule, global_scope=True) for rule in update.added
@@ -994,6 +1035,8 @@ def _format_rule_update(
         )
     if update.removed:
         result = "included" if include else "excluded"
+        if target == "remote":
+            result = f"remotely {result}"
         remaining_scope = (
             "global synchronization policy"
             if global_scope
@@ -1033,6 +1076,7 @@ def _manage_rules(
                 heading="Synchronization rules",
                 grouped=True,
                 global_scope=True,
+                show_targets=True,
             )
         if arguments.rule_id is None:
             raise ConfigurationError("rules remove requires a rule id")
@@ -1054,12 +1098,14 @@ def _manage_rules(
             heading="Synchronization rules",
             grouped=True,
             global_scope=True,
+            show_targets=True,
         )
         profile_rules = _format_rules(
             name,
             profile.rules,
             heading="Synchronization rules",
             grouped=True,
+            show_targets=True,
         )
         return (
             f"{global_rules}\n\n{profile_rules}\n\n"
@@ -1238,21 +1284,30 @@ def _comparison_kind(entry: ComparisonEntry) -> str:
 
 
 def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
+    if entry.state == "remote-excluded":
+        return "r x"
     if entry.action == "excluded":
-        return "!" if entry.remote_kind is not None else "x"
+        return "r !" if entry.remote_kind is not None else "l x"
     if entry.action == "conflict":
-        return "?"
+        return "  ?"
     if entry.action == "unchanged":
-        return "="
+        return "  ="
     if entry.action == "untraversed":
-        return "r" if entry.state == "remote-only" else " "
+        return "r  " if entry.state == "remote-only" else "   "
     if entry.action == "skip":
-        return "r" if entry.state == "remote-only" else "l"
+        return "r  " if entry.state == "remote-only" else "l  "
     if entry.state == "changed":
-        return "~"
+        return "  ~"
     if direction == "push":
-        return "+" if entry.state == "local-only" else "-"
-    return "+" if entry.state == "remote-only" else "-"
+        return "l +" if entry.state == "local-only" else "r -"
+    return "r +" if entry.state == "remote-only" else "l -"
+
+
+def _comparison_marker_color(marker: str) -> str | None:
+    action = marker[-1]
+    if marker == "r x":
+        return _EXCLUDED_REMOTE_COLOR
+    return _DIFF_MARKER_COLORS.get(action) or _DIFF_MARKER_COLORS.get(marker.strip())
 
 
 def _comparison_entry_kind(entry: ComparisonEntry, direction: str) -> str:
@@ -1270,15 +1325,15 @@ def _use_color(output: TextIO) -> bool:
 def _format_legend(output: TextIO) -> str:
     color = _use_color(output)
     entries = (
-        ("+", "new locally", _DIFF_MARKER_COLORS["+"]),
-        ("~", "modified", _DIFF_MARKER_COLORS["~"]),
-        ("-", "remote deletion authorized", _DIFF_MARKER_COLORS["-"]),
-        ("r", "remote-only, retained", _DIFF_MARKER_COLORS["r"]),
-        ("l", "local-only, retained", _DIFF_MARKER_COLORS["l"]),
+        ("l +", "local-only; upload", _DIFF_MARKER_COLORS["+"]),
+        ("  ~", "present on both sides; update", _DIFF_MARKER_COLORS["~"]),
+        ("r -", "remote-only; delete", _DIFF_MARKER_COLORS["-"]),
+        ("r  ", "remote-only; retain", _DIFF_MARKER_COLORS["r"]),
+        ("r x", "remote-excluded; leave untouched", _EXCLUDED_REMOTE_COLOR),
         ("?", "conflict", _DIFF_MARKER_COLORS["?"]),
         ("=", "unchanged file", None),
-        ("x", "excluded, absent remotely", _DIFF_MARKER_COLORS["x"]),
-        ("!", "excluded, present remotely", _DIFF_MARKER_COLORS["!"]),
+        ("l x", "local-excluded, absent remotely", _DIFF_MARKER_COLORS["x"]),
+        ("r !", "local-excluded, present remotely", _DIFF_MARKER_COLORS["!"]),
         ("/", "directory", _DIRECTORY_COLOR),
         ("▸", "contents not inspected", _COLLAPSED_DIRECTORY_COLOR),
     )
@@ -1305,7 +1360,7 @@ def _format_path_line(
     indent = "  " * depth
     label = f"{path}/" if directory else path
     traversal = " ▸" if collapsed else ""
-    omit_marker = omit_empty_directory_marker and directory and marker == " "
+    omit_marker = omit_empty_directory_marker and directory and not marker.strip()
     body = (
         f"{label}{traversal}"
         if omit_marker
@@ -1314,6 +1369,43 @@ def _format_path_line(
     line = f"{indent}{body}"
     if not color:
         return line
+    if omit_marker:
+        directory_color = (
+            _COLLAPSED_DIRECTORY_COLOR
+            if collapsed
+            else path_color
+            or (_EXCLUDED_DIRECTORY_COLOR if excluded else _DIRECTORY_COLOR)
+        )
+        suffix = " ▸" if collapsed else ""
+        return f"{indent}{directory_color}{path}/{suffix}{_RESET}"
+    if len(marker) == 3:
+        side, action = marker[0], marker[2]
+        side_color = _DIFF_MARKER_COLORS.get(side)
+        rendered_side = (
+            f"{side_color}{side}{_RESET}" if side_color and side != " " else side
+        )
+        rendered_action = (
+            f"{marker_color}{action}{_RESET}"
+            if marker_color and action != " "
+            else action
+        )
+        rendered_status = f"{rendered_side} {rendered_action}"
+        if directory:
+            directory_color = path_color or (
+                _EXCLUDED_DIRECTORY_COLOR if excluded else _DIRECTORY_COLOR
+            )
+            suffix = " ▸" if collapsed else ""
+            return (
+                f"{indent}{rendered_status} "
+                f"{directory_color}{path}/{suffix}{_RESET}"
+            )
+        path_style = marker_color or side_color
+        rendered_path = (
+            f"{path_style}{label}{traversal}{_RESET}"
+            if path_style
+            else f"{label}{traversal}"
+        )
+        return f"{indent}{rendered_status} {rendered_path}"
     if directory:
         if collapsed:
             if omit_marker:
@@ -1390,7 +1482,7 @@ def _format_comparison_entries(
         collapsed = entry.path in collapsed_paths
         directory = _comparison_entry_kind(entry, direction) == "directory"
         marker = (
-            " "
+            "   "
             if directory and entry.action == "unchanged"
             else _comparison_marker(entry, direction)
         )
@@ -1407,7 +1499,7 @@ def _format_comparison_entries(
                 path=path,
                 depth=depth,
                 color=color,
-                marker_color=_DIFF_MARKER_COLORS.get(marker),
+                marker_color=_comparison_marker_color(marker),
                 excluded=entry.action == "excluded",
                 collapsed=collapsed,
                 omit_empty_directory_marker=True,
@@ -1671,22 +1763,30 @@ def _descendant_directories(
         entry.path: entry for entry in remote.entries if entry.kind == "directory"
     }
     paths = sorted(local_directories.keys() | remote_directories.keys())
-    return tuple(
-        (
-            PurePosixPath(path),
-            path in local_directories,
-            path in remote_directories,
+    descendants: list[tuple[PurePosixPath, bool, bool]] = []
+    for path in paths:
+        local_entry = local_directories.get(path)
+        remote_entry = remote_directories.get(path)
+        if local_entry is None and not descend_remote_only:
+            continue
+        if selector is not None and not selector.may_match_descendant(path):
+            continue
+        if (
+            local_entry is not None
+            and local_entry.excluded
+            and not rules.may_include_descendant(path, target="local")
+            and not descend_excluded
+        ):
+            continue
+        if any(
+            entry is not None and entry.remote_excluded
+            for entry in (local_entry, remote_entry)
+        ):
+            continue
+        descendants.append(
+            (PurePosixPath(path), local_entry is not None, remote_entry is not None)
         )
-        for path in paths
-        for entry in (local_directories.get(path) or remote_directories[path],)
-        if path in local_directories or descend_remote_only
-        if (selector is None or selector.may_match_descendant(path))
-        and (
-            not entry.excluded
-            or rules.may_include_descendant(path)
-            or descend_excluded
-        )
-    )
+    return tuple(descendants)
 
 
 def _profile_relative_current_directory(
@@ -1817,6 +1917,7 @@ def _build_plan(
             and prune_remote
             and _recursive_transfer_scope(arguments)
         ),
+        respect_remote_boundaries=True,
     )
     print("Reading remote files over FTPS...", file=progress, flush=True)
 
@@ -2005,7 +2106,12 @@ def _diff(
             )
             if current.include_container and directory.parts:
                 container_path = directory.as_posix()
-                excluded = rules.excludes(container_path, is_directory=True)
+                excluded = rules.excludes(
+                    container_path, target="local", is_directory=True
+                )
+                remote_excluded = rules.excludes(
+                    container_path, target="remote", is_directory=True
+                )
                 if current.has_local:
                     local = TreeSnapshot(
                         local.entries
@@ -2014,6 +2120,7 @@ def _diff(
                                 container_path,
                                 "directory",
                                 excluded=excluded,
+                                remote_excluded=remote_excluded,
                             ),
                         )
                     )
@@ -2025,6 +2132,7 @@ def _diff(
                                 container_path,
                                 "directory",
                                 excluded=excluded,
+                                remote_excluded=remote_excluded,
                             ),
                         )
                     )
@@ -2075,6 +2183,10 @@ def _diff(
                         and (
                             entry.action
                             not in {"unchanged", "excluded", "untraversed"}
+                            or (
+                                entry.state == "remote-excluded"
+                                and not arguments.included_only
+                            )
                             or (
                                 entry.action == "untraversed"
                                 and entry.state == "remote-only"

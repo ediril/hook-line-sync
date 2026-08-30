@@ -107,13 +107,16 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
     assets = root / "assets"
     cache = root / "cache"
     opaque = root / "opaque"
+    protected = root / "protected"
     assets.mkdir()
     cache.mkdir()
     opaque.mkdir()
+    protected.mkdir()
     (assets / "logo.svg").write_text("logo", encoding="utf-8")
     (cache / "index.bin").write_bytes(b"ignored")
     (cache / "keep.bin").write_bytes(b"included")
     (opaque / "hidden.bin").write_bytes(b"ignored")
+    (protected / "remote-only.bin").write_bytes(b"protected")
     (root / "debug.log").write_text("ignored", encoding="utf-8")
     local_root = root.parent / "local-root"
     local_root.mkdir()
@@ -137,6 +140,7 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
             SyncRule(2, "exclude", "*.log"),
             SyncRule(3, "include", "cache/keep.bin"),
             SyncRule(4, "exclude", "opaque/**"),
+            SyncRule(5, "exclude", "protected", "remote"),
         )
     )
     with transport:
@@ -147,6 +151,7 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
             ("assets", "directory"),
             ("assets/logo.svg", "file"),
             ("cache/keep.bin", "file"),
+            ("protected", "directory"),
         ]
         shallow_diagnostic = transport.snapshot(
             rules,
@@ -174,6 +179,7 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
             "debug.log": True,
             "opaque": True,
             "opaque/hidden.bin": True,
+            "protected": False,
         }
         local = snapshot_local(local_root, RuleSet())
         comparison = {
@@ -182,6 +188,8 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
         }
         assert comparison["local.txt"].action == "upload"
         assert comparison["assets/logo.svg"].action == "skip"
+        assert comparison["protected"].action == "excluded"
+        assert "protected/remote-only.bin" not in comparison
 
     assert transport._client is None
 

@@ -26,6 +26,10 @@ subtrees because their contents are eligible for deletion. `--keep-remote`
 changes deletion policy, not selection depth. Bare push remains recursive by
 definition.
 
+An explicit remote exclusion is a harder boundary: diff and transfer show the
+boundary but never enter or mutate it, regardless of recursion or deletion
+policy.
+
 Bare diff is a presentation exception: it remains shallow but marks an
 immediate remote-only directory as a collapsed recursive deletion because the
 corresponding bare push will enter and delete that subtree. An explicit shallow

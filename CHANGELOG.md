@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.30.9 — 2026-08-30
+
+### Added
+
+- Add declarative `--remote` rules to `exclude` and `include`. A remote-excluded
+  file or directory is left untouched; excluded directories are not traversed.
+- Group stored rules by local and remote target, and show remote boundaries as
+  `r x` in compact diff output.
+
+### Changed
+
+- Use separate side and action columns in diff output, such as `l +`, `r -`,
+  and `r x`.
+- Keep existing local-rule documents unchanged; only remote rules persist an
+  explicit `"target": "remote"` field.
+
 ## 0.8.30.8 — 2026-08-30
 
 ### Fixed

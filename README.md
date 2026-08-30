@@ -188,6 +188,26 @@ levels. Patterns are rooted where the command runs. HLSync rules are not
 Gitignore syntax: `!`, `?`, bracket patterns, absolute paths, parent traversal,
 and partial-segment `**` are rejected.
 
+Local rules define the authoritative local set. Remote rules instead protect
+server-side paths from synchronization:
+
+```console
+hlsync exclude --remote subdomains
+hlsync include --remote subdomains
+```
+
+Remote operands are declarative and never require a connection when recorded.
+`subdomains` and `subdomains/` store the same exact boundary. During diff or
+push, an existing remote file is left untouched; an existing remote directory
+and everything beneath it are left untouched without traversing the directory.
+A matching remote inclusion removes or overrides that boundary and returns the
+path to normal push policy. Remote directory boundaries cannot be pierced by a
+more specific child inclusion. `hlsync rules` groups the two rule targets under
+`Local` and `Remote`.
+
+Local rules keep the original compact JSON form. A missing stored `target`
+means local; only remote rules add `"target": "remote"`.
+
 Rules have stable IDs and the highest matching ID wins. HLSync removes provably
 redundant exact rules but preserves ambiguous wildcard overlaps.
 
@@ -249,7 +269,8 @@ hlsync diff index.html app.js styles.css
 hlsync diff '**/*.css'
 ```
 
-Local path existence is authoritative. In the default push view, remote-only
+Local path existence is authoritative except at explicit remote-exclusion
+boundaries. In the default push view, remote-only
 paths are shown as deletions because push will make the selected remote scope
 match local state. Preview retention instead with:
 
@@ -264,15 +285,15 @@ one-sided paths, and conflicts. Use `-a`/`--all` to restore the exploratory
 view with unchanged and excluded paths. Combine `--all` with
 `-i`/`--inc`/`--included-only` to keep unchanged paths while hiding exclusions.
 
-For push authority, an excluded local path is treated as absent. If it exists
-remotely, default diff marks its deletion as `-`; `diff -k --all` marks the
-retained remote copy as `!`. `-i` never hides an actionable deletion.
+For push authority, a locally excluded path is treated as absent. If it exists
+remotely, default diff marks its deletion as `r -`; `diff -k --all` marks the
+retained remote copy as `r !`. `-i` never hides an actionable deletion.
 
 Bare diff keeps traversal shallow but projects the recursive scope of bare
-push: an immediate remote-only directory appears as `- folder/ ▸`, warning that
+push: an immediate remote-only directory appears as `r - folder/ ▸`, warning that
 push will delete the subtree while indicating that diff did not enumerate its
 contents. Use `diff -r` to inspect beneath it. An explicit shallow operand such
-as `diff .` retains an unentered child directory as `r folder/ ▸`.
+as `diff .` retains an unentered child directory as `r   folder/ ▸`.
 
 Show the current status and directory notation without connecting:
 
@@ -286,8 +307,10 @@ Diff prints each directory as it is compared. For a shell-driven review,
 
 Colors are automatic on terminals, disabled for pipes and redirection, and
 suppressed when `NO_COLOR` is set. Text markers retain the core meaning without
-color; notably, `x` means excluded and absent remotely, while `!` means excluded
-and present remotely.
+color. The left status column uses `l` and `r` for the relevant side; the right
+column shows the action. Notably, `r x` is a remote-excluded path left
+untouched, while `l x` and `r !` describe locally excluded paths that are
+respectively absent or present remotely.
 
 ## Push and pull
 
@@ -303,9 +326,10 @@ hlsync pull templates -r
 ```
 
 Push uploads local-only files and replaces changed remote files. Pull replaces
-changed existing local files but never restores a missing local path. Excluded
-paths are never uploaded or pulled. Push deletes selected remote-only paths by
-default, including remote copies of excluded local paths. `-k` /
+changed existing local files but never restores a missing local path. Locally
+excluded paths are never uploaded or pulled; remote-excluded paths are not
+traversed or changed. Push deletes selected remote-only paths by default,
+including remote copies of locally excluded paths. `-k` /
 `--keep-remote` retains them. Deletion does not add traversal depth: an explicit
 directory remains shallow unless `-r` is supplied. Bare `push` remains recursive
 by definition.

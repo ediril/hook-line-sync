@@ -18,6 +18,8 @@ recursive scan and does not descend into a directory merely to seek artifacts.
 An abandoned upload is deleted. A backup is deleted when its destination exists
 and restored when the destination is absent. This lifecycle management never
 depends on the remote-only retention option.
+Remote-excluded directories are never entered, including for artifact
+recovery.
 
 Pull replaces changed local files but never downloads remote-only paths. Each
 download is written and synced beside its destination, verifies size, preserves

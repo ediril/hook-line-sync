@@ -222,15 +222,16 @@ class ExplicitFTPSTransport:
                     selector is None
                     or selector.may_match_descendant(relative_path)
                 )
-                exclusion_may_descend = (
+                local_exclusion_may_descend = (
                     traverse_excluded
                     or not excluded
-                    or rules.may_include_descendant(relative_path)
+                    or rules.may_include_descendant(relative_path, target="local")
                 )
                 if (
                     kind == "directory"
                     and selection_may_descend
-                    and exclusion_may_descend
+                    and local_exclusion_may_descend
+                    and not entry.remote_excluded
                 ):
                     walk(relative)
 
@@ -287,10 +288,23 @@ class ExplicitFTPSTransport:
                 )
             excluded = rules.excludes(
                 relative_path,
+                target="local",
+                is_directory=kind == "directory",
+            )
+            remote_excluded = rules.excludes(
+                relative_path,
+                target="remote",
                 is_directory=kind == "directory",
             )
             if kind != "file":
-                entries.append(TreeEntry(relative_path, kind, excluded=excluded))
+                entries.append(
+                    TreeEntry(
+                        relative_path,
+                        kind,
+                        excluded=excluded,
+                        remote_excluded=remote_excluded,
+                    )
+                )
                 continue
             size_value = facts.get("size")
             modified_value = facts.get("modify")
@@ -317,6 +331,7 @@ class ExplicitFTPSTransport:
                         modified_ns=modified_ns,
                         timestamp_precision_ns=precision_ns,
                         excluded=excluded,
+                        remote_excluded=remote_excluded,
                     )
                 )
             except SnapshotError as error:

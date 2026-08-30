@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from hlsync.rules import RuleAction, RuleError, RuleSet, SyncRule
+from hlsync.rules import RuleAction, RuleError, RuleSet, RuleTarget, SyncRule
 from hlsync.storage import write_json_atomic
 
 CONFIG_VERSION = 9
@@ -106,11 +106,16 @@ def _rule_action_already_applies(
     rules: tuple[SyncRule, ...],
     action: RuleAction,
     pattern: str,
+    target: RuleTarget,
 ) -> bool:
     if "*" in pattern:
         return False
     winner = next(
-        (rule for rule in reversed(rules) if rule.matches(pattern)),
+        (
+            rule
+            for rule in reversed(rules)
+            if rule.target == target and rule.matches(pattern)
+        ),
         None,
     )
     excluded = winner is not None and winner.action == "exclude"
@@ -122,6 +127,7 @@ def _append_rules(
     action: RuleAction,
     patterns: tuple[str, ...],
     *,
+    target: RuleTarget = "local",
     base_rules: tuple[SyncRule, ...] = (),
 ) -> tuple[tuple[SyncRule, ...], RuleUpdate]:
     ordered = list(rules)
@@ -132,15 +138,23 @@ def _append_rules(
         unique_patterns = [item for item in unique_patterns if item != pattern]
         unique_patterns.append(pattern)
     for pattern in unique_patterns:
-        replaced = tuple(rule for rule in ordered if rule.pattern == pattern)
-        ordered = [rule for rule in ordered if rule.pattern != pattern]
+        replaced = tuple(
+            rule
+            for rule in ordered
+            if rule.pattern == pattern and rule.target == target
+        )
+        ordered = [
+            rule
+            for rule in ordered
+            if rule.pattern != pattern or rule.target != target
+        ]
         if replaced and _rule_action_already_applies(
-            (*base_rules, *ordered), action, pattern
+            (*base_rules, *ordered), action, pattern, target
         ):
             removed.extend(replaced)
             continue
         next_id = max((rule.id for rule in ordered), default=0) + 1
-        rule = SyncRule(next_id, action, pattern)
+        rule = SyncRule(next_id, action, pattern, target)
         ordered.append(rule)
         added.append(rule)
     return (
@@ -367,6 +381,7 @@ class ApplicationConfiguration:
         action: RuleAction,
         patterns: tuple[str, ...],
         *,
+        target: RuleTarget = "local",
         base_rules: tuple[SyncRule, ...] = (),
     ) -> RuleUpdate:
         profile = self.profiles[profile_name]
@@ -374,6 +389,7 @@ class ApplicationConfiguration:
             profile.rules,
             action,
             patterns,
+            target=target,
             base_rules=base_rules,
         )
         self.profiles[profile_name] = profile.with_rules(rules)
@@ -446,11 +462,14 @@ class GlobalRuleConfiguration:
         self,
         action: RuleAction,
         patterns: tuple[str, ...],
+        *,
+        target: RuleTarget = "local",
     ) -> tuple[GlobalRuleConfiguration, RuleUpdate]:
         rules, update = _append_rules(
             self.rules,
             action,
             patterns,
+            target=target,
         )
         return GlobalRuleConfiguration(rules), update
 

@@ -16,6 +16,9 @@ always takes fresh snapshots and builds a new plan immediately before mutation;
 displayed output is never an executable cached plan. Excluded local paths are
 treated as absent from the authoritative set, so a selected remote counterpart
 is deleted by default and retained under `--keep-remote`.
+Remote exclusions are synchronization boundaries instead: the planner emits a
+non-executable excluded entry for the boundary and suppresses every operation
+beneath an excluded remote directory.
 
 ## Rationale
 

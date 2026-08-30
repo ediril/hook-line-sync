@@ -124,15 +124,15 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     assert invoke(["--legend"], store) == (
         0,
         "Diff legend:\n"
-        "  +  new locally\n"
-        "  ~  modified\n"
-        "  -  remote deletion authorized\n"
-        "  r  remote-only, retained\n"
-        "  l  local-only, retained\n"
+        "  l +  local-only; upload\n"
+        "    ~  present on both sides; update\n"
+        "  r -  remote-only; delete\n"
+        "  r    remote-only; retain\n"
+        "  r x  remote-excluded; leave untouched\n"
         "  ?  conflict\n"
         "  =  unchanged file\n"
-        "  x  excluded, absent remotely\n"
-        "  !  excluded, present remotely\n"
+        "  l x  local-excluded, absent remotely\n"
+        "  r !  local-excluded, present remotely\n"
         "  /  directory\n"
         "  ▸  contents not inspected\n",
         "",
@@ -841,7 +841,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert push_comparison[1].startswith("src/\n")
-    assert "+ main.py\n" in push_comparison[1]
+    assert "l + main.py\n" in push_comparison[1]
     assert "nested" not in push_comparison[1]
     assert "src/nested/child.py" not in push_comparison[1]
     assert "README.md" not in push_comparison[1]
@@ -849,34 +849,39 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
-    assert "  - debug.log\n" in push_comparison[1]
+    assert "  r - debug.log\n" in push_comparison[1]
     hidden_exclusions = invoke(["diff", "-i"], store)
-    assert "  - debug.log\n" in hidden_exclusions[1]
+    assert "  r - debug.log\n" in hidden_exclusions[1]
     assert invoke(["prod", "diff", "same.txt"], store)[1] == (
         "  no differences\n"
     )
 
     recursive_comparison = invoke(["diff", "-r"], store)
     assert "Options: recursive (-r).\n" in recursive_comparison[2]
-    assert "  + child.py\n" in recursive_comparison[1]
+    assert "  l + child.py\n" in recursive_comparison[1]
     assert recursive_comparison[1].index("nested/\n") < (
-        recursive_comparison[1].index("  + child.py\n")
+        recursive_comparison[1].index("  l + child.py\n")
     )
-    assert recursive_comparison[1].index("  + child.py\n") < (
-        recursive_comparison[1].index("+ .env.example\n")
+    assert recursive_comparison[1].index("  l + child.py\n") < (
+        recursive_comparison[1].index("l + .env.example\n")
     )
 
     monkeypatch.chdir(workspace)
     pruned_comparison = invoke(["diff"], store, terminal_output=True)
     assert "Options:" not in pruned_comparison[2]
-    assert "\033[31m- deployed.html\033[0m\n" in pruned_comparison[1]
+    assert "\033[38;5;30mr\033[0m \033[31m-\033[0m" in pruned_comparison[1]
+    assert "\033[31mdeployed.html\033[0m\n" in pruned_comparison[1]
     assert "archive/ ▸" in pruned_comparison[1]
     assert "\033[31m-\033[0m" in pruned_comparison[1]
     assert "src/" not in pruned_comparison[1]
     assert "same.txt" not in pruned_comparison[1]
     kept_comparison = invoke(["diff", "-k"], store, terminal_output=True)
     assert "Options: keep remote-only paths (-k).\n" in kept_comparison[2]
-    assert "\033[38;5;30mr deployed.html\033[0m\n" in kept_comparison[1]
+    retained_line = (
+        "\033[38;5;30mr\033[0m   "
+        "\033[38;5;30mdeployed.html\033[0m\n"
+    )
+    assert retained_line in kept_comparison[1]
     explicit_shallow = invoke(["diff", "."], store, terminal_output=True)
     assert "archive/ ▸" in explicit_shallow[1]
     assert "\033[38;5;30mr\033[0m" in explicit_shallow[1]
@@ -894,16 +899,16 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "nested" not in directory_comparison[1]
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
-    assert "    + child.py\n" in recursive_directory_comparison[1]
+    assert "    l + child.py\n" in recursive_directory_comparison[1]
     nested_directory_comparison = invoke(["diff", "src/nested"], store)
     assert nested_directory_comparison[1].startswith("src/nested/\n")
-    assert "  + child.py\n" in nested_directory_comparison[1]
+    assert "  l + child.py\n" in nested_directory_comparison[1]
     expanded_comparison = invoke(
         ["diff", "README.md,src/main.py", "src"], store
     )
     assert expanded_comparison[0] == 0
-    assert "+ README.md\n" in expanded_comparison[1]
-    assert "  + main.py\n" in expanded_comparison[1]
+    assert "l + README.md\n" in expanded_comparison[1]
+    assert "  l + main.py\n" in expanded_comparison[1]
     assert "src/ ▸\n" not in expanded_comparison[1]
 
     colored_comparison = invoke(
@@ -914,8 +919,9 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_comparison[1]
     )
-    assert "  \033[31m- debug.log\033[0m" in colored_comparison[1]
-    assert "= same.txt" in colored_comparison[1]
+    assert "\033[38;5;30mr\033[0m \033[31m-\033[0m" in colored_comparison[1]
+    assert "\033[31mdebug.log\033[0m" in colored_comparison[1]
+    assert "  = same.txt" in colored_comparison[1]
     assert colored_comparison[1].index("node_modules/") < (
         colored_comparison[1].index("src/")
     )
@@ -923,8 +929,8 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         colored_comparison[1].index("README.md")
     )
     all_included = invoke(["diff", "**", "--all", "-i"], store)
-    assert "= same.txt" in all_included[1]
-    assert "  - debug.log\n" in all_included[1]
+    assert "  = same.txt" in all_included[1]
+    assert "  r - debug.log\n" in all_included[1]
     with monkeypatch.context() as no_color:
         no_color.setenv("NO_COLOR", "1")
         uncolored_comparison = invoke(
@@ -948,8 +954,10 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         ["diff", "--pull", "-r"], store, terminal_output=True
     )
     assert pull_comparison[0] == 0
-    assert "\033[38;5;30mr deployed.html\033[0m\n" in pull_comparison[1]
-    assert "\033[38;5;51ml README.md\033[0m\n" in pull_comparison[1]
+    assert "\033[38;5;30mr\033[0m" in pull_comparison[1]
+    assert "deployed.html" in pull_comparison[1]
+    assert "\033[38;5;51ml\033[0m" in pull_comparison[1]
+    assert "README.md" in pull_comparison[1]
     with pytest.raises(SystemExit):
         run(["diff", "--pull", "-k"], store=store)
     with pytest.raises(SystemExit):
@@ -1045,12 +1053,112 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     prefixed_diff = invoke(["prod", "diff", "src"], store)
     assert prefixed_diff[0] == 0
     assert prefixed_diff[1].startswith("src/\n")
-    assert "  + main.py\n" in prefixed_diff[1]
+    assert "  l + main.py\n" in prefixed_diff[1]
     prefixed_page = invoke(["prod", "diff", ".", "-r", "--paged"], store)
     assert (
         "Resume: hlsync prod diff . --recursive --paged --resume archive\n"
         in prefixed_page[1]
     )
+
+
+def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> None:
+    store = ConfigurationStore(tmp_path / "configs.json")
+    workspace = tmp_path / "workspace"
+    protected = workspace / "future-dir"
+    protected.mkdir(parents=True)
+    (protected / "local.txt").write_text("local", encoding="utf-8")
+    invoke(
+        [
+            "create",
+            "prod",
+            "--host",
+            "unreachable.example",
+            "--remote-root",
+            "/public_html",
+            "--local-root",
+            str(workspace),
+        ],
+        store,
+    )
+    monkeypatch.chdir(workspace)
+
+    recorded = invoke(["exclude", "--remote", "future-dir"], store)
+    assert recorded == (
+        0,
+        "Recorded remote exclusion rules for profile 'prod':\n"
+        "  1  exclude ./future-dir\n",
+        "",
+    )
+    assert store.load().profiles["prod"].rules == (
+        SyncRule(1, "exclude", "future-dir", "remote"),
+    )
+    rules_view = invoke(["rules"], store)[1]
+    assert "Remote\n\n./\n  1  exclude future-dir\n" in rules_view
+
+    listed = []
+    operations = []
+
+    class ProtectedTransport:
+        def __init__(self, profile) -> None:
+            del profile
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def list_directory(self, relative_directory, rules):
+            listed.append(relative_directory.as_posix())
+            assert relative_directory.as_posix() == "."
+            assert rules.excludes("future-dir", target="remote", is_directory=True)
+            return TreeSnapshot(
+                (
+                    TreeEntry(
+                        "future-dir",
+                        "directory",
+                        remote_excluded=True,
+                    ),
+                )
+            )
+
+        def snapshot(self, rules, selector=None, **_):
+            assert rules.excludes("future-dir", target="remote", is_directory=True)
+            assert selector is None or selector.matches("future-dir")
+            return TreeSnapshot(
+                (
+                    TreeEntry(
+                        "future-dir",
+                        "directory",
+                        remote_excluded=True,
+                    ),
+                )
+            )
+
+        def make_directory(self, path):
+            operations.append(("mkdir", path))
+
+        def upload_file(self, source, path, **_):
+            operations.append(("upload", path, source.read()))
+
+        def delete_path(self, path, *, is_directory):
+            operations.append(("delete", path, is_directory))
+
+    monkeypatch.setattr("hlsync.cli.ExplicitFTPSTransport", ProtectedTransport)
+
+    comparison = invoke(["diff", "-r"], store)
+    assert comparison[0] == 0
+    assert comparison[1] == "r x future-dir/\n"
+    assert listed == ["."]
+
+    pushed = invoke(["push"], store)
+    assert pushed[0] == 0
+    assert operations == []
+    assert "Nothing to push" in pushed[1]
+
+    included = invoke(["include", "--remote", "future-dir/"], store)
+    assert included[0] == 0
+    assert store.load().profiles["prod"].rules == ()
 
 
 def test_map_confirms_replacement_and_rejects_overlapping_local_roots(

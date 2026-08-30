@@ -8,6 +8,7 @@ from typing import Any, Literal
 from hlsync.selection import FileSelector, SelectionError
 
 RuleAction = Literal["include", "exclude"]
+RuleTarget = Literal["local", "remote"]
 
 
 class RuleError(ValueError):
@@ -93,20 +94,51 @@ def patterns_from_operands(
     return tuple(normalized)
 
 
-def patterns_from_global_operands(values: tuple[str, ...]) -> tuple[str, ...]:
+def patterns_from_global_operands(
+    values: tuple[str, ...],
+    *,
+    trailing_slash_tree: bool = True,
+) -> tuple[str, ...]:
     """Normalize reusable patterns rooted at every profile's local root."""
     normalized: list[str] = []
     for value in values:
         if not isinstance(value, str) or not value.strip():
             raise RuleError("global rule patterns must be non-empty strings")
         pattern = value.strip()
-        supplied = PurePosixPath(pattern)
+        supplied = PurePosixPath(
+            pattern if trailing_slash_tree else pattern.rstrip("/")
+        )
         if supplied.is_absolute() or ".." in supplied.parts:
             raise RuleError("global rules must be relative to the profile root")
-        if pattern.endswith("/"):
+        if trailing_slash_tree and pattern.endswith("/"):
             supplied = supplied / "**"
         try:
             normalized.append(FileSelector(supplied.as_posix()).pattern)
+        except SelectionError as error:
+            raise RuleError(str(error)) from error
+    return tuple(normalized)
+
+
+def patterns_from_remote_operands(
+    values: tuple[str, ...],
+    *,
+    profile_root: Path,
+    current_directory: Path,
+) -> tuple[str, ...]:
+    """Normalize declarative remote paths without consulting either filesystem."""
+    base = _relative_base(profile_root, current_directory)
+    normalized: list[str] = []
+    for value in values:
+        if not isinstance(value, str) or not value.strip():
+            raise RuleError("remote rule paths must be non-empty strings")
+        pattern = value.strip()
+        supplied = PurePosixPath(pattern.rstrip("/"))
+        if supplied.is_absolute() or not supplied.parts or ".." in supplied.parts:
+            raise RuleError(
+                "remote rule paths must be relative to the profile or current directory"
+            )
+        try:
+            normalized.append(FileSelector((base / supplied).as_posix()).pattern)
         except SelectionError as error:
             raise RuleError(str(error)) from error
     return tuple(normalized)
@@ -117,6 +149,7 @@ class SyncRule:
     id: int
     action: RuleAction
     pattern: str
+    target: RuleTarget = "local"
 
     def __post_init__(self) -> None:
         if isinstance(self.id, bool) or not isinstance(self.id, int) or self.id < 1:
@@ -128,6 +161,8 @@ class SyncRule:
             raise RuleError("rule action must be 'include' or 'exclude'")
         if not isinstance(self.pattern, str):
             raise RuleError("rule pattern must be a string")
+        if self.target not in {"local", "remote"}:
+            raise RuleError("rule target must be 'local' or 'remote'")
         try:
             normalized = FileSelector(self.pattern).pattern
         except SelectionError as error:
@@ -142,13 +177,33 @@ class SyncRule:
         return self._selector.may_match_descendant(profile_relative_directory)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "action": self.action, "pattern": self.pattern}
+        value = {
+            "id": self.id,
+            "action": self.action,
+            "pattern": self.pattern,
+        }
+        if self.target == "remote":
+            value["target"] = self.target
+        return value
 
     @classmethod
     def from_dict(cls, value: Any) -> SyncRule:
-        if not isinstance(value, dict) or set(value) != {"id", "action", "pattern"}:
-            raise RuleError("each rule must contain only id, action, and pattern")
-        return cls(id=value["id"], action=value["action"], pattern=value["pattern"])
+        required = {"id", "action", "pattern"}
+        if (
+            not isinstance(value, dict)
+            or not required.issubset(value)
+            or set(value) - required != ({"target"} if "target" in value else set())
+        ):
+            raise RuleError(
+                "each rule must contain id, action, and pattern, with only an "
+                "optional target"
+            )
+        return cls(
+            id=value["id"],
+            action=value["action"],
+            pattern=value["pattern"],
+            target=value.get("target", "local"),
+        )
 
 
 @dataclass(frozen=True)
@@ -168,7 +223,7 @@ class RuleSet:
     def layered(cls, *layers: tuple[SyncRule, ...]) -> RuleSet:
         return cls(
             tuple(
-                SyncRule(index, rule.action, rule.pattern)
+                SyncRule(index, rule.action, rule.pattern, rule.target)
                 for index, rule in enumerate(
                     (rule for layer in layers for rule in layer),
                     start=1,
@@ -176,7 +231,13 @@ class RuleSet:
             )
         )
 
-    def excludes(self, relative_path: str, *, is_directory: bool = False) -> bool:
+    def excludes(
+        self,
+        relative_path: str,
+        *,
+        target: RuleTarget = "local",
+        is_directory: bool = False,
+    ) -> bool:
         del is_directory
         profile_relative_path = relative_path
         path = PurePosixPath(profile_relative_path)
@@ -184,14 +245,24 @@ class RuleSet:
             raise RuleError("evaluated paths must be non-empty profile-relative paths")
         candidate = path.as_posix()
         winner = next(
-            (rule for rule in reversed(self.rules) if rule.matches(candidate)),
+            (
+                rule
+                for rule in reversed(self.rules)
+                if rule.target == target and rule.matches(candidate)
+            ),
             None,
         )
         return winner is not None and winner.action == "exclude"
 
-    def may_include_descendant(self, relative_directory: str) -> bool:
+    def may_include_descendant(
+        self,
+        relative_directory: str,
+        *,
+        target: RuleTarget = "local",
+    ) -> bool:
         return any(
             rule.action == "include"
+            and rule.target == target
             and rule.may_match_descendant(relative_directory)
             for rule in self.rules
         )

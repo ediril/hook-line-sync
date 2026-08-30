@@ -31,7 +31,9 @@ to the selected scope. Effective-policy assembly reindexes rules only
 transiently for matching and does not alter either persisted sequence.
 
 Each stored rule has an explicit `include` or `exclude` action and a normalized
-profile-relative pattern. `*` matches within one path segment, and a complete
+profile-relative pattern. A missing target means `local`; only remote rules
+persist an explicit `"target": "remote"` field. `*` matches within one path
+segment, and a complete
 `**` segment matches across directory levels. Empty patterns, absolute paths,
 parent traversal, `?`, bracket patterns, and partial-segment `**` are rejected.
 
@@ -39,6 +41,17 @@ Adding the same normalized pattern removes its prior rule before evaluating
 the requested action. Further cleanup occurs only where equivalence can be
 proved without changing the effective layered policy. Rule inspection may
 group and sort for readability, but evaluation remains ordered.
+
+Local rules define the authoritative local set. Remote rules define boundaries
+that must not be traversed, uploaded, replaced, or deleted. Remote operands are
+recorded declaratively without connecting or inspecting either filesystem;
+with or without a trailing slash, an exact operand stores the same boundary.
+At comparison or transfer time, its remote entry type determines whether it
+protects one file or a complete directory subtree. A matching remote inclusion
+removes or overrides the boundary and returns the path to ordinary
+local-authority behavior; it does not download the path. A child inclusion does
+not pierce an excluded remote directory because doing so would require entering
+the protected subtree.
 
 ## Rationale
 
@@ -57,6 +70,8 @@ without protecting a real reference.
 - Default exclusions for `vendor`, `node_modules`, `.env`, lockfiles, tests,
   logs, temporary extensions, or other potentially deployable content.
 - Automatically merging new defaults into an existing global rules file.
+- Inferring a remote operand's file type while recording the rule.
+- Partially traversing a remote-excluded directory for narrower child rules.
 - Requiring an active profile for global rule management.
 - A single shared persisted ID sequence across global and profile files.
 - Accepting numeric global IDs or `g`-prefixed profile IDs as aliases.

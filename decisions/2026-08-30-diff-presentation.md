@@ -4,9 +4,11 @@ Date: 2026-08-30
 
 ## Decision
 
-Diff uses compact textual statuses: `+` create, `~` replace, `-` delete,
-`?` conflict, `r` remote-only retained, `l` local-only retained, `=` unchanged
-file, `x` excluded and absent remotely, and `!` excluded but retained remotely.
+Diff uses separate side and action columns. `l +` is a local-only upload, `r -`
+an authorized remote-only deletion, `~` a replacement, and `r x` a
+remote-excluded boundary that remains untouched. Retained one-sided paths use
+`r` or `l`; unchanged files use `=`, conflicts use `?`, and local exclusions
+use `l x` when absent remotely or `r !` when present remotely.
 Directories end in `/`; a two-sided directory has no equality marker because
 its entry says nothing about its contents. A trailing `▸` marks a directory
 whose contents were not traversed.
@@ -25,8 +27,9 @@ uninspected by diff. `-r` expands the subtree. An explicit shallow operand does
 not inherit bare push recursion, so its unentered remote-only child is retained
 and shown as `r folder/ ▸`.
 
-Diff defaults to operational entries and omits unchanged, neutral excluded,
-and untraversed entries. `-a` / `--all` restores the complete exploratory view.
+Diff defaults to operational entries and remote-excluded boundaries, and omits
+unchanged, neutral local exclusions, and untraversed entries. `-a` / `--all`
+restores the complete exploratory view.
 Color respects `NO_COLOR` and redirected output and has no command-line
 override. `hlsync --legend` renders the symbol and color reference without
 loading a profile or connecting to FTPS.

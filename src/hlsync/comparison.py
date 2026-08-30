@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from pathlib import PurePosixPath
 from typing import Literal
 
 from hlsync.selection import FileSelection, SelectionError
@@ -13,6 +14,7 @@ ComparisonState = Literal[
     "remote-only",
     "changed",
     "excluded",
+    "remote-excluded",
     "type-conflict",
     "symlink-conflict",
 ]
@@ -96,12 +98,39 @@ def build_comparison(
 ) -> ComparisonPlan:
     local_entries = {entry.path: entry for entry in local.entries}
     remote_entries = {entry.path: entry for entry in remote.entries}
+    remote_exclusion_roots = tuple(
+        PurePosixPath(entry.path)
+        for entry in (*local.entries, *remote.entries)
+        if entry.remote_excluded
+    )
     comparison: list[ComparisonEntry] = []
 
     for path in sorted(local_entries.keys() | remote_entries.keys()):
+        candidate_path = PurePosixPath(path)
+        if any(root in candidate_path.parents for root in remote_exclusion_roots):
+            continue
         local_entry = local_entries.get(path)
         remote_entry = remote_entries.get(path)
         if selector is not None and not selector.matches(path):
+            continue
+        protected_entry = next(
+            (
+                entry
+                for entry in (remote_entry, local_entry)
+                if entry is not None and entry.remote_excluded
+            ),
+            None,
+        )
+        if protected_entry is not None:
+            comparison.append(
+                ComparisonEntry(
+                    path=path,
+                    state="remote-excluded",
+                    action="excluded",
+                    local_kind=local_entry.kind if local_entry else None,
+                    remote_kind=remote_entry.kind if remote_entry else None,
+                )
+            )
             continue
         if any(
             entry is not None and entry.excluded

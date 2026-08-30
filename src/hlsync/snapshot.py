@@ -23,6 +23,7 @@ class TreeEntry:
     modified_ns: int | None = None
     timestamp_precision_ns: int | None = None
     excluded: bool = False
+    remote_excluded: bool = False
 
     def __post_init__(self) -> None:
         path = PurePosixPath(self.path)
@@ -31,6 +32,8 @@ class TreeEntry:
         object.__setattr__(self, "path", path.as_posix())
         if not isinstance(self.excluded, bool):
             raise SnapshotError("snapshot exclusion state must be a boolean")
+        if not isinstance(self.remote_excluded, bool):
+            raise SnapshotError("remote exclusion state must be a boolean")
         metadata = (self.size, self.modified_ns, self.timestamp_precision_ns)
         if self.kind == "file":
             if any(value is None for value in metadata):
@@ -71,6 +74,7 @@ def snapshot_local(
     *,
     include_excluded: bool = False,
     traverse_excluded: bool = False,
+    respect_remote_boundaries: bool = False,
 ) -> TreeSnapshot:
     if not root.is_dir():
         raise SnapshotError(f"local root is not an accessible directory: {root}")
@@ -97,7 +101,15 @@ def snapshot_local(
                 or not excluded
                 or rules.may_include_descendant(relative_path)
             )
-            if kind == "directory" and selection_may_descend and exclusion_may_descend:
+            remote_may_descend = (
+                not respect_remote_boundaries or not entry.remote_excluded
+            )
+            if (
+                kind == "directory"
+                and selection_may_descend
+                and exclusion_may_descend
+                and remote_may_descend
+            ):
                 walk(relative)
 
     walk(PurePosixPath())
@@ -140,6 +152,9 @@ def list_local_directory(
             ) from error
 
         excluded = rules.excludes(relative_path, is_directory=kind == "directory")
+        remote_excluded = rules.excludes(
+            relative_path, target="remote", is_directory=kind == "directory"
+        )
         if kind == "file":
             try:
                 stat = child.stat(follow_symlinks=False)
@@ -156,8 +171,16 @@ def list_local_directory(
                     modified_ns=stat.st_mtime_ns,
                     timestamp_precision_ns=1,
                     excluded=excluded,
+                    remote_excluded=remote_excluded,
                 )
             )
         else:
-            entries.append(TreeEntry(relative_path, kind, excluded=excluded))
+            entries.append(
+                TreeEntry(
+                    relative_path,
+                    kind,
+                    excluded=excluded,
+                    remote_excluded=remote_excluded,
+                )
+            )
     return TreeSnapshot(tuple(entries))
