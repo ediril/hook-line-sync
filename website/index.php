@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.30.17';
+$version = '0.8.30.18';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 $title = 'Hook Line Sync — a better way to "just FTP it"';
@@ -218,7 +218,7 @@ function h(string $value): string
                     <div class="step-icon" aria-hidden="true">⌁</div>
                     <h3>Exclude what doesn’t belong</h3>
                     <p>Exclude files that should never leave your machine. Use an explicit pattern when future matching files should stay excluded too.</p>
-                    <code>hlsync exc --pattern '*.map'</code>
+                    <code>hlsync rules -e --pattern '*.map'</code>
                 </li>
                 <li>
                     <span class="step-number">03</span>

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.30.18 — 2026-08-30
+
+### Changed
+
+- Consolidate rule inspection and mutation under `hlsync rules`: use `-e` or
+  `-i` to add rules and `--remove` to delete one.
+- Replace the standalone `exclude` and `include` commands with a compact,
+  folder-grouped rule overview.
+
 ## 0.8.30.17 — 2026-08-30
 
 ### Changed

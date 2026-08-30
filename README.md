@@ -48,7 +48,7 @@ From the local project root:
 ```console
 hlsync create prod --host ftp.example.com --remote-root /public_html/site
 hlsync connect
-hlsync exclude .git node_modules
+hlsync rules -e .git node_modules
 hlsync diff -r
 hlsync push
 ```
@@ -149,11 +149,10 @@ Manage global exclusions and inclusions from any directory with `-g` /
 local root; append `/` to target a complete directory tree:
 
 ```console
-hlsync exclude -g --pattern '*.tmp'
-hlsync include -g --pattern 'public/*.tmp'
-hlsync exclude -g                 # list global exclusions
-hlsync rules -g                   # inspect global rules
-hlsync rules -g remove g4         # remove global rule g4
+hlsync rules -e -g --pattern '*.tmp'
+hlsync rules -i -g --pattern 'public/*.tmp'
+hlsync rules -g                    # inspect global rules
+hlsync rules -g --remove g4        # remove global rule g4
 ```
 
 Global rules apply first and profile rules apply afterward, so an ordinary
@@ -167,8 +166,8 @@ file.
 Exclude current paths permanently:
 
 ```console
-hlsync exclude .git node_modules composer.json composer.lock
-hlsync exc '*.md'
+hlsync rules -e .git node_modules composer.json composer.lock
+hlsync rules -e '*.md'
 ```
 
 Normal wildcard operands are expanded against the current local tree and
@@ -178,9 +177,9 @@ quoted and shell-expanded matches produce the same path rules.
 Use `--pattern` when future matching paths should also be covered:
 
 ```console
-hlsync exc --pattern '*.md'       # this directory only
-hlsync exc --pattern '**/*.log'   # every directory below this point
-hlsync inc --pattern 'vendor/**'  # re-include a subtree
+hlsync rules -e --pattern '*.md'       # this directory only
+hlsync rules -e --pattern '**/*.log'   # every directory below this point
+hlsync rules -i --pattern 'vendor/**'  # re-include a subtree
 ```
 
 `*` matches within one path segment; a complete `**` segment crosses directory
@@ -192,8 +191,8 @@ Local rules define the authoritative local set. Remote rules instead protect
 server-side paths from synchronization:
 
 ```console
-hlsync exclude --remote subdomains
-hlsync include --remote subdomains
+hlsync rules -e --remote subdomains
+hlsync rules -i --remote subdomains
 ```
 
 Remote operands are declarative and never require a connection when recorded.
@@ -212,10 +211,8 @@ Rules have stable IDs and the highest matching ID wins. HLSync removes provably
 redundant exact rules but preserves ambiguous wildcard overlaps.
 
 ```console
-hlsync exc                 # exclusion rules
-hlsync inc                 # inclusion rules
-hlsync rules               # complete policy
-hlsync rules remove 3
+hlsync rules
+hlsync rules --remove 3
 ```
 
 Multiple operands and comma-separated groups are accepted. A literal filename

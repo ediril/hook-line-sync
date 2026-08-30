@@ -135,7 +135,9 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     assert "--info" not in profile_help
     rules_help = invoke(["help", "rules"], store)[1]
     assert "hlsync [PROFILE] rules" in rules_help
-    assert "hlsync [PROFILE] rules remove RULE_ID" in rules_help
+    assert "hlsync [PROFILE] rules --remove RULE_ID" in rules_help
+    assert "-e, --exclude" in rules_help
+    assert "-i, --include" in rules_help
     assert "--profile" not in rules_help
     assert "[{remove}] [rule_id]" not in rules_help
     assert "profile             show the current profile" in help_output
@@ -164,13 +166,7 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
         "  ▸  contents not inspected\n",
         "",
     )
-    for command in ("exclude", "include"):
-        rule_help = invoke(["help", command], store)[1]
-        assert f"hlsync [PROFILE] {command} [PATH ...]" in rule_help
-        assert f"hlsync [PROFILE] {command} --pattern PATTERN ..." in rule_help
     profile_selection_commands = (
-        "exclude",
-        "include",
         "rules",
         "list",
         "diff",
@@ -319,14 +315,14 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
 
     monkeypatch.chdir(outside)
     assert invoke(
-        ["exclude", "-g", "--pattern", "*.tmp"], store
+        ["rules", "-e", "-g", "--pattern", "*.tmp"], store
     ) == (
         0,
         "Recorded global exclusion rules:\n  g7  exclude *.tmp\n",
         "",
     )
     assert invoke(
-        ["include", "-g", "--pattern", "**/.DS_Store"], store
+        ["rules", "-i", "-g", "--pattern", "**/.DS_Store"], store
     ) == (
         0,
         "Recorded global inclusion rules:\n"
@@ -338,22 +334,20 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
     excluded = invoke(["list"], store)[1]
     assert "x .DS_Store\n" not in excluded
     assert "x scratch.tmp\n" in excluded
-    assert invoke(["include", "--pattern", "*.tmp"], store)[0] == 0
+    assert invoke(["rules", "-i", "--pattern", "*.tmp"], store)[0] == 0
     included = invoke(["list"], store)[1]
     assert "x .DS_Store\n" not in included
     assert "x scratch.tmp\n" not in included
     combined = invoke(["rules"], store)[1]
-    assert combined.index("Global synchronization rules:") < combined.index(
-        "Synchronization rules for profile 'prod':"
-    )
-    assert "  g7  exclude *.tmp\n" in combined
+    assert combined.index("Global rules:") < combined.index("Profile 'prod' rules:")
+    assert "    g7  exclude *.tmp\n" in combined
     assert combined.endswith(
-        "Global rules apply first; profile rules override them.\n"
+        "Later rules win; profile rules override global rules.\n"
     )
-    invalid_global_id = invoke(["rules", "-g", "remove", "8"], store)
+    invalid_global_id = invoke(["rules", "-g", "--remove", "8"], store)
     assert invalid_global_id[0] == 1
     assert "rule id must be g-prefixed (for example g3)" in invalid_global_id[2]
-    assert invoke(["rules", "-g", "remove", "g8"], store) == (
+    assert invoke(["rules", "-g", "--remove", "g8"], store) == (
         0,
         "Removed global rule g8: include **/.DS_Store\n",
         "",
@@ -364,7 +358,7 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
         for rule in GlobalRuleStore(global_path).load().rules
     )
     assert invoke(
-        ["exclude", "-g", "--pattern", "*.bak"], store
+        ["rules", "-e", "-g", "--pattern", "*.bak"], store
     ) == (
         0,
         "Recorded global exclusion rules:\n  g8  exclude *.bak\n",
@@ -477,15 +471,21 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     (docs / "note.txt").write_text("note", encoding="utf-8")
 
     exclude_result = invoke(
-        ["exc", "--pattern", ".git/, node_modules/,*.log,**/.cache/"], store
+        [
+            "rules",
+            "-e",
+            "--pattern",
+            ".git/, node_modules/,*.log,**/.cache/",
+        ],
+        store,
     )
-    expanded_exclude_result = invoke(
-        ["exc", "composer.*"], store
+    expanded_exclude_result = invoke(["rules", "-e", "composer.*"], store)
+    include_result = invoke(["rules", "-i", "node_modules/keep.js"], store)
+    directory_include_result = invoke(
+        ["rules", "-i", "node_modules/package"], store
     )
-    include_result = invoke(["inc", "node_modules/keep.js"], store)
-    directory_include_result = invoke(["inc", "node_modules/package"], store)
     monkeypatch.chdir(docs)
-    assert invoke(["exc", "note.txt"], store)[0] == 0
+    assert invoke(["rules", "-e", "note.txt"], store)[0] == 0
     monkeypatch.chdir(workspace)
 
     assert exclude_result == (
@@ -560,47 +560,13 @@ def test_ordered_exclusion_commands_persist_reinclusion(
         ["list", "node_modules", "--recursive"], store
     )
     assert "      nested.js\n" in recursive_directory_view[1]
-    assert invoke(["exc"], store) == (
-        0,
-        "Exclusion rules for profile 'prod':\n"
-        "\n"
-        "./\n"
-        "  3  exclude *.log\n"
-        "  5  exclude composer.json\n"
-        "  6  exclude composer.lock\n"
-        "\n"
-        ".git/\n"
-        "  1  exclude all contents\n"
-        "\n"
-        "docs/\n"
-        "  9  exclude note.txt\n"
-        "\n"
-        "node_modules/\n"
-        "  2  exclude all contents\n"
-        "\n"
-        "Everywhere\n"
-        "  4  exclude .cache/**\n",
-        "",
-    )
-    assert invoke(["inc"], store) == (
-        0,
-        "Inclusion rules for profile 'prod':\n"
-        "\n"
-        "node_modules/\n"
-        "  7  include keep.js\n"
-        "\n"
-        "node_modules/package/\n"
-        "  8  include all contents\n",
-        "",
-    )
     rules_view = invoke(["rules"], store)
     assert rules_view[0] == 0
     assert rules_view[1].index("./\n") < rules_view[1].index(".git/\n")
     assert rules_view[1].index(".git/\n") < rules_view[1].index("docs/\n")
-    assert "  2  exclude all contents\n  7  include keep.js\n" in rules_view[1]
-    assert "Higher rule IDs take precedence when rules overlap.\n" in rules_view[1]
+    assert "    2  exclude all contents\n    7  include keep.js\n" in rules_view[1]
     assert rules_view[1].endswith(
-        "Global rules apply first; profile rules override them.\n"
+        "Later rules win; profile rules override global rules.\n"
     )
     list_stdout = invoke(["profiles"], store)[1]
     assert "* prod\n" in list_stdout
@@ -609,12 +575,12 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     assert f"  Local root: {workspace}\n" in profile_stdout
     assert "  Rules: 9\n" in profile_stdout
     assert invoke(["root"], store) == (0, f"{workspace}\n", "")
-    assert invoke(["rules", "remove", "8"], store) == (
+    assert invoke(["rules", "--remove", "8"], store) == (
         0,
         "Removed rule 8 from profile 'prod': include node_modules/package/**\n",
         "",
     )
-    assert invoke(["inc", "composer.json"], store) == (
+    assert invoke(["rules", "-i", "composer.json"], store) == (
         0,
         "Paths are included by the remaining policy for profile 'prod';\n"
         "removed the unnecessary rules:\n"
@@ -630,7 +596,7 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     outside = tmp_path / "outside"
     outside.mkdir()
     monkeypatch.chdir(outside)
-    assert invoke(["prod", "exclude", "*.env"], store) == (
+    assert invoke(["prod", "rules", "-e", "*.env"], store) == (
         0,
         "Recorded exclusion rules for profile 'prod':\n"
         "  10  exclude ./root.env\n",
@@ -676,7 +642,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     monkeypatch.chdir(workspace)
     assert invoke(
-        ["exclude", "--pattern", "node_modules/,**/*.log"], store
+        ["rules", "-e", "--pattern", "node_modules/,**/*.log"], store
     )[0] == 0
     expected_rules = RuleSet.layered(
         DEFAULT_GLOBAL_RULES,
@@ -1145,7 +1111,7 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
     )
     monkeypatch.chdir(workspace)
 
-    recorded = invoke(["exclude", "--remote", "future-dir"], store)
+    recorded = invoke(["rules", "-e", "--remote", "future-dir"], store)
     assert recorded == (
         0,
         "Recorded remote exclusion rules for profile 'prod':\n"
@@ -1156,7 +1122,7 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
         SyncRule(1, "exclude", "future-dir", "remote"),
     )
     rules_view = invoke(["rules"], store)[1]
-    assert "Remote\n\n./\n  1  exclude future-dir\n" in rules_view
+    assert "  Remote:\n    ./\n      1  exclude future-dir\n" in rules_view
 
     listed = []
     operations = []
@@ -1228,7 +1194,7 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
     assert operations == []
     assert "Nothing to push" in pushed[1]
 
-    included = invoke(["include", "--remote", "future-dir/"], store)
+    included = invoke(["rules", "-i", "--remote", "future-dir/"], store)
     assert included[0] == 0
     assert store.load().profiles["prod"].rules == ()
 
@@ -1260,7 +1226,7 @@ def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
         )
 
     monkeypatch.chdir(root)
-    assert invoke(["exclude", "--pattern", "*.log"], store)[0] == 0
+    assert invoke(["rules", "-e", "--pattern", "*.log"], store)[0] == 0
     monkeypatch.chdir(child)
     overlap_status, _, overlap_error = invoke(
         ["map", "staging"], store, stdin="yes\n"

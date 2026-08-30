@@ -117,8 +117,6 @@ CANONICAL_COMMANDS = (
     "diff",
     "push",
     "pull",
-    "exclude",
-    "include",
     "rules",
     "help",
     "version",
@@ -135,8 +133,6 @@ PROFILE_AWARE_COMMANDS = frozenset(
         "diff",
         "push",
         "pull",
-        "exclude",
-        "include",
         "rules",
     }
 )
@@ -365,93 +361,67 @@ def build_parser() -> argparse.ArgumentParser:
         help="new absolute remote root; omitted leaves it unchanged",
     )
 
-    for command, help_text, rule_name in (
-        (
-            "exclude",
-            "permanently exclude paths from synchronization",
-            "exclusion",
-        ),
-        (
-            "include",
-            "permanently re-include paths in synchronization",
-            "inclusion",
-        ),
-    ):
-        rules_parser = subparsers.add_parser(
-            command,
-            help=help_text,
-            usage=(
-                f"hlsync [PROFILE] {command} [PATH ...]\n"
-                f"       hlsync [PROFILE] {command} --pattern PATTERN ...\n"
-                f"       hlsync [PROFILE] {command} --remote PATH ...\n"
-                f"       hlsync {command} -g [PATTERN ...]"
-            ),
-            description=(
-                f"Record or, with no paths, list {rule_name} rules. Paths "
-                "resolve locally; --pattern matches future paths, --remote "
-                "protects remote paths, and -g applies globally."
-            ),
-        )
-        add_pattern_operands(
-            rules_parser,
-            required=False,
-            metavar="PATH",
-            help_text=(
-                "paths, wildcard expressions, or comma-separated groups; "
-                f"omit to list {rule_name} rules; with -g, operands are "
-                "reusable profile-root patterns"
-            ),
-        )
-        rules_parser.add_argument(
-            "--remote",
-            action="store_true",
-            help="apply rules to remote paths that must be left untouched",
-        )
-        rules_parser.add_argument(
-            "--pattern",
-            action="store_true",
-            help="record operands as reusable wildcard patterns",
-        )
-        rules_parser.add_argument(
-            "-g",
-            "--global",
-            dest="global_rules",
-            action="store_true",
-            help="manage rules shared by every profile",
-        )
-
     rules_parser = subparsers.add_parser(
         "rules",
-        help="list or remove synchronization rules",
+        help="list or change synchronization rules",
         usage=(
             "hlsync [PROFILE] rules\n"
-            "       hlsync [PROFILE] rules remove RULE_ID\n"
-            "       hlsync rules -g [remove GLOBAL_RULE_ID]"
+            "       hlsync [PROFILE] rules (-e | -i) [--remote] "
+            "[--pattern] PATH ...\n"
+            "       hlsync [PROFILE] rules --remove RULE_ID\n"
+            "       hlsync rules -g [(-e | -i) PATH ... | "
+            "--remove GLOBAL_RULE_ID]"
         ),
         description=(
-            "List synchronization rules, or remove one by its displayed ID. "
-            "Profile IDs are numeric; global IDs use the gN form."
+            "List rules, add exclusions or inclusions with -e/-i, or remove "
+            "one with --remove. Use -g for global rules."
         ),
     )
-    rules_parser.add_argument(
-        "operation",
-        nargs="?",
-        choices=("remove",),
-        metavar="remove",
-        help="remove one rule; omit to list rules",
+    rule_action = rules_parser.add_mutually_exclusive_group()
+    rule_action.add_argument(
+        "-e",
+        "--exclude",
+        dest="rule_action",
+        action="store_const",
+        const="exclude",
+        help="exclude paths",
+    )
+    rule_action.add_argument(
+        "-i",
+        "--include",
+        dest="rule_action",
+        action="store_const",
+        const="include",
+        help="include paths",
+    )
+    rule_action.add_argument(
+        "--remove",
+        dest="rule_id",
+        metavar="RULE_ID",
+        help="remove the displayed rule ID",
+    )
+    add_pattern_operands(
+        rules_parser,
+        required=False,
+        metavar="PATH",
+        help_text="paths, wildcards, or comma-separated groups",
     )
     rules_parser.add_argument(
-        "rule_id",
-        nargs="?",
-        metavar="RULE_ID",
-        help="displayed rule ID required by remove",
+        "--remote",
+        action="store_true",
+        help="apply new rules to protected remote paths",
+    )
+    rules_parser.add_argument(
+        "--pattern",
+        action="store_true",
+        help="record operands as reusable wildcard patterns",
     )
     rules_parser.add_argument(
         "-g",
         "--global",
         dest="global_rules",
         action="store_true",
-        help="show or remove rules shared by every profile",
+        help="manage rules shared by every profile",
     )
     remove_parser = subparsers.add_parser(
         "remove",
@@ -866,11 +836,14 @@ def _format_rules(
     global_scope: bool = False,
     show_targets: bool = False,
 ) -> str:
-    scope_heading = (
-        f"Global {heading.lower()}"
-        if global_scope
-        else f"{heading} for profile '{name}'"
-    )
+    if grouped and heading == "Rules":
+        scope_heading = "Global rules" if global_scope else f"Profile '{name}' rules"
+    else:
+        scope_heading = (
+            f"Global {heading.lower()}"
+            if global_scope
+            else f"{heading} for profile '{name}'"
+        )
     if not rules:
         return f"No {scope_heading.lower()}."
     identifiers = {
@@ -878,34 +851,38 @@ def _format_rules(
     }
     width = max(len(identifier) for identifier in identifiers.values())
     if grouped:
-        target_groups = (
-            (("Local", tuple(rule for rule in rules if rule.target == "local")),
-             ("Remote", tuple(rule for rule in rules if rule.target == "remote")))
-            if show_targets
-            else (("", rules),)
+        populated_targets = tuple(
+            (label, tuple(rule for rule in rules if rule.target == target))
+            for label, target in (("Local", "local"), ("Remote", "remote"))
+            if any(rule.target == target for rule in rules)
         )
+        show_target_headings = show_targets and (
+            len(populated_targets) > 1
+            or (populated_targets and populated_targets[0][0] == "Remote")
+        )
+        target_groups = populated_targets if show_targets else (("", rules),)
         lines = [f"{scope_heading}:"]
         for target_heading, target_rules in target_groups:
             if not target_rules:
                 continue
-            if target_heading:
-                lines.extend(("", target_heading))
+            group_indent = "  "
+            if show_target_headings:
+                lines.append(f"  {target_heading}:")
+                group_indent = "    "
             groups: dict[str, list[tuple[SyncRule, str]]] = {}
             for rule in target_rules:
                 group, expression = _rule_display_location(rule)
                 groups.setdefault(group, []).append((rule, expression))
             for group in sorted(groups, key=_rule_group_key):
-                lines.extend(("", group))
+                lines.append(f"{group_indent}{group}")
                 for rule, expression in sorted(
                     groups[group],
                     key=lambda item: (item[1].casefold(), item[1], item[0].id),
                 ):
                     lines.append(
-                        f"  {identifiers[rule.id]:>{width}}  "
+                        f"{group_indent}  {identifiers[rule.id]:>{width}}  "
                         f"{rule.action:<7} {expression}"
                     )
-        if _rules_need_precedence_note(rules):
-            lines.extend(("", "Higher rule IDs take precedence when rules overlap."))
         return "\n".join(lines)
     return "\n".join(
         (
@@ -983,32 +960,8 @@ def _change_rules(
     patterns = normalize_pattern_operands(arguments)
     target = "remote" if arguments.remote else "local"
     if not patterns:
-        if arguments.pattern:
-            raise ConfigurationError("--pattern requires at least one operand")
-        action = "include" if include else "exclude"
-        kind = "Inclusion" if include else "Exclusion"
-        if arguments.remote:
-            kind = f"Remote {kind.lower()}"
-        if arguments.global_rules:
-            rules = tuple(
-                rule
-                for rule in _global_rule_store(store).load().rules
-                if rule.action == action and rule.target == target
-            )
-            return _format_rules(
-                "",
-                rules,
-                heading=f"{kind} rules",
-                grouped=True,
-                global_scope=True,
-            )
-        _, name, profile = _resolve_profile(arguments, store)
-        rules = tuple(
-            rule
-            for rule in profile.rules
-            if rule.action == action and rule.target == target
-        )
-        return _format_rules(name, rules, heading=f"{kind} rules", grouped=True)
+        flag = "-i/--include" if include else "-e/--exclude"
+        raise ConfigurationError(f"{flag} requires at least one path")
     if arguments.global_rules:
         global_store = _global_rule_store(store)
         configuration = global_store.load()
@@ -1139,22 +1092,32 @@ def _manage_rules(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
 ) -> str:
+    if arguments.rule_action is not None:
+        return _change_rules(
+            arguments,
+            store,
+            include=arguments.rule_action == "include",
+        )
+    patterns = normalize_pattern_operands(arguments)
+    if patterns:
+        raise ConfigurationError("rule paths require -e/--exclude or -i/--include")
+    if arguments.remote or arguments.pattern:
+        raise ConfigurationError("--remote and --pattern require -e or -i")
     if arguments.global_rules:
         global_store = _global_rule_store(store)
         global_configuration = global_store.load()
-        if arguments.operation is None:
-            if arguments.rule_id is not None:
-                raise ConfigurationError("a rule id requires the remove operation")
-            return _format_rules(
+        if arguments.rule_id is None:
+            formatted = _format_rules(
                 "",
                 global_configuration.rules,
-                heading="Synchronization rules",
+                heading="Rules",
                 grouped=True,
                 global_scope=True,
                 show_targets=True,
             )
-        if arguments.rule_id is None:
-            raise ConfigurationError("rules remove requires a rule id")
+            if _rules_need_precedence_note(global_configuration.rules):
+                return f"{formatted}\nLater rules win."
+            return formatted
         global_configuration, removed = global_configuration.without_rule(
             _parse_rule_id(arguments.rule_id, global_scope=True)
         )
@@ -1164,13 +1127,12 @@ def _manage_rules(
             f"{removed.action} {_format_rule_expression(removed)}"
         )
     configuration, name, profile = _resolve_profile(arguments, store)
-    if arguments.operation is None:
-        if arguments.rule_id is not None:
-            raise ConfigurationError("a rule id requires the remove operation")
+    if arguments.rule_id is None:
+        global_configuration = _global_rule_store(store).load()
         global_rules = _format_rules(
             "",
-            _global_rule_store(store).load().rules,
-            heading="Synchronization rules",
+            global_configuration.rules,
+            heading="Rules",
             grouped=True,
             global_scope=True,
             show_targets=True,
@@ -1178,16 +1140,14 @@ def _manage_rules(
         profile_rules = _format_rules(
             name,
             profile.rules,
-            heading="Synchronization rules",
+            heading="Rules",
             grouped=True,
             show_targets=True,
         )
         return (
             f"{global_rules}\n\n{profile_rules}\n\n"
-            "Global rules apply first; profile rules override them."
+            "Later rules win; profile rules override global rules."
         )
-    if arguments.rule_id is None:
-        raise ConfigurationError("rules remove requires a rule id")
     removed = configuration.remove_rule(
         name,
         _parse_rule_id(arguments.rule_id, global_scope=False),
@@ -2688,12 +2648,6 @@ def run(
             message = _connect(arguments, configuration_store)
         elif arguments.command == "map":
             message = _map(arguments, configuration_store, stdin, stdout)
-        elif arguments.command == "exclude":
-            message = _change_rules(
-                arguments, configuration_store, include=False
-            )
-        elif arguments.command == "include":
-            message = _change_rules(arguments, configuration_store, include=True)
         elif arguments.command == "rules":
             message = _manage_rules(arguments, configuration_store)
         elif arguments.command == "remove":

@@ -15,11 +15,12 @@ conservative exclusions for Git, Subversion, and Mercurial metadata plus
 belongs to the user; later releases do not merge or restore defaults
 automatically.
 
-`include` and `exclude` operate on the active profile by default. `-g` /
-`--global` selects the global layer and works without an active profile.
+`rules` is the sole policy-management command. It lists the active profile and
+global layers by default, adds exclusions with `-e` / `--exclude`, adds
+inclusions with `-i` / `--include`, and removes a displayed ID with `--remove`.
+`-g` / `--global` selects the global layer and works without an active profile.
 Global operands are reusable patterns rooted at each profile root; a trailing
-slash denotes a complete directory tree. `rules` displays global and profile
-layers together, while `rules -g` inspects or removes only global rules.
+slash denotes a complete directory tree.
 
 Stored IDs are positive integers scoped to their separate files and calculated
 as the highest current ID plus one. Deleting the highest rule permits its ID to
