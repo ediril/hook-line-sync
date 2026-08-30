@@ -19,11 +19,17 @@ rejected.
 Selection constrains traversal before comparison. A literal directory starts
 at that directory; a wildcard starts at its narrowest fixed prefix. Default
 push deletion never expands traversal depth: a shallow directory selection can
-delete immediate remote-only children but does not enter child directories.
+delete immediate remote-only files but does not enter or delete child
+directories.
 Recursive push and push-oriented diff may enter selected remote-only or excluded
 subtrees because their contents are eligible for deletion. `--keep-remote`
 changes deletion policy, not selection depth. Bare push remains recursive by
 definition.
+
+Bare diff is a presentation exception: it remains shallow but marks an
+immediate remote-only directory as a collapsed recursive deletion because the
+corresponding bare push will enter and delete that subtree. An explicit shallow
+operand does not project that implicit recursion.
 
 An immediate directory outside selected traversal depth is a diagnostic
 boundary, not an executable action. It may be displayed with `▸`, but transfer

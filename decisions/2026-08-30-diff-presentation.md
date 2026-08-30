@@ -18,6 +18,13 @@ retained excluded counterparts. `-i` hides neutral exclusions but never hides
 an actionable deletion. `--pull` uses retained one-sided markers and does not
 project deletion.
 
+Bare diff does not enter child directories, but it projects bare push's
+recursive deletion boundary. An immediate remote-only directory is therefore
+shown as `- folder/ ▸`: deletion is actionable, while its contents remain
+uninspected by diff. `-r` expands the subtree. An explicit shallow operand does
+not inherit bare push recursion, so its unentered remote-only child is retained
+and shown as `r folder/ ▸`.
+
 Diff defaults to operational entries and omits unchanged, neutral excluded,
 and untraversed entries. `-a` / `--all` restores the complete exploratory view.
 Color respects `NO_COLOR` and redirected output and has no command-line

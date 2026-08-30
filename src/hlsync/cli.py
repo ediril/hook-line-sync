@@ -1245,7 +1245,7 @@ def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
     if entry.action == "unchanged":
         return "="
     if entry.action == "untraversed":
-        return " "
+        return "r" if entry.state == "remote-only" else " "
     if entry.action == "skip":
         return "r" if entry.state == "remote-only" else "l"
     if entry.state == "changed":
@@ -2046,7 +2046,19 @@ def _diff(
                 and entry.path != directory.as_posix()
                 and entry.action != "excluded"
             )
-            plan = mark_untraversed_directories(plan, collapsed_paths)
+            projected_recursive_deletions = frozenset(
+                entry.path
+                for entry in plan.entries
+                if direction == "push"
+                and not arguments.pattern_operands
+                and not arguments.keep_remote
+                and entry.action == "delete-remote"
+                and entry.path in collapsed_paths
+            )
+            plan = mark_untraversed_directories(
+                plan,
+                collapsed_paths - projected_recursive_deletions,
+            )
             shown = tuple(
                 entry
                 for entry in plan.entries
@@ -2060,8 +2072,14 @@ def _diff(
                     )
                     or (
                         not arguments.show_all
-                        and entry.action
-                        not in {"unchanged", "excluded", "untraversed"}
+                        and (
+                            entry.action
+                            not in {"unchanged", "excluded", "untraversed"}
+                            or (
+                                entry.action == "untraversed"
+                                and entry.state == "remote-only"
+                            )
+                        )
                     )
                 )
             )

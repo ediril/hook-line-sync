@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.30.8 — 2026-08-30
+
+### Fixed
+
+- Show immediate remote-only directories in compact shallow diff output instead
+  of silently dropping them; bare diff marks recursive push deletion as
+  `- folder/ ▸`, while retained shallow boundaries use `r folder/ ▸`.
+
 ## 0.8.30.7 — 2026-08-30
 
 ### Changed

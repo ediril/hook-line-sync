@@ -268,6 +268,12 @@ For push authority, an excluded local path is treated as absent. If it exists
 remotely, default diff marks its deletion as `-`; `diff -k --all` marks the
 retained remote copy as `!`. `-i` never hides an actionable deletion.
 
+Bare diff keeps traversal shallow but projects the recursive scope of bare
+push: an immediate remote-only directory appears as `- folder/ ▸`, warning that
+push will delete the subtree while indicating that diff did not enumerate its
+contents. Use `diff -r` to inspect beneath it. An explicit shallow operand such
+as `diff .` retains an unentered child directory as `r folder/ ▸`.
+
 Show the current status and directory notation without connecting:
 
 ```console

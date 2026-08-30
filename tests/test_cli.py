@@ -741,6 +741,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
             same_stat = same.stat()
             return TreeSnapshot(
                 (
+                    TreeEntry("archive", "directory"),
                     TreeEntry(
                         "deployed.html",
                         "file",
@@ -869,11 +870,16 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     pruned_comparison = invoke(["diff"], store, terminal_output=True)
     assert "Options:" not in pruned_comparison[2]
     assert "\033[31m- deployed.html\033[0m\n" in pruned_comparison[1]
+    assert "archive/ ▸" in pruned_comparison[1]
+    assert "\033[31m-\033[0m" in pruned_comparison[1]
     assert "src/" not in pruned_comparison[1]
     assert "same.txt" not in pruned_comparison[1]
     kept_comparison = invoke(["diff", "-k"], store, terminal_output=True)
     assert "Options: keep remote-only paths (-k).\n" in kept_comparison[2]
     assert "\033[38;5;30mr deployed.html\033[0m\n" in kept_comparison[1]
+    explicit_shallow = invoke(["diff", "."], store, terminal_output=True)
+    assert "archive/ ▸" in explicit_shallow[1]
+    assert "\033[38;5;30mr\033[0m" in explicit_shallow[1]
     monkeypatch.chdir(source)
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
@@ -928,7 +934,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
 
     paged = invoke(["diff", ".", "--recursive", "--paged"], store)
     assert (
-        "Resume: hlsync diff . --recursive --paged --resume node_modules\n"
+        "Resume: hlsync diff . --recursive --paged --resume archive\n"
         in paged[1]
     )
     resumed = invoke(
@@ -1042,7 +1048,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "  + main.py\n" in prefixed_diff[1]
     prefixed_page = invoke(["prod", "diff", ".", "-r", "--paged"], store)
     assert (
-        "Resume: hlsync prod diff . --recursive --paged --resume node_modules\n"
+        "Resume: hlsync prod diff . --recursive --paged --resume archive\n"
         in prefixed_page[1]
     )
 
