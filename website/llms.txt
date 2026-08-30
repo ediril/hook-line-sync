@@ -2,7 +2,7 @@
 
 > Hook Line Sync (HLSync) is a command-line workflow for deploying local projects to shared hosting over explicit FTP over TLS (FTPS): map once, preview the diff, then push the intended files.
 
-HLSync is for developers who want a safer, repeatable alternative to manual FTP without adopting a full deployment stack. The local project is authoritative; the remote server is a deployment target. Excluded local paths are never uploaded, and remote deletion requires explicit pruning authorization.
+HLSync is for developers who want a safer, repeatable alternative to manual FTP without adopting a full deployment stack. The local project is authoritative; the remote server is a deployment target. Push deletes selected remote-only paths by default, including remote copies of excluded paths; `--keep-remote` retains them when needed.
 
 ## Documentation
 

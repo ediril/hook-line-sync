@@ -162,13 +162,8 @@ def _active_options(arguments: argparse.Namespace) -> str | None:
         options.append("all entries (-a)")
     if getattr(arguments, "included_only", False):
         options.append("included paths only (-i)")
-    if getattr(arguments, "prune_remote", False):
-        label = (
-            "preview remote pruning (-p)"
-            if arguments.command == "diff"
-            else "remote pruning (-p)"
-        )
-        options.append(label)
+    if getattr(arguments, "keep_remote", False):
+        options.append("keep remote-only paths (-k)")
     if getattr(arguments, "paged", False):
         options.append("paged output (--paged)")
     if getattr(arguments, "resume", None) is not None:
@@ -469,7 +464,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="preview file changes without modifying anything",
         usage=(
             "hlsync [PROFILE] diff [PATH ...]\n"
-            "       [--pull | --prune-remote] [-r] [-a] [-i] [--paged]\n"
+            "       [--pull | --keep-remote] [-r] [-a] [-i] [--paged]\n"
             "       [--resume DIRECTORY]"
         ),
         description=(
@@ -491,7 +486,7 @@ def build_parser() -> argparse.ArgumentParser:
     diff_direction.add_argument(
         "--pull",
         action="store_true",
-        help="show changes from the remote perspective; cannot prune",
+        help="show changes from the remote perspective without remote deletion",
     )
     diff_parser.add_argument(
         "-r",
@@ -518,10 +513,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="resume a paged diff at a profile-relative directory",
     )
     diff_direction.add_argument(
-        "-p",
-        "--prune-remote",
+        "-k",
+        "--keep-remote",
         action="store_true",
-        help="preview deletion of remote-only paths in the push view",
+        help="show remote-only paths as retained instead of deleted",
     )
     transfer_help = {
         "push": "upload local changes to the remote profile",
@@ -529,8 +524,8 @@ def build_parser() -> argparse.ArgumentParser:
     }
     transfer_description = {
         "push": (
-            "Upload new and changed local files. Remote-only files are reported "
-            "and left untouched unless --prune-remote is supplied."
+            "Upload new and changed local files and delete selected remote-only "
+            "paths. Use --keep-remote to retain them."
         ),
         "pull": (
             "Replace changed existing local files from the remote profile. "
@@ -544,7 +539,7 @@ def build_parser() -> argparse.ArgumentParser:
             description=transfer_description[command],
             usage=(
                 f"hlsync [PROFILE] {command} [PATH ...] [-r]"
-                + (" [-p]" if command == "push" else "")
+                + (" [-k]" if command == "push" else "")
             ),
         )
         add_pattern_operands(
@@ -569,13 +564,12 @@ def build_parser() -> argparse.ArgumentParser:
                 else "include descendants of selected directories"
             ),
         )
-        transfer_parser.set_defaults(prune_remote=False)
         if command == "push":
             transfer_parser.add_argument(
-                "-p",
-                "--prune-remote",
+                "-k",
+                "--keep-remote",
                 action="store_true",
-                help="delete selected remote-only paths",
+                help="retain selected remote-only paths",
             )
 
     help_parser = subparsers.add_parser("help", help="show command help")
@@ -1772,8 +1766,8 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
     command.extend(("diff", *arguments.pattern_operands))
     if arguments.pull:
         command.append("--pull")
-    if arguments.prune_remote:
-        command.append("--prune-remote")
+    if arguments.keep_remote:
+        command.append("--keep-remote")
     if arguments.recursive:
         command.append("--recursive")
     if arguments.included_only:
@@ -1795,6 +1789,9 @@ def _build_plan(
     include_excluded: bool = False,
 ) -> tuple[TreeSnapshot, TreeSnapshot, ComparisonPlan]:
     selector = _file_selection(arguments, root)
+    prune_remote = direction == "push" and not getattr(
+        arguments, "keep_remote", False
+    )
     print("Scanning local files...", file=progress, flush=True)
     local = snapshot_local(
         root,
@@ -1803,7 +1800,7 @@ def _build_plan(
         include_excluded=include_excluded,
         traverse_excluded=(
             include_excluded
-            and arguments.prune_remote
+            and prune_remote
             and _recursive_transfer_scope(arguments)
         ),
     )
@@ -1818,7 +1815,7 @@ def _build_plan(
         include_excluded=include_excluded,
         traverse_excluded=(
             include_excluded
-            and arguments.prune_remote
+            and prune_remote
             and _recursive_transfer_scope(arguments)
         ),
         artifact_recovery=report_recovery if direction == "push" else None,
@@ -1828,7 +1825,7 @@ def _build_plan(
         local,
         remote,
         direction=direction,
-        prune_remote=arguments.prune_remote,
+        prune_remote=prune_remote,
         selector=selector if arguments.pattern_operands else None,
     )
     untraversed_directories = frozenset(
@@ -1856,6 +1853,7 @@ def _diff(
     selector = _file_selection(arguments, root)
     rules = _effective_rules(store, profile)
     direction = "pull" if arguments.pull else "push"
+    prune_remote = direction == "push" and not arguments.keep_remote
     color = _use_color(output)
     print(f"Checking differences for profile '{name}'...", file=progress, flush=True)
     options = _active_options(arguments)
@@ -1934,10 +1932,9 @@ def _diff(
                 remote_listing,
                 rules,
                 selector,
-                descend_remote_only=arguments.prune_remote,
+                descend_remote_only=prune_remote,
                 descend_excluded=(
-                    arguments.prune_remote
-                    and _recursive_transfer_scope(arguments)
+                    prune_remote and _recursive_transfer_scope(arguments)
                 ),
             )
             pending_descendants = tuple(
@@ -2022,7 +2019,7 @@ def _diff(
                 local,
                 remote,
                 direction=direction,
-                prune_remote=arguments.prune_remote,
+                prune_remote=prune_remote,
             )
             descended_paths = frozenset(
                 path.as_posix() for path, _, _ in descendants
@@ -2192,7 +2189,7 @@ def _format_transfer(name: str, result: TransferResult) -> str:
             for entry in result.plan.entries
         )
         if retained_remote:
-            lines.append("Remote-only paths retained; use -p to delete them.")
+            lines.append("Remote-only paths retained by --keep-remote.")
     else:
         if skipped:
             lines.append("Remote-only paths not restored:")

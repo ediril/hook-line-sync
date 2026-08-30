@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Make push and its default diff projection delete selected remote-only
+  paths, replacing opt-in pruning with `-k` / `--keep-remote` retention.
 - [x] Remove persisted rule-ID allocation counters and derive disposable IDs
   from the rules that currently exist.
 - [x] Namespace global rule identifiers as `gN` in the CLI so they cannot be
@@ -46,22 +48,22 @@
   setup and release-maintenance details to the end.
 - [x] Indent zero-action transfer results and report the number of unchanged
   included files in an empty push's selected scope.
-- [x] Keep pruning authorization independent from traversal depth so excluded
+- [x] Keep remote deletion policy independent from traversal depth so excluded
   directories are entered only within an explicitly recursive scope.
 - [x] Treat excluded local paths as absent for push authority so remote copies
-  produce the pruning hint and are deleted only when `-p` is supplied, without
-  traversing excluded directories during an ordinary push.
-- [x] Collapse the post-push remote-only report to one pruning hint instead of
+  are deleted by default, without traversing excluded directories in a shallow
+  push.
+- [x] Collapse the post-push remote-only retention report instead of
   repeating paths already available through `diff`.
-- [x] Report an empty transfer plainly and point push users to `-p` when
-  selected remote-only paths are deliberately retained.
+- [x] Report an empty transfer plainly and confirm when `--keep-remote`
+  deliberately retains selected remote-only paths.
 - [x] Align streamed transfer paths in a stable fixed-width operation column.
 - [x] Stream plain-language path updates as transfer operations begin and
   replace the internal comparison table with a compact success summary.
 - [x] Rewrite the README as a concise but complete current-user guide and
   document why safe FTPS replacement requires staging files.
 - [x] Recover HLSync-owned abandoned upload and backup artifacts automatically
-  within push scope without requiring remote-prune authorization.
+  within push scope independently of remote-only retention policy.
 - [x] Accept server-specific successful MFMT responses while independently
   verifying the staged timestamp with MDTM before installing an upload.
 - [x] Replace internal push/pull plan terminology in progress output with plain
@@ -112,8 +114,8 @@
 - [x] Split profile inspection into a minimal `profiles` list and detailed
   `profile [PROFILE]` view, and interactively resolve ambiguous command prefixes
   without guessing in noninteractive use.
-- [x] Give `list` the shared path-selector model and make remote pruning an
-  explicitly push-only action with unambiguous diff markers.
+- [x] Give `list` the shared path-selector model and make remote deletion a
+  push-only action with unambiguous diff markers.
 - [x] Implement current-directory scope contracts for `diff`, `push`, and
   `pull`: bare push uses the complete current subtree, pull requires an explicit
   path, and diff plus explicit directory operands remain shallow unless `-r`

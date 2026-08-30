@@ -102,6 +102,11 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     diff_help = invoke(["help", "diff"], store)[1]
     assert "--color" not in diff_help
     assert "-a, --all" in diff_help
+    assert "-k, --keep-remote" in diff_help
+    assert "--prune-remote" not in diff_help
+    push_help = invoke(["help", "push"], store)[1]
+    assert "-k, --keep-remote" in push_help
+    assert "--prune-remote" not in push_help
     rules_help = invoke(["help", "rules"], store)[1]
     assert "hlsync [PROFILE] rules" in rules_help
     assert "hlsync [PROFILE] rules remove RULE_ID" in rules_help
@@ -821,9 +826,9 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
-    assert "debug.log" not in push_comparison[1]
+    assert "  - debug.log\n" in push_comparison[1]
     hidden_exclusions = invoke(["diff", "-i"], store)
-    assert "debug.log" not in hidden_exclusions[1]
+    assert "  - debug.log\n" in hidden_exclusions[1]
     assert invoke(["prod", "diff", "same.txt"], store)[1] == (
         "  no differences\n"
     )
@@ -839,13 +844,14 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
 
     monkeypatch.chdir(workspace)
-    pruned_comparison = invoke(
-        ["diff", "--prune-remote"], store, terminal_output=True
-    )
-    assert "Options: preview remote pruning (-p).\n" in pruned_comparison[2]
+    pruned_comparison = invoke(["diff"], store, terminal_output=True)
+    assert "Options:" not in pruned_comparison[2]
     assert "\033[31m- deployed.html\033[0m\n" in pruned_comparison[1]
     assert "src/" not in pruned_comparison[1]
     assert "same.txt" not in pruned_comparison[1]
+    kept_comparison = invoke(["diff", "-k"], store, terminal_output=True)
+    assert "Options: keep remote-only paths (-k).\n" in kept_comparison[2]
+    assert "\033[38;5;30mr deployed.html\033[0m\n" in kept_comparison[1]
     monkeypatch.chdir(source)
     selected_comparison = invoke(["diff", "main.py"], store)
     assert selected_comparison[0] == 0
@@ -880,7 +886,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_comparison[1]
     )
-    assert "  \033[38;5;166m! debug.log\033[0m" in colored_comparison[1]
+    assert "  \033[31m- debug.log\033[0m" in colored_comparison[1]
     assert "= same.txt" in colored_comparison[1]
     assert colored_comparison[1].index("node_modules/") < (
         colored_comparison[1].index("src/")
@@ -890,7 +896,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     all_included = invoke(["diff", "**", "--all", "-i"], store)
     assert "= same.txt" in all_included[1]
-    assert "debug.log" not in all_included[1]
+    assert "  - debug.log\n" in all_included[1]
     with monkeypatch.context() as no_color:
         no_color.setenv("NO_COLOR", "1")
         uncolored_comparison = invoke(
@@ -899,7 +905,10 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "\033[" not in uncolored_comparison[1]
 
     paged = invoke(["diff", ".", "--recursive", "--paged"], store)
-    assert "Resume: hlsync diff . --recursive --paged --resume src\n" in paged[1]
+    assert (
+        "Resume: hlsync diff . --recursive --paged --resume node_modules\n"
+        in paged[1]
+    )
     resumed = invoke(
         ["diff", ".", "--recursive", "--paged", "--resume", "src"], store
     )
@@ -914,9 +923,9 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "\033[38;5;30mr deployed.html\033[0m\n" in pull_comparison[1]
     assert "\033[38;5;51ml README.md\033[0m\n" in pull_comparison[1]
     with pytest.raises(SystemExit):
-        run(["diff", "--pull", "-p"], store=store)
+        run(["diff", "--pull", "-k"], store=store)
     with pytest.raises(SystemExit):
-        run(["pull", "-p"], store=store)
+        run(["pull", "-k"], store=store)
     with pytest.raises(SystemExit):
         run(["pull"], store=store)
 
@@ -927,7 +936,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     operations.clear()
 
     monkeypatch.chdir(workspace)
-    push_result = invoke(["push", "src"], store)
+    push_result = invoke(["push", "src", "-k"], store)
     assert push_result[0] == 0
     assert push_result[2].startswith("Preparing push for profile 'prod'...\n")
     assert "Comparing local and remote files...\n" in push_result[2]
@@ -939,7 +948,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     assert push_result[1] == (
         "Push complete: 3 changes.\n"
-        "Remote-only paths retained; use -p to delete them.\n"
+        "Remote-only paths retained by --keep-remote.\n"
     )
     assert operations == [
         ("mkdir", "src"),
@@ -952,7 +961,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         "  Nothing to push; 1 file is up to date in this scope.\n"
     )
     operations.clear()
-    pruned_exclusion = invoke(["push", "src/debug.log", "-p"], store)
+    pruned_exclusion = invoke(["push", "src/debug.log"], store)
     assert pruned_exclusion[0] == 0
     assert snapshot_traversal[-1] is False
     assert operations == [("delete", "src/debug.log", False)]
@@ -960,22 +969,22 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert pruned_exclusion[1] == "Push complete: 1 change.\n"
     operations.clear()
     recursive_pruned_exclusion = invoke(
-        ["push", "src/debug.log", "-p", "-r"],
+        ["push", "src/debug.log", "-r"],
         store,
     )
     assert recursive_pruned_exclusion[0] == 0
     assert (
-        "Options: recursive (-r); remote pruning (-p).\n"
+        "Options: recursive (-r).\n"
         in recursive_pruned_exclusion[2]
     )
     assert snapshot_traversal[-1] is True
     assert operations == [("delete", "src/debug.log", False)]
     operations.clear()
-    retained_push = invoke(["push", "deployed.html"], store)
+    retained_push = invoke(["push", "deployed.html", "-k"], store)
     assert "Pushing changes..." not in retained_push[2]
     assert retained_push[1] == (
         "  Nothing to push.\n"
-        "Remote-only paths retained; use -p to delete them.\n"
+        "Remote-only paths retained by --keep-remote.\n"
     )
     pull_result = invoke(["pull", "deployed.html"], store)
     assert pull_result[0] == 0
@@ -1010,8 +1019,9 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert prefixed_diff[1].startswith("src/\n")
     assert "  + main.py\n" in prefixed_diff[1]
     prefixed_page = invoke(["prod", "diff", ".", "-r", "--paged"], store)
-    assert "Resume: hlsync prod diff . --recursive --paged --resume src\n" in (
-        prefixed_page[1]
+    assert (
+        "Resume: hlsync prod diff . --recursive --paged --resume node_modules\n"
+        in prefixed_page[1]
     )
 
 

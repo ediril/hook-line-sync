@@ -246,21 +246,24 @@ hlsync diff index.html app.js styles.css
 hlsync diff '**/*.css'
 ```
 
-Local path existence is authoritative. Remote-only paths are retained by
-default rather than restored or deleted. Preview explicit remote deletion with:
+Local path existence is authoritative. In the default push view, remote-only
+paths are shown as deletions because push will make the selected remote scope
+match local state. Preview retention instead with:
 
 ```console
-hlsync diff --prune-remote
+hlsync diff --keep-remote
+hlsync diff -k
 ```
 
-`--pull` changes the perspective for changed existing files. Pull rejects
-remote pruning. Diff normally shows only actionable differences, retained
+`--pull` changes the perspective for changed existing files and retains
+remote-only paths. Diff normally shows only actionable differences, retained
 one-sided paths, and conflicts. Use `-a`/`--all` to restore the exploratory
 view with unchanged and excluded paths. Combine `--all` with
 `-i`/`--inc`/`--included-only` to keep unchanged paths while hiding exclusions.
 
 For push authority, an excluded local path is treated as absent. If it exists
-remotely, ordinary diff marks it `!`; `diff -p` projects its deletion as `-`.
+remotely, default diff marks its deletion as `-`; `diff -k --all` marks the
+retained remote copy as `!`. `-i` never hides an actionable deletion.
 
 Show the current status and directory notation without connecting:
 
@@ -292,28 +295,30 @@ hlsync pull templates -r
 
 Push uploads local-only files and replaces changed remote files. Pull replaces
 changed existing local files but never restores a missing local path. Excluded
-paths are never uploaded or pulled. A remote copy of an excluded path is
-retained normally and becomes pruneable only with explicit `-p` authorization.
-Pruning does not add traversal depth: an explicit directory remains shallow
-unless `-r` is supplied. Bare `push` remains recursive by definition.
+paths are never uploaded or pulled. Push deletes selected remote-only paths by
+default, including remote copies of excluded local paths. `-k` /
+`--keep-remote` retains them. Deletion does not add traversal depth: an explicit
+directory remains shallow unless `-r` is supplied. Bare `push` remains recursive
+by definition.
 
 Transfers print `Adding`, `Updating`, `Creating`, or `Deleting` with the path
 immediately before each operation begins, then finish with a compact count.
 When no operation is needed, HLSync prints `Nothing to push` or `Nothing to
 pull` without announcing an empty transfer phase. An empty push also reports
 how many included files are up to date in the selected scope. A push that
-retains remote-only paths points to `-p` for explicit deletion without
+uses `--keep-remote` confirms retention without
 repeating the paths already available through `diff`.
 
-Remote-only paths remain untouched unless a push explicitly authorizes pruning:
+Retain remote-only paths for an exceptional push with:
 
 ```console
-hlsync push --prune-remote
-hlsync push -p 'generated/*.html'
+hlsync push --keep-remote
+hlsync push -k 'generated/*.html'
 ```
 
-Pruning is limited to the selected scope, runs only after every upload succeeds,
-and is suppressed after any upload failure. Pull never deletes remote paths.
+Deletion is limited to the selected scope, runs only after every upload
+succeeds, and is suppressed after any upload failure. Pull never deletes remote
+paths.
 
 ### Safe file replacement
 
@@ -336,8 +341,9 @@ During a push, HLSync recovers its exact reserved artifacts as each selected
 remote directory is read. It does not perform a separate recursive cleanup
 scan. Abandoned upload files are deleted; obsolete backups are deleted when
 their destination exists; a sole backup is restored when its destination is
-missing. This cleanup never requires `-p` and does not affect ordinary
-remote-only files. Concurrent pushes to one profile are not supported.
+missing. This cleanup is independent of remote-only deletion policy and does
+not affect ordinary remote-only files. Concurrent pushes to one profile are not
+supported.
 
 A path-scoped permission failure skips that path or unwritable subtree while
 independent paths continue. The command exits nonzero and suppresses all

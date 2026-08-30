@@ -17,7 +17,7 @@ that directory if recovery changed it. Recovery does not run as a separate
 recursive scan and does not descend into a directory merely to seek artifacts.
 An abandoned upload is deleted. A backup is deleted when its destination exists
 and restored when the destination is absent. This lifecycle management never
-requires remote-prune authorization.
+depends on the remote-only retention option.
 
 Pull replaces changed local files but never downloads remote-only paths. Each
 download is written and synced beside its destination, verifies size, preserves
@@ -27,18 +27,18 @@ renames into place.
 Immediately before each remote mutation or local replacement, execution emits
 a semantic operation event. The CLI renders these as plain-language `Adding`,
 `Updating`, `Creating`, or `Deleting` lines and flushes them immediately. A
-successful command ends with a compact count and reports retained remote-only
-paths without repeating the complete comparison model. A zero-action result is
+successful command ends with a compact count. A zero-action result is
 indented like streamed operations and reports the number of unchanged included
-files actually inspected. Push-only retained paths include a `-p` pruning hint;
-pull never suggests remote deletion.
+files actually inspected. A push using `--keep-remote` confirms retention
+without repeating paths already available through diff.
 
-Explicit push pruning deletes remote-only files and then directories deepest
-first, only after every planned upload succeeds. Type and symlink conflicts
-reject the plan before mutation. A path-scoped permission failure skips that
-path or unwritable subtree, continues independent work, suppresses all pruning,
-and produces a nonzero exit. A session failure or failed replacement recovery
-aborts because subsequent remote state cannot be trusted.
+Push deletes selected remote-only files and then directories deepest first,
+only after every planned upload succeeds. `--keep-remote` suppresses those
+deletions. Type and symlink conflicts reject the plan before mutation. A
+path-scoped permission failure skips that path or unwritable subtree, continues
+independent work, suppresses all deletion, and produces a nonzero exit. A
+session failure or failed replacement recovery aborts because subsequent remote
+state cannot be trusted.
 
 ## Rationale
 

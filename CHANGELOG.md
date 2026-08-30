@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.30.4 — 2026-08-30
+
+### Changed
+
+- Make push and its default diff projection delete selected remote-only paths,
+  including remote copies of excluded local paths.
+- Replace `-p` / `--prune-remote` with `-k` / `--keep-remote` as the explicit
+  retention override.
+
 ## 0.8.30.3 — 2026-08-30
 
 ### Changed

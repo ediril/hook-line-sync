@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.30.3';
+$version = '0.8.30.4';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 $title = 'Hook Line Sync — a better way to "just FTP it"';
@@ -172,7 +172,7 @@ function h(string $value): string
                         <p class="muted">Checking differences for profile 'discovery'...</p>
                         <p><span class="directory">&nbsp; assets/</span></p>
                         <p><span class="added">+</span> &nbsp; index.php</p>
-                        <p class="remote-only"><span>r</span> &nbsp; legacy.php</p>
+                        <p><span class="removed">-</span> &nbsp; legacy.php</p>
                         <p>&nbsp; <span class="changed">~</span> &nbsp; site.css</p>
                         <p>&nbsp; <span class="added">+</span> <span class="directory">icons/</span></p>
                         <p class="terminal-gap"><span class="prompt">❯</span> <b>hlsync push</b></p>
@@ -180,7 +180,8 @@ function h(string $value): string
                         <p>&nbsp; Adding&nbsp;&nbsp;&nbsp;index.php</p>
                         <p>&nbsp; Updating site.css</p>
                         <p>&nbsp; Creating icons/</p>
-                        <p><span class="success">✓</span> Push complete: 3 changes.</p>
+                        <p>&nbsp; Deleting&nbsp; legacy.php</p>
+                        <p><span class="success">✓</span> Push complete: 4 changes.</p>
                         <span class="cursor" aria-hidden="true"></span>
                     </div>
                 </div>
@@ -230,7 +231,7 @@ function h(string $value): string
                     <span class="step-number">04</span>
                     <div class="step-icon" aria-hidden="true">↥</div>
                     <h3>Push the changes</h3>
-                    <p>Upload new and modified files. Remote-only files stay untouched unless you explicitly enable pruning.</p>
+                    <p>Upload new and modified files, then remove remote-only files in the selected scope. Use <code>-k</code> when remote-only files should stay.</p>
                     <code>hlsync push</code>
                 </li>
             </ol>
@@ -255,14 +256,14 @@ function h(string $value): string
                     <div class="mini-diff" aria-hidden="true">
                         <span class="added">+</span><i></i><b>new</b>
                         <span class="changed">~</span><i></i><b>changed</b>
-                        <span class="remote-only">r</span><i></i><b>remote-only / kept</b>
-                        <span class="removed">-</span><i></i><b>pruned with -p</b>
+                        <span class="removed">-</span><i></i><b>remote-only / deleted</b>
+                        <span class="remote-only">r</span><i></i><b>kept with -k</b>
                     </div>
                 </article>
                 <article class="principle">
                     <span class="principle-index">B</span>
-                    <h3>Remote deletion is opt-in</h3>
-                    <p>Remote-only paths are reported and preserved unless you explicitly run push with <code>-p</code>.</p>
+                    <h3>Push matches local state</h3>
+                    <p>Remote-only paths in the selected scope are deleted after uploads succeed. Use <code>-k</code> when they should be retained.</p>
                 </article>
                 <article class="principle">
                     <span class="principle-index">C</span>
