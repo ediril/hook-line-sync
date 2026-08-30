@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.30.14 — 2026-08-30
+
+### Changed
+
+- Compress command descriptions into quick-reference rules while retaining
+  traversal defaults and safety-relevant exceptions.
+
 ## 0.8.30.13 — 2026-08-30
 
 ### Changed

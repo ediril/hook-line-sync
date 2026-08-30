@@ -291,9 +291,8 @@ def build_parser() -> argparse.ArgumentParser:
         "create",
         help="create an FTPS profile with a mapped local root",
         description=(
-            "Create an FTPS profile. Credentials remain in environment "
-            "variables. Without --local-root, confirm the current directory "
-            "or enter another local directory."
+            "Create an FTPS profile using environment-variable credentials. "
+            "Without --local-root, choose the current or another directory."
         ),
     )
     create_parser.add_argument("profile_name", help="new profile name")
@@ -332,8 +331,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="verify a profile's FTPS connection",
         usage="hlsync connect [PROFILE]\n       hlsync PROFILE connect",
         description=(
-            "Verify one secure FTPS connection, then disconnect. The profile "
-            "is inferred from the current directory unless named explicitly."
+            "Check secure FTPS connectivity, then disconnect. Infer the profile "
+            "from the current directory unless named."
         ),
     )
     connect_parser.add_argument(
@@ -348,10 +347,8 @@ def build_parser() -> argparse.ArgumentParser:
             "       hlsync PROFILE map [--local-root PATH] [--remote-root PATH]"
         ),
         description=(
-            "Change either mapped root after confirmation; confirmation "
-            "defaults to no. Omitted roots remain unchanged, except an "
-            "when neither root is supplied, the local root defaults to the "
-            "current directory."
+            "Change mapped roots after a [y/N] confirmation. Omitted roots stay "
+            "unchanged; with neither option, use the current local directory."
         ),
     )
     map_parser.add_argument(
@@ -390,10 +387,9 @@ def build_parser() -> argparse.ArgumentParser:
                 f"       hlsync {command} -g [PATTERN ...]"
             ),
             description=(
-                f"Record {rule_name} rules, or list them when no paths are "
-                "given. Ordinary operands resolve existing local paths; "
-                "--pattern records future matches, --remote targets protected "
-                "remote paths, and -g targets every profile."
+                f"Record or, with no paths, list {rule_name} rules. Paths "
+                "resolve locally; --pattern matches future paths, --remote "
+                "protects remote paths, and -g applies globally."
             ),
         )
         add_pattern_operands(
@@ -462,8 +458,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="remove a profile",
         usage="hlsync remove [PROFILE]\n       hlsync PROFILE remove",
         description=(
-            "Remove only the local profile configuration. Remote files are "
-            "not changed. The current profile is used when omitted."
+            "Remove local profile configuration only; remote files stay "
+            "unchanged. Infer the profile when omitted."
         ),
     )
     remove_parser.add_argument(
@@ -475,8 +471,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="print a profile's mapped local root",
         usage="hlsync root [PROFILE]\n       hlsync PROFILE root",
         description=(
-            "Print only the canonical mapped local root, suitable for shell "
-            "composition such as cd \"$(hlsync root PROFILE)\"."
+            "Print only the canonical local root, suitable for "
+            "cd \"$(hlsync root PROFILE)\"."
         ),
     )
     root_parser.add_argument(
@@ -494,8 +490,8 @@ def build_parser() -> argparse.ArgumentParser:
             "       hlsync PROFILE profile [--details]"
         ),
         description=(
-            "Print the inferred or named profile. The default is its name "
-            "only; --details adds endpoint, mapping, credentials, and rules."
+            "Print the inferred or named profile. --details adds its "
+            "connection, mapping, credentials, and rules."
         ),
     )
     profile_parser.add_argument(
@@ -514,10 +510,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "profiles",
         help="list configured profiles",
-        description=(
-            "List configured profile names. An asterisk marks the profile "
-            "containing the current directory."
-        ),
+        description="List profiles; * marks the one containing this directory.",
     )
 
     list_parser = subparsers.add_parser(
@@ -529,10 +522,8 @@ def build_parser() -> argparse.ArgumentParser:
             "       hlsync [PROFILE] lsr [-r] [-i] [PATH ...]"
         ),
         description=(
-            "List selected paths and exclusion status. Local listing is the "
-            "default and does not connect; --remote/lsr reads FTPS. With no "
-            "path, list the current directory one level deep. An explicit "
-            "directory also lists one level; -r includes descendants."
+            "List one directory level locally, or remotely with --remote/lsr. "
+            "Use -r for descendants and -i to hide exclusions."
         ),
     )
     add_pattern_operands(
@@ -540,8 +531,7 @@ def build_parser() -> argparse.ArgumentParser:
         required=False,
         metavar="PATH",
         help_text=(
-            "relative file paths or wildcard patterns; defaults to immediate "
-            "contents of the current directory"
+            "relative paths or wildcards; default: current directory"
         ),
     )
     list_parser.add_argument(
@@ -566,13 +556,9 @@ def build_parser() -> argparse.ArgumentParser:
             "       [--resume DIRECTORY]"
         ),
         description=(
-            "Preview file changes without modifying local or remote files. "
-            "With no path or an explicit directory, inspect one level; -r "
-            "includes descendants. The default projects push actions from "
-            "local authority; --pull reverses perspective, -i hides exclusions, "
-            "and --all also shows unchanged and untraversed entries. Bare diff "
-            "marks remote-only directories as collapsed subtree deletions to "
-            "match recursive bare push."
+            "Preview push actions one directory level at a time. Use -r for "
+            "descendants, --pull to reverse direction, -i to hide exclusions, "
+            "and -a to show everything."
         ),
     )
     add_pattern_operands(
@@ -580,8 +566,7 @@ def build_parser() -> argparse.ArgumentParser:
         required=False,
         metavar="PATH",
         help_text=(
-            "relative file paths or wildcard patterns; defaults to immediate "
-            "contents of the current directory"
+            "relative paths or wildcards; default: current directory"
         ),
     )
     diff_direction = diff_parser.add_mutually_exclusive_group()
@@ -626,16 +611,13 @@ def build_parser() -> argparse.ArgumentParser:
     }
     transfer_description = {
         "push": (
-            "Upload new and changed local files and delete selected remote-only "
-            "paths. With no path, push the complete current subtree recursively. "
-            "An explicit included directory is shallow unless -r is supplied. "
-            "An explicit remote-only directory is fully walked so it can be "
-            "deleted; -k retains remote-only paths."
+            "Push local changes. No PATH recurses; a directory PATH is shallow "
+            "unless -r. Remote-only directory PATHs are deleted recursively "
+            "unless -k."
         ),
         "pull": (
-            "Replace changed existing local files from the remote profile. "
-            "A path is required. An explicit directory is shallow unless -r "
-            "is supplied. Missing local files are not restored."
+            "Update existing local files. A directory PATH is shallow unless "
+            "-r; missing local paths stay missing."
         ),
     }
     for command in ("push", "pull"):
@@ -657,10 +639,9 @@ def build_parser() -> argparse.ArgumentParser:
             required=command == "pull",
             metavar="PATH",
             help_text=(
-                "relative file paths or wildcard patterns; defaults to the "
-                "complete current subtree"
+                "relative paths or wildcards; default: current subtree"
                 if command == "push"
-                else "required relative file paths or wildcard patterns"
+                else "relative paths or wildcards"
             ),
         )
         transfer_parser.add_argument(
@@ -668,10 +649,9 @@ def build_parser() -> argparse.ArgumentParser:
             "--recursive",
             action="store_true",
             help=(
-                "include descendants of explicit selected directories; bare "
-                "push is already recursive"
+                "recurse into selected directories (implied with no PATH)"
                 if command == "push"
-                else "include descendants of selected directories"
+                else "recurse into selected directories"
             ),
         )
         if command == "push":

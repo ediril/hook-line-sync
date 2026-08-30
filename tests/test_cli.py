@@ -108,20 +108,21 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     compact_push_help = " ".join(push_help.split())
     assert "-k, --keep-remote" in push_help
     assert "--prune-remote" not in push_help
-    assert "no path, push the complete current subtree recursively" in (
+    assert "No PATH recurses; a directory PATH is shallow unless -r." in (
         compact_push_help
     )
-    assert "explicit included directory is shallow unless -r" in compact_push_help
-    assert "explicit remote-only directory is fully walked" in compact_push_help
+    assert "Remote-only directory PATHs are deleted recursively unless -k." in (
+        compact_push_help
+    )
     compact_list_help = " ".join(invoke(["help", "list"], store)[1].split())
-    assert "no path, list the current directory one level deep" in compact_list_help
-    assert "explicit directory also lists one level" in compact_list_help
+    assert "List one directory level" in compact_list_help
+    assert "Use -r for descendants" in compact_list_help
     compact_diff_help = " ".join(diff_help.split())
-    assert "no path or an explicit directory, inspect one level" in compact_diff_help
-    assert "collapsed subtree deletions" in compact_diff_help
+    assert "one directory level at a time" in compact_diff_help
+    assert "--pull to reverse direction" in compact_diff_help
     compact_pull_help = " ".join(invoke(["help", "pull"], store)[1].split())
-    assert "A path is required" in compact_pull_help
-    assert "explicit directory is shallow unless -r" in compact_pull_help
+    assert "usage: hlsync [PROFILE] pull PATH" in compact_pull_help
+    assert "A directory PATH is shallow unless -r" in compact_pull_help
     profile_help = invoke(["help", "profile"], store)[1]
     assert "--details" in profile_help
     assert "--info" not in profile_help
