@@ -1776,6 +1776,10 @@ def _build_plan(
         ),
     )
     print("Reading remote files over FTPS...", file=progress, flush=True)
+
+    def report_recovery(message: str) -> None:
+        print(f"  {message}", file=progress, flush=True)
+
     remote = transport.snapshot(
         rules,
         selector,
@@ -1785,6 +1789,7 @@ def _build_plan(
             and arguments.prune_remote
             and _recursive_transfer_scope(arguments)
         ),
+        artifact_recovery=report_recovery if direction == "push" else None,
     )
     print("Comparing local and remote files...", file=progress, flush=True)
     plan = build_comparison(
@@ -2198,17 +2203,6 @@ def _transfer(
         print(options, file=progress, flush=True)
     print("Connecting securely over FTPS...", file=progress, flush=True)
     with ExplicitFTPSTransport(profile) as transport:
-        if arguments.command == "push":
-            print(
-                "Checking for interrupted uploads...",
-                file=progress,
-                flush=True,
-            )
-            recoveries = transport.recover_artifacts(
-                _file_selection(arguments, root)
-            )
-            for recovery in recoveries:
-                print(f"  {recovery}", file=progress, flush=True)
         local, remote, plan = _build_plan(
             arguments,
             root,

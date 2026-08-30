@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.30.1 — 2026-08-30
+
+### Changed
+
+- Recover interrupted-upload artifacts while traversing selected push
+  directories instead of recursively scanning the remote scope before the
+  comparison.
+
 ## 0.8.29.16 — 2026-08-29
 
 ### Added

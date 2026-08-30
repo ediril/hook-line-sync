@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Fold interrupted-upload recovery into selected push traversal so it does
+  not recursively pre-scan the remote profile or list its directories twice.
 - [x] Add a user-owned global synchronization policy with conservative defaults,
   `-g` management, and profile-level override precedence.
 - [x] Unify the command, Python package, configuration directory, persisted

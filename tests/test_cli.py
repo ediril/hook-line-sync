@@ -641,6 +641,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
             *,
             include_excluded=False,
             traverse_excluded=False,
+            artifact_recovery=None,
         ):
             snapshot_traversal.append(traverse_excluded)
             assert rules.rules == expected_rules
@@ -724,10 +725,6 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
 
         def make_directory(self, path):
             operations.append(("mkdir", path))
-
-        def recover_artifacts(self, selector):
-            del selector
-            return ()
 
         def upload_file(
             self,
@@ -1125,17 +1122,14 @@ def test_push_reports_partial_failure_after_continuing_independent_paths(
             *,
             include_excluded=False,
             traverse_excluded=False,
+            artifact_recovery=None,
         ):
-            del traverse_excluded
+            del traverse_excluded, artifact_recovery
             return TreeSnapshot()
 
         def make_directory(self, path):
             if path == "blocked":
                 raise PathOperationError("550 Permission denied")
-
-        def recover_artifacts(self, selector):
-            del selector
-            return ()
 
         def upload_file(
             self,

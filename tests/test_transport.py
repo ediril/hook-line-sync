@@ -329,32 +329,52 @@ def test_push_artifact_recovery_cleans_staging_and_restores_missing_destination(
 
     client = RecoveryClient()
     transport._client = client
+    listed_directories = []
 
-    def recovery_snapshot(rules, selector, *, include_excluded=False):
+    def list_directory(relative_directory, rules):
         assert rules == RuleSet()
-        assert include_excluded
-        assert selector.matches(upload)
-        assert selector.matches(missing_backup)
-        assert not selector.matches(f"other/.else.hlsync-upload-{token}")
+        directory = relative_directory.as_posix()
+        listed_directories.append(directory)
+        if directory == ".":
+            return TreeSnapshot(
+                (
+                    TreeEntry("templates", "directory"),
+                    TreeEntry("unrelated", "directory"),
+                )
+            )
+        assert directory == "templates"
+        if listed_directories.count("templates") == 1:
+            return TreeSnapshot(
+                (
+                    file_entry("templates/about.php"),
+                    file_entry(upload),
+                    file_entry(old_backup),
+                    file_entry(missing_backup),
+                )
+            )
         return TreeSnapshot(
             (
                 file_entry("templates/about.php"),
-                file_entry(upload),
-                file_entry(old_backup),
-                file_entry(missing_backup),
+                file_entry("templates/missing.php"),
             )
         )
 
-    monkeypatch.setattr(transport, "snapshot", recovery_snapshot)
-    messages = transport.recover_artifacts(FileSelector("templates/*"))
+    monkeypatch.setattr(transport, "list_directory", list_directory)
+    messages = []
+    transport.snapshot(
+        RuleSet(),
+        FileSelector("templates/*"),
+        artifact_recovery=messages.append,
+    )
 
+    assert listed_directories == [".", "templates", "templates"]
     assert client.deleted == [upload, old_backup]
     assert client.renamed == [(missing_backup, "templates/missing.php")]
-    assert messages == (
+    assert messages == [
         f"Removed abandoned upload '{upload}'.",
         f"Removed old backup '{old_backup}'.",
         "Restored interrupted replacement 'templates/missing.php'.",
-    )
+    ]
 
 
 def test_selected_push_pull_and_remote_prune_use_the_shared_plan(

@@ -329,8 +329,9 @@ This makes each file replacement recoverable, not the complete project
 transactional—FTPS has no project-wide transaction. A later failure does not
 roll back files already installed.
 
-Before every push, HLSync recovers its exact reserved artifacts in the selected
-scope. Abandoned upload files are deleted; obsolete backups are deleted when
+During a push, HLSync recovers its exact reserved artifacts as each selected
+remote directory is read. It does not perform a separate recursive cleanup
+scan. Abandoned upload files are deleted; obsolete backups are deleted when
 their destination exists; a sole backup is restored when its destination is
 missing. This cleanup never requires `-p` and does not affect ordinary
 remote-only files. Concurrent pushes to one profile are not supported.

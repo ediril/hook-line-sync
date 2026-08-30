@@ -5,6 +5,7 @@ import os
 import re
 import ssl
 from calendar import timegm
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
@@ -45,22 +46,6 @@ def _hlsync_artifact(path: str) -> _HLSyncArtifact | None:
         return None
     destination = remote.with_name(match.group("destination")).as_posix()
     return _HLSyncArtifact(path, destination, match.group("kind"))
-
-
-@dataclass(frozen=True)
-class _ArtifactRecoverySelection:
-    selected: FileSelection
-
-    @property
-    def pattern(self) -> str:
-        return self.selected.pattern
-
-    def matches(self, path: str) -> bool:
-        artifact = _hlsync_artifact(path)
-        return self.selected.matches(artifact.destination if artifact else path)
-
-    def may_match_descendant(self, directory: str) -> bool:
-        return self.selected.may_match_descendant(directory)
 
 
 def _parse_modify_timestamp(
@@ -118,6 +103,7 @@ class RemoteTransport(Protocol):
         *,
         include_excluded: bool = False,
         traverse_excluded: bool = False,
+        artifact_recovery: Callable[[str], None] | None = None,
     ) -> TreeSnapshot: ...
 
     def list_directory(
@@ -127,8 +113,6 @@ class RemoteTransport(Protocol):
     ) -> TreeSnapshot: ...
 
     def make_directory(self, relative_path: str) -> None: ...
-
-    def recover_artifacts(self, selector: FileSelection) -> tuple[str, ...]: ...
 
     def upload_file(
         self,
@@ -209,6 +193,7 @@ class ExplicitFTPSTransport:
         *,
         include_excluded: bool = False,
         traverse_excluded: bool = False,
+        artifact_recovery: Callable[[str], None] | None = None,
     ) -> TreeSnapshot:
         if self._client is None:
             raise TransportError("FTPS transport is not connected")
@@ -216,6 +201,12 @@ class ExplicitFTPSTransport:
 
         def walk(relative_directory: PurePosixPath) -> None:
             listing = self.list_directory(relative_directory, rules)
+            if artifact_recovery is not None:
+                recoveries = self._recover_artifacts(listing, selector)
+                for recovery in recoveries:
+                    artifact_recovery(recovery)
+                if recoveries:
+                    listing = self.list_directory(relative_directory, rules)
             for entry in listing.entries:
                 relative_path = entry.path
                 relative = PurePosixPath(relative_path)
@@ -352,18 +343,18 @@ class ExplicitFTPSTransport:
                 f"could not create remote directory '{path}': {error}"
             ) from error
 
-    def recover_artifacts(self, selector: FileSelection) -> tuple[str, ...]:
-        snapshot = self.snapshot(
-            RuleSet(),
-            _ArtifactRecoverySelection(selector),
-            include_excluded=True,
-        )
-        entries = {entry.path: entry for entry in snapshot.entries}
+    def _recover_artifacts(
+        self,
+        listing: TreeSnapshot,
+        selector: FileSelection | None,
+    ) -> tuple[str, ...]:
+        entries = {entry.path: entry for entry in listing.entries}
         artifacts = tuple(
             artifact
             for path in sorted(entries)
             for artifact in (_hlsync_artifact(path),)
             if artifact is not None
+            and (selector is None or selector.matches(artifact.destination))
         )
         for artifact in artifacts:
             if entries[artifact.path].kind != "file":
