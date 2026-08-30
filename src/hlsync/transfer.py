@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Literal
 
-from hls.comparison import ComparisonEntry, ComparisonPlan
-from hls.snapshot import EntryKind, TreeEntry, TreeSnapshot
-from hls.transport import PathOperationError, RemoteTransport
+from hlsync.comparison import ComparisonEntry, ComparisonPlan
+from hlsync.snapshot import EntryKind, TreeEntry, TreeSnapshot
+from hlsync.transport import PathOperationError, RemoteTransport
 
 
 class TransferError(RuntimeError):
@@ -237,7 +237,7 @@ def _replace_local_file(
         ) from error
     descriptor, temporary_name = tempfile.mkstemp(
         dir=destination.parent,
-        prefix=f".{destination.name}.hls-pull-",
+        prefix=f".{destination.name}.hlsync-pull-",
     )
     temporary = Path(temporary_name)
     try:

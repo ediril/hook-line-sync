@@ -5,18 +5,18 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
-from hls.selection import FileSelector, SelectionError
+from hlsync.selection import FileSelector, SelectionError
 
 RuleAction = Literal["include", "exclude"]
 
 
 class RuleError(ValueError):
-    """Raised when an HLS synchronization rule is unsafe or malformed."""
+    """Raised when an HLSync synchronization rule is unsafe or malformed."""
 
 
-def _relative_base(project_root: Path, current_directory: Path) -> PurePosixPath:
+def _relative_base(profile_root: Path, current_directory: Path) -> PurePosixPath:
     try:
-        relative = current_directory.relative_to(project_root)
+        relative = current_directory.relative_to(profile_root)
     except ValueError:
         return PurePosixPath()
     return PurePosixPath(*relative.parts)
@@ -25,14 +25,14 @@ def _relative_base(project_root: Path, current_directory: Path) -> PurePosixPath
 def expand_path_operands(
     values: tuple[str, ...],
     *,
-    project_root: Path,
+    profile_root: Path,
     current_directory: Path,
 ) -> tuple[str, ...]:
     """Expand wildcard operands to the local paths they currently match."""
     try:
-        current_directory.relative_to(project_root)
+        current_directory.relative_to(profile_root)
     except ValueError:
-        expansion_root = project_root
+        expansion_root = profile_root
     else:
         expansion_root = current_directory
     expanded: list[str] = []
@@ -60,11 +60,11 @@ def expand_path_operands(
 def patterns_from_operands(
     values: tuple[str, ...],
     *,
-    project_root: Path,
+    profile_root: Path,
     current_directory: Path,
 ) -> tuple[str, ...]:
-    """Translate CLI operands into project-rooted HLS patterns."""
-    base = _relative_base(project_root, current_directory)
+    """Translate CLI operands into profile-rooted HLSync patterns."""
+    base = _relative_base(profile_root, current_directory)
     normalized: list[str] = []
     for value in values:
         if not isinstance(value, str) or not value.strip():
@@ -76,7 +76,7 @@ def patterns_from_operands(
                 "rule patterns must be relative to the profile or current directory"
             )
         rooted = base / supplied
-        local_path = project_root.joinpath(*rooted.parts)
+        local_path = profile_root.joinpath(*rooted.parts)
         is_directory = pattern.endswith("/") or (
             "*" not in pattern
             and local_path.is_dir()
@@ -116,11 +116,11 @@ class SyncRule:
         object.__setattr__(self, "pattern", normalized)
         object.__setattr__(self, "_selector", FileSelector(normalized))
 
-    def matches(self, project_relative_path: str) -> bool:
-        return self._selector.matches(project_relative_path)
+    def matches(self, profile_relative_path: str) -> bool:
+        return self._selector.matches(profile_relative_path)
 
-    def may_match_descendant(self, project_relative_directory: str) -> bool:
-        return self._selector.may_match_descendant(project_relative_directory)
+    def may_match_descendant(self, profile_relative_directory: str) -> bool:
+        return self._selector.may_match_descendant(profile_relative_directory)
 
     def to_dict(self) -> dict[str, Any]:
         return {"id": self.id, "action": self.action, "pattern": self.pattern}
@@ -147,8 +147,8 @@ class RuleSet:
 
     def excludes(self, relative_path: str, *, is_directory: bool = False) -> bool:
         del is_directory
-        project_relative_path = relative_path
-        path = PurePosixPath(project_relative_path)
+        profile_relative_path = relative_path
+        path = PurePosixPath(profile_relative_path)
         if path.is_absolute() or not path.parts or ".." in path.parts:
             raise RuleError("evaluated paths must be non-empty profile-relative paths")
         candidate = path.as_posix()

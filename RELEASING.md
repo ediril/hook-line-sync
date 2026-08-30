@@ -1,7 +1,7 @@
 # Releasing HLS
 
-HLS publishes the `hook-line-sync` distribution to PyPI. The installed command
-is `hlsync`; the import package remains `hls`.
+HLSync publishes the `hook-line-sync` distribution to PyPI. The installed
+command and import package are both `hlsync`.
 
 ## PyPI requirements
 
@@ -11,7 +11,7 @@ repository.
 
 ## Release procedure
 
-1. Set `src/hls/__init__.py` to the next
+1. Set `src/hlsync/__init__.py` to the next
    `0.<month>.<day>.<increment>` version without leading zeroes.
 2. Add a matching dated section to `CHANGELOG.md`.
 3. Commit the release changes. From that clean checkout, with development

@@ -41,10 +41,10 @@ dev = [
 ]
 
 [project.scripts]
-hlsync = "hls.cli:main"
+hlsync = "hlsync.cli:main"
 
 [tool.setuptools.dynamic]
-version = { attr = "hls.__version__" }
+version = { attr = "hlsync.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]

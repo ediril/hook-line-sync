@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Unify the command, Python package, configuration directory, persisted
+  profile schema, and staging artifacts under the `hlsync` identity.
 - [x] Consolidate obsolete profile decisions and supersede stale traversal
   guidance with newly dated decisions.
 - [x] Rename `add` to `create`, standardize profile terminology, and let `map`

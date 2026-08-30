@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Literal
 
-from hls.selection import FileSelection, SelectionError
-from hls.snapshot import EntryKind, TreeEntry, TreeSnapshot
+from hlsync.selection import FileSelection, SelectionError
+from hlsync.snapshot import EntryKind, TreeEntry, TreeSnapshot
 
 Direction = Literal["push", "pull"]
 ComparisonState = Literal[

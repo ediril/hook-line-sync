@@ -63,7 +63,7 @@ preview.
 A profile identifies one deployment target: protocol, host, port, remote root,
 credential environment-variable names, and one local root. Multiple
 profiles may use the same server. Credential values are never stored in
-`~/.hls/configs.json`.
+`~/.hlsync/configs.json`.
 
 FTPS is the default and currently the only protocol. Override credential
 variable names when creating a profile if needed:
@@ -336,8 +336,8 @@ python -m pip install -e '.[dev]'
 pytest
 ```
 
-The PyPI distribution is `hook-line-sync`, the installed command is `hlsync`,
-and the internal Python package remains `hls`. See [`TODO.md`](TODO.md) for the
+The PyPI distribution is `hook-line-sync`; the installed command and Python
+package are both `hlsync`. See [`TODO.md`](TODO.md) for the
 ordered work queue and [`CHANGELOG.md`](CHANGELOG.md) for completed changes.
 
 Maintainer release instructions are in [`RELEASING.md`](RELEASING.md). The

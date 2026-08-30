@@ -10,13 +10,13 @@ from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import TLS_FTPHandler
 from pyftpdlib.servers import FTPServer
 
-from hls.comparison import build_comparison
-from hls.config import ProjectConfiguration
-from hls.rules import RuleSet, SyncRule
-from hls.selection import FileSelector
-from hls.snapshot import TreeEntry, TreeSnapshot, snapshot_local
-from hls.transfer import TransferOperation, execute_transfer
-from hls.transport import (
+from hlsync.comparison import build_comparison
+from hlsync.config import ProfileConfiguration
+from hlsync.rules import RuleSet, SyncRule
+from hlsync.selection import FileSelector
+from hlsync.snapshot import TreeEntry, TreeSnapshot, snapshot_local
+from hlsync.transfer import TransferOperation, execute_transfer
+from hlsync.transport import (
     ExplicitFTPSTransport,
     PathOperationError,
     TransportError,
@@ -27,7 +27,7 @@ def test_missing_credentials_are_reported(monkeypatch) -> None:
     monkeypatch.delenv("PROD_FTPS_USERNAME", raising=False)
     monkeypatch.delenv("PROD_FTPS_PASSWORD", raising=False)
     transport = ExplicitFTPSTransport(
-        ProjectConfiguration(
+        ProfileConfiguration(
             host="localhost",
             remote_root="/",
             username_env="PROD_FTPS_USERNAME",
@@ -122,7 +122,7 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
     monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
     context = ssl.create_default_context(cafile=os.fspath(certificate))
     transport = ExplicitFTPSTransport(
-        ProjectConfiguration(
+        ProfileConfiguration(
             host="localhost",
             remote_root="/",
             port=port,
@@ -191,7 +191,7 @@ def test_rejects_an_untrusted_server_certificate(tls_ftp_server, monkeypatch) ->
     monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
     monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
     transport = ExplicitFTPSTransport(
-        ProjectConfiguration(
+        ProfileConfiguration(
             host="localhost",
             remote_root="/",
             port=port,
@@ -204,13 +204,13 @@ def test_rejects_an_untrusted_server_certificate(tls_ftp_server, monkeypatch) ->
         transport.connect()
 
 
-def test_rejects_an_inaccessible_project_root(tls_ftp_server, monkeypatch) -> None:
+def test_rejects_an_inaccessible_profile_root(tls_ftp_server, monkeypatch) -> None:
     port, certificate, _ = tls_ftp_server
     monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
     monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
     context = ssl.create_default_context(cafile=os.fspath(certificate))
     transport = ExplicitFTPSTransport(
-        ProjectConfiguration(
+        ProfileConfiguration(
             host="localhost",
             remote_root="/missing",
             port=port,
@@ -262,7 +262,7 @@ def test_upload_verifies_timestamp_independently_of_mfmt_response(
             self.renamed.append((source, destination))
 
     transport = ExplicitFTPSTransport(
-        ProjectConfiguration(host="ftp.example.com", remote_root="/")
+        ProfileConfiguration(host="ftp.example.com", remote_root="/")
     )
     matching = TimestampClient("20231114221320")
     transport._client = matching
@@ -299,9 +299,9 @@ def test_push_artifact_recovery_cleans_staging_and_restores_missing_destination(
     monkeypatch,
 ) -> None:
     token = "a" * 32
-    upload = f"templates/.about.php.hls-upload-{token}"
-    old_backup = f"templates/.about.php.hls-backup-{token}"
-    missing_backup = f"templates/.missing.php.hls-backup-{'b' * 32}"
+    upload = f"templates/.about.php.hlsync-upload-{token}"
+    old_backup = f"templates/.about.php.hlsync-backup-{token}"
+    missing_backup = f"templates/.missing.php.hlsync-backup-{'b' * 32}"
 
     def file_entry(path):
         return TreeEntry(
@@ -313,7 +313,7 @@ def test_push_artifact_recovery_cleans_staging_and_restores_missing_destination(
         )
 
     transport = ExplicitFTPSTransport(
-        ProjectConfiguration(host="ftp.example.com", remote_root="/")
+        ProfileConfiguration(host="ftp.example.com", remote_root="/")
     )
 
     class RecoveryClient:
@@ -335,7 +335,7 @@ def test_push_artifact_recovery_cleans_staging_and_restores_missing_destination(
         assert include_excluded
         assert selector.matches(upload)
         assert selector.matches(missing_backup)
-        assert not selector.matches(f"other/.else.hls-upload-{token}")
+        assert not selector.matches(f"other/.else.hlsync-upload-{token}")
         return TreeSnapshot(
             (
                 file_entry("templates/about.php"),
@@ -373,7 +373,7 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
     monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
     context = ssl.create_default_context(cafile=os.fspath(certificate))
     transport = ExplicitFTPSTransport(
-        ProjectConfiguration(host="localhost", remote_root="/", port=port),
+        ProfileConfiguration(host="localhost", remote_root="/", port=port),
         ssl_context=context,
     )
     progress = []

@@ -11,10 +11,10 @@ from pathlib import PurePosixPath
 from typing import BinaryIO, Protocol
 from uuid import uuid4
 
-from hls.config import ProjectConfiguration
-from hls.rules import RuleSet
-from hls.selection import FileSelection
-from hls.snapshot import EntryKind, SnapshotError, TreeEntry, TreeSnapshot
+from hlsync.config import ProfileConfiguration
+from hlsync.rules import RuleSet
+from hlsync.selection import FileSelection
+from hlsync.snapshot import EntryKind, SnapshotError, TreeEntry, TreeSnapshot
 
 
 class TransportError(RuntimeError):
@@ -25,26 +25,26 @@ class PathOperationError(TransportError):
     """Raised when one remote path fails but the FTPS session remains usable."""
 
 
-_HLS_ARTIFACT_NAME = re.compile(
-    r"^\.(?P<destination>.+)\.hls-(?P<kind>upload|backup)-"
+_HLSYNC_ARTIFACT_NAME = re.compile(
+    r"^\.(?P<destination>.+)\.hlsync-(?P<kind>upload|backup)-"
     r"(?P<token>[0-9a-f]{32})$"
 )
 
 
 @dataclass(frozen=True)
-class _HLSArtifact:
+class _HLSyncArtifact:
     path: str
     destination: str
     kind: str
 
 
-def _hls_artifact(path: str) -> _HLSArtifact | None:
+def _hlsync_artifact(path: str) -> _HLSyncArtifact | None:
     remote = PurePosixPath(path)
-    match = _HLS_ARTIFACT_NAME.fullmatch(remote.name)
+    match = _HLSYNC_ARTIFACT_NAME.fullmatch(remote.name)
     if match is None:
         return None
     destination = remote.with_name(match.group("destination")).as_posix()
-    return _HLSArtifact(path, destination, match.group("kind"))
+    return _HLSyncArtifact(path, destination, match.group("kind"))
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,7 @@ class _ArtifactRecoverySelection:
         return self.selected.pattern
 
     def matches(self, path: str) -> bool:
-        artifact = _hls_artifact(path)
+        artifact = _hlsync_artifact(path)
         return self.selected.matches(artifact.destination if artifact else path)
 
     def may_match_descendant(self, directory: str) -> bool:
@@ -149,7 +149,7 @@ class RemoteTransport(Protocol):
 
 @dataclass
 class ExplicitFTPSTransport:
-    configuration: ProjectConfiguration
+    configuration: ProfileConfiguration
     timeout: float = 30.0
     ssl_context: ssl.SSLContext | None = None
 
@@ -362,7 +362,7 @@ class ExplicitFTPSTransport:
         artifacts = tuple(
             artifact
             for path in sorted(entries)
-            for artifact in (_hls_artifact(path),)
+            for artifact in (_hlsync_artifact(path),)
             if artifact is not None
         )
         for artifact in artifacts:
@@ -378,7 +378,7 @@ class ExplicitFTPSTransport:
             self.delete_path(artifact.path, is_directory=False)
             messages.append(f"Removed abandoned upload '{artifact.path}'.")
 
-        backups_by_destination: dict[str, list[_HLSArtifact]] = {}
+        backups_by_destination: dict[str, list[_HLSyncArtifact]] = {}
         for artifact in artifacts:
             if artifact.kind == "backup":
                 backups_by_destination.setdefault(
@@ -428,8 +428,8 @@ class ExplicitFTPSTransport:
         path = _relative_remote_path(relative_path)
         remote = PurePosixPath(path)
         token = uuid4().hex
-        temporary = str(remote.with_name(f".{remote.name}.hls-upload-{token}"))
-        backup = str(remote.with_name(f".{remote.name}.hls-backup-{token}"))
+        temporary = str(remote.with_name(f".{remote.name}.hlsync-upload-{token}"))
+        backup = str(remote.with_name(f".{remote.name}.hlsync-backup-{token}"))
         client = self._connected_client()
         timestamp = datetime.fromtimestamp(
             modified_ns // 1_000_000_000,

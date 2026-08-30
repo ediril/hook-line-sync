@@ -8,6 +8,7 @@ from typing import Any
 
 
 def write_json_atomic(path: Path, document: dict[str, Any]) -> None:
+    """Atomically replace a JSON configuration document."""
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     payload = json.dumps(document, indent=2, sort_keys=True) + "\n"
     descriptor, temporary_name = tempfile.mkstemp(
@@ -26,4 +27,3 @@ def write_json_atomic(path: Path, document: dict[str, Any]) -> None:
     except BaseException:
         temporary_path.unlink(missing_ok=True)
         raise
-

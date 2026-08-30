@@ -9,7 +9,7 @@ from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_FILE = ROOT / "src" / "hls" / "__init__.py"
+VERSION_FILE = ROOT / "src" / "hlsync" / "__init__.py"
 CHANGELOG_FILE = ROOT / "CHANGELOG.md"
 WEBSITE_FILE = ROOT / "website" / "index.php"
 PYPROJECT_FILE = ROOT / "pyproject.toml"
@@ -33,7 +33,7 @@ def release_version() -> tuple[str, int, int]:
     matches = tuple(VERSION_PATTERN.finditer(VERSION_FILE.read_text()))
     if len(matches) != 1:
         raise SystemExit(
-            "release check failed: src/hls/__init__.py must contain exactly one "
+            "release check failed: src/hlsync/__init__.py must contain exactly one "
             'valid __version__ = "0.<month>.<day>.<increment>" assignment'
         )
     match = matches[0]
@@ -50,11 +50,11 @@ def validate_release(tag: str | None = None) -> str:
     scripts_match = CONSOLE_SCRIPTS_PATTERN.search(PYPROJECT_FILE.read_text())
     if (
         scripts_match is None
-        or scripts_match["body"].strip() != 'hlsync = "hls.cli:main"'
+        or scripts_match["body"].strip() != 'hlsync = "hlsync.cli:main"'
     ):
         raise SystemExit(
             "release check failed: pyproject.toml must expose only the "
-            "hlsync = hls.cli:main console script"
+            "hlsync = hlsync.cli:main console script"
         )
 
     website_versions = tuple(

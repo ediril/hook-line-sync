@@ -7,11 +7,11 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from hls.rules import RuleAction, RuleError, RuleSet, SyncRule
-from hls.storage import write_json_atomic
+from hlsync.rules import RuleAction, RuleError, RuleSet, SyncRule
+from hlsync.storage import write_json_atomic
 
-CONFIG_VERSION = 7
-PROJECT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+CONFIG_VERSION = 8
+PROFILE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 ENVIRONMENT_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 DEFAULT_USERNAME_ENV = "PROD_FTPS_USERNAME"
 DEFAULT_PASSWORD_ENV = "PROD_FTPS_PASSWORD"
@@ -27,8 +27,8 @@ class RuleUpdate:
     removed: tuple[SyncRule, ...] = ()
 
 
-def validate_project_name(name: str) -> str:
-    if not PROJECT_NAME_PATTERN.fullmatch(name):
+def validate_profile_name(name: str) -> str:
+    if not PROFILE_NAME_PATTERN.fullmatch(name):
         raise ConfigurationError(
             "profile name must start with a letter or digit and contain "
             "only letters, digits, '.', '_', or '-'"
@@ -109,7 +109,7 @@ def _rule_action_already_applies(
 
 
 @dataclass(frozen=True)
-class ProjectConfiguration:
+class ProfileConfiguration:
     host: str
     remote_root: str
     port: int = 21
@@ -169,8 +169,8 @@ class ProjectConfiguration:
         *,
         local_root: str,
         remote_root: str,
-    ) -> ProjectConfiguration:
-        return ProjectConfiguration(
+    ) -> ProfileConfiguration:
+        return ProfileConfiguration(
             host=self.host,
             remote_root=remote_root,
             port=self.port,
@@ -187,10 +187,10 @@ class ProjectConfiguration:
         rules: tuple[SyncRule, ...],
         *,
         next_rule_id: int | None = None,
-    ) -> ProjectConfiguration:
+    ) -> ProfileConfiguration:
         if self.local_root is None:
             raise ConfigurationError("cannot change rules for an unmapped profile")
-        return ProjectConfiguration(
+        return ProfileConfiguration(
             host=self.host,
             remote_root=self.remote_root,
             port=self.port,
@@ -229,7 +229,7 @@ class ProjectConfiguration:
         }
 
     @classmethod
-    def from_dict(cls, value: Any) -> ProjectConfiguration:
+    def from_dict(cls, value: Any) -> ProfileConfiguration:
         if not isinstance(value, dict):
             raise ConfigurationError("profile configuration must be an object")
         expected = {
@@ -275,15 +275,15 @@ class ProjectConfiguration:
 
 @dataclass
 class ApplicationConfiguration:
-    projects: dict[str, ProjectConfiguration] = field(default_factory=dict)
+    profiles: dict[str, ProfileConfiguration] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        for name in self.projects:
-            validate_project_name(name)
+        for name in self.profiles:
+            validate_profile_name(name)
         mapped = [
-            (name, Path(project.local_root))
-            for name, project in self.projects.items()
-            if project.local_root is not None
+            (name, Path(profile.local_root))
+            for name, profile in self.profiles.items()
+            if profile.local_root is not None
         ]
         for index, (name, root) in enumerate(mapped):
             for other_name, other_root in mapped[:index]:
@@ -295,38 +295,38 @@ class ApplicationConfiguration:
 
     def set_profile_roots(
         self,
-        project_name: str,
+        profile_name: str,
         *,
         local_root: str,
         remote_root: str,
     ) -> None:
-        project = self.projects[project_name]
+        profile = self.profiles[profile_name]
         root = Path(local_root)
-        for other_name, other in self.projects.items():
-            if other_name == project_name or other.local_root is None:
+        for other_name, other in self.profiles.items():
+            if other_name == profile_name or other.local_root is None:
                 continue
             other_root = Path(other.local_root)
             if _paths_overlap(root, other_root):
                 raise ConfigurationError(
-                    f"local root '{root}' for profile '{project_name}' overlaps "
+                    f"local root '{root}' for profile '{profile_name}' overlaps "
                     f"profile '{other_name}' root '{other_root}'"
                 )
-        self.projects[project_name] = project.with_roots(
+        self.profiles[profile_name] = profile.with_roots(
             local_root=local_root,
             remote_root=remote_root,
         )
 
     def append_rules(
         self,
-        project_name: str,
+        profile_name: str,
         action: RuleAction,
         patterns: tuple[str, ...],
     ) -> RuleUpdate:
-        project = self.projects[project_name]
-        ordered = list(project.rules)
+        profile = self.profiles[profile_name]
+        ordered = list(profile.rules)
         added: list[SyncRule] = []
         removed: list[SyncRule] = []
-        next_rule_id = project.next_rule_id
+        next_rule_id = profile.next_rule_id
         unique_patterns: list[str] = []
         for pattern in patterns:
             unique_patterns = [item for item in unique_patterns if item != pattern]
@@ -344,40 +344,40 @@ class ApplicationConfiguration:
             ordered.append(rule)
             added.append(rule)
             next_rule_id += 1
-        self.projects[project_name] = project.with_rules(
+        self.profiles[profile_name] = profile.with_rules(
             tuple(ordered),
             next_rule_id=next_rule_id,
         )
         return RuleUpdate(tuple(added), tuple(removed))
 
-    def remove_rule(self, project_name: str, rule_id: int) -> SyncRule:
-        project = self.projects[project_name]
-        removed = next((rule for rule in project.rules if rule.id == rule_id), None)
+    def remove_rule(self, profile_name: str, rule_id: int) -> SyncRule:
+        profile = self.profiles[profile_name]
+        removed = next((rule for rule in profile.rules if rule.id == rule_id), None)
         if removed is None:
             raise ConfigurationError(
-                f"profile '{project_name}' has no rule with id {rule_id}"
+                f"profile '{profile_name}' has no rule with id {rule_id}"
             )
-        remaining = tuple(rule for rule in project.rules if rule.id != rule_id)
-        self.projects[project_name] = project.with_rules(remaining)
+        remaining = tuple(rule for rule in profile.rules if rule.id != rule_id)
+        self.profiles[profile_name] = profile.with_rules(remaining)
         return removed
 
-    def project_for_path(
+    def profile_for_path(
         self, local_path: Path
-    ) -> tuple[str, ProjectConfiguration] | None:
-        for name, project in sorted(self.projects.items()):
-            if project.local_root is None:
+    ) -> tuple[str, ProfileConfiguration] | None:
+        for name, profile in sorted(self.profiles.items()):
+            if profile.local_root is None:
                 continue
-            root = Path(project.local_root)
+            root = Path(profile.local_root)
             if local_path == root or root in local_path.parents:
-                return name, project
+                return name, profile
         return None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "version": CONFIG_VERSION,
-            "projects": {
-                name: project.to_dict()
-                for name, project in sorted(self.projects.items())
+            "profiles": {
+                name: profile.to_dict()
+                for name, profile in sorted(self.profiles.items())
             },
         }
 
@@ -388,23 +388,24 @@ class ApplicationConfiguration:
         if value.get("version") != CONFIG_VERSION:
             raise ConfigurationError(
                 f"config version mismatch (found {value.get('version')!r}, "
-                f"expected {CONFIG_VERSION}); rules format changed—recreate config"
+                f"expected {CONFIG_VERSION}); configuration schema changed—"
+                "recreate config"
             )
-        if set(value) != {"version", "projects"}:
+        if set(value) != {"version", "profiles"}:
             raise ConfigurationError("configuration has unknown or missing fields")
-        projects_value = value["projects"]
-        if not isinstance(projects_value, dict):
-            raise ConfigurationError("projects must be an object")
-        projects = {
-            validate_project_name(name): ProjectConfiguration.from_dict(project)
-            for name, project in projects_value.items()
+        profiles_value = value["profiles"]
+        if not isinstance(profiles_value, dict):
+            raise ConfigurationError("profiles must be an object")
+        profiles = {
+            validate_profile_name(name): ProfileConfiguration.from_dict(profile)
+            for name, profile in profiles_value.items()
         }
-        return cls(projects=projects)
+        return cls(profiles=profiles)
 
 
 class ConfigurationStore:
     def __init__(self, path: Path | None = None) -> None:
-        self.path = path or Path.home() / ".hls" / "configs.json"
+        self.path = path or Path.home() / ".hlsync" / "configs.json"
 
     def load(self) -> ApplicationConfiguration:
         if not self.path.exists():

@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Literal
 
-from hls.rules import RuleSet
-from hls.selection import FileSelection
+from hlsync.rules import RuleSet
+from hlsync.selection import FileSelection
 
 EntryKind = Literal["directory", "file", "symlink"]
 

@@ -64,13 +64,13 @@ class FileSelector:
         cls,
         value: str,
         *,
-        project_root: Path,
+        profile_root: Path,
         current_directory: Path,
     ) -> FileSelector:
         if not value:
             raise SelectionError("file selector cannot be empty")
         try:
-            current_relative = current_directory.relative_to(project_root)
+            current_relative = current_directory.relative_to(profile_root)
         except ValueError:
             base = PurePosixPath()
         else:
@@ -82,14 +82,14 @@ class FileSelector:
             )
         return cls((base / supplied).as_posix())
 
-    def matches(self, project_relative_path: str) -> bool:
-        path = PurePosixPath(project_relative_path)
+    def matches(self, profile_relative_path: str) -> bool:
+        path = PurePosixPath(profile_relative_path)
         if path.is_absolute() or ".." in path.parts:
             raise SelectionError("selected paths must remain inside the profile")
         return _matches_parts(PurePosixPath(self.pattern).parts, path.parts)
 
-    def may_match_descendant(self, project_relative_directory: str) -> bool:
-        directory = PurePosixPath(project_relative_directory)
+    def may_match_descendant(self, profile_relative_directory: str) -> bool:
+        directory = PurePosixPath(profile_relative_directory)
         if directory.is_absolute() or ".." in directory.parts:
             raise SelectionError("selected paths must remain inside the profile")
         return _can_match_descendant(
@@ -116,14 +116,14 @@ class FileSelectorSet:
     def pattern(self) -> str:
         return ", ".join(selector.pattern for selector in self.selectors)
 
-    def matches(self, project_relative_path: str) -> bool:
+    def matches(self, profile_relative_path: str) -> bool:
         return any(
-            selector.matches(project_relative_path) for selector in self.selectors
+            selector.matches(profile_relative_path) for selector in self.selectors
         )
 
-    def may_match_descendant(self, project_relative_directory: str) -> bool:
+    def may_match_descendant(self, profile_relative_directory: str) -> bool:
         return any(
-            selector.may_match_descendant(project_relative_directory)
+            selector.may_match_descendant(profile_relative_directory)
             for selector in self.selectors
         )
 
@@ -142,17 +142,17 @@ class DirectoryContentsSelection:
     def pattern(self) -> str:
         return self.traversal.pattern
 
-    def matches(self, project_relative_path: str) -> bool:
-        return self.traversal.matches(project_relative_path)
+    def matches(self, profile_relative_path: str) -> bool:
+        return self.traversal.matches(profile_relative_path)
 
-    def may_match_descendant(self, project_relative_directory: str) -> bool:
-        return self.traversal.may_match_descendant(project_relative_directory)
+    def may_match_descendant(self, profile_relative_directory: str) -> bool:
+        return self.traversal.may_match_descendant(profile_relative_directory)
 
-    def includes_result(self, project_relative_path: str, *, directory: bool) -> bool:
+    def includes_result(self, profile_relative_path: str, *, directory: bool) -> bool:
         return not (
             directory
             and self.containers is not None
-            and self.containers.matches(project_relative_path)
+            and self.containers.matches(profile_relative_path)
         )
 
 

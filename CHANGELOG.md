@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.29.15 — 2026-08-29
+
+### Changed
+
+- Rename the Python package from `hls` to `hlsync`, move configuration from
+  `~/.hls` to `~/.hlsync`, and rename the persisted `projects` collection to
+  `profiles` in configuration version 8.
+- Rename HLSync-owned staging artifacts from `.hls-*` to `.hlsync-*` without
+  compatibility aliases or migration behavior.
+
 ## 0.8.29.14 — 2026-08-29
 
 ### Changed

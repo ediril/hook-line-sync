@@ -2,12 +2,12 @@ import io
 
 import pytest
 
-from hls import __version__
-from hls.cli import run
-from hls.config import ConfigurationStore
-from hls.rules import RuleSet, SyncRule
-from hls.snapshot import TreeEntry, TreeSnapshot, snapshot_local
-from hls.transport import PathOperationError
+from hlsync import __version__
+from hlsync.cli import run
+from hlsync.config import ConfigurationStore
+from hlsync.rules import RuleSet, SyncRule
+from hlsync.snapshot import TreeEntry, TreeSnapshot, snapshot_local
+from hlsync.transport import PathOperationError
 
 
 class TerminalInput(io.StringIO):
@@ -66,12 +66,12 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
         f"{__version__}\n",
         "",
     )
-    project = store.load().projects["client-site"]
-    assert project.host == "ftp.example.com"
-    assert project.remote_root == "/public_html/site"
-    assert project.local_root == str(tmp_path)
-    assert project.username_env == "PROD_FTPS_USERNAME"
-    assert project.password_env == "PROD_FTPS_PASSWORD"
+    profile = store.load().profiles["client-site"]
+    assert profile.host == "ftp.example.com"
+    assert profile.remote_root == "/public_html/site"
+    assert profile.local_root == str(tmp_path)
+    assert profile.username_env == "PROD_FTPS_USERNAME"
+    assert profile.password_env == "PROD_FTPS_PASSWORD"
 
     help_output = invoke(["help"], store)[1]
     assert "create              create an FTPS profile" in help_output
@@ -105,7 +105,7 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     rules_help = invoke(["help", "rules"], store)[1]
     assert "hlsync [PROFILE] rules" in rules_help
     assert "hlsync [PROFILE] rules remove RULE_ID" in rules_help
-    assert "--project" not in rules_help
+    assert "--profile" not in rules_help
     assert "[{remove}] [rule_id]" not in rules_help
     assert "profile             show details for one profile" in help_output
     assert "profiles            list configured profiles" in help_output
@@ -133,7 +133,7 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
         rule_help = invoke(["help", command], store)[1]
         assert f"hlsync [PROFILE] {command} [PATH ...]" in rule_help
         assert f"hlsync [PROFILE] {command} --pattern PATTERN ..." in rule_help
-    project_selection_commands = (
+    profile_selection_commands = (
         "exclude",
         "include",
         "rules",
@@ -142,8 +142,8 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
         "push",
         "pull",
     )
-    for command in project_selection_commands:
-        assert "--project" not in invoke(["help", command], store)[1]
+    for command in profile_selection_commands:
+        assert "--profile" not in invoke(["help", command], store)[1]
 
     list_status, list_stdout, list_stderr = invoke(["profiles"], store)
     assert (list_status, list_stderr) == (0, "")
@@ -198,7 +198,7 @@ def test_add_maps_the_current_directory_after_confirmation(
         f"Mapped '{workspace}' to 'prod:/public_html'.\n",
         "",
     )
-    assert store.load().projects["prod"].local_root == str(workspace)
+    assert store.load().profiles["prod"].local_root == str(workspace)
 
 
 def test_add_prompts_for_another_local_root_when_current_is_declined(
@@ -232,7 +232,7 @@ def test_add_prompts_for_another_local_root_when_current_is_declined(
         f"Mapped '{selected}' to 'prod:/public_html'.\n",
         "",
     )
-    assert store.load().projects["prod"].local_root == str(selected)
+    assert store.load().profiles["prod"].local_root == str(selected)
 
 
 def test_cli_refuses_invalid_profile_mutations(tmp_path) -> None:
@@ -296,8 +296,8 @@ def test_add_supports_explicit_protocol_port_and_environment_names(tmp_path) -> 
     )
 
     assert status == 0
-    project = store.load().projects["staging"]
-    assert (project.type, project.port, project.username_env, project.password_env) == (
+    profile = store.load().profiles["staging"]
+    assert (profile.type, profile.port, profile.username_env, profile.password_env) == (
         "ftps",
         2121,
         "SHARED_USER",
@@ -379,9 +379,9 @@ def test_ordered_exclusion_commands_persist_reinclusion(
         "  6  exclude ./composer.lock\n",
         "",
     )
-    project = store.load().projects["prod"]
-    assert project.local_root == str(workspace)
-    assert project.rules == (
+    profile = store.load().profiles["prod"]
+    assert profile.local_root == str(workspace)
+    assert profile.rules == (
         SyncRule(1, "exclude", ".git/**"),
         SyncRule(2, "exclude", "node_modules/**"),
         SyncRule(3, "exclude", "*.log"),
@@ -392,8 +392,8 @@ def test_ordered_exclusion_commands_persist_reinclusion(
         SyncRule(8, "include", "node_modules/package/**"),
         SyncRule(9, "exclude", "docs/note.txt"),
     )
-    assert project.next_rule_id == 10
-    rules = RuleSet(project.rules)
+    assert profile.next_rule_id == 10
+    rules = RuleSet(profile.rules)
     assert rules.excludes(".git", is_directory=True)
     assert not rules.excludes("node_modules/package/index.js")
     assert not rules.excludes("node_modules/keep.js")
@@ -476,7 +476,7 @@ def test_ordered_exclusion_commands_persist_reinclusion(
         "Removed rule 8 from profile 'prod': include node_modules/package/**\n",
         "",
     )
-    assert store.load().projects["prod"].next_rule_id == 10
+    assert store.load().profiles["prod"].next_rule_id == 10
     assert invoke(["inc", "composer.json"], store) == (
         0,
         "Paths are included by the remaining policy for profile 'prod';\n"
@@ -484,11 +484,11 @@ def test_ordered_exclusion_commands_persist_reinclusion(
         "  5  exclude ./composer.json\n",
         "",
     )
-    updated = store.load().projects["prod"]
+    updated = store.load().profiles["prod"]
     assert 5 not in {rule.id for rule in updated.rules}
     assert not any(rule.pattern == "composer.json" for rule in updated.rules)
     assert updated.next_rule_id == 10
-    assert "project mapped to the current directory" not in profile_stdout
+    assert "profile mapped to the current directory" not in profile_stdout
 
     (workspace / "root.env").write_text("ROOT=1", encoding="utf-8")
     outside = tmp_path / "outside"
@@ -548,8 +548,8 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     snapshot_traversal = []
 
     class FakeTransport:
-        def __init__(self, project) -> None:
-            del project
+        def __init__(self, profile) -> None:
+            del profile
 
         def __enter__(self):
             return self
@@ -676,7 +676,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         def delete_path(self, path, *, is_directory):
             operations.append(("delete", path, is_directory))
 
-    monkeypatch.setattr("hls.cli.ExplicitFTPSTransport", FakeTransport)
+    monkeypatch.setattr("hlsync.cli.ExplicitFTPSTransport", FakeTransport)
     monkeypatch.chdir(source)
 
     assert invoke(["connect"], store) == (
@@ -1005,11 +1005,11 @@ def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
         "  Remote root: /prod → /production\n",
         "",
     )
-    remapped_project = store.load().projects["prod"]
-    assert remapped_project.local_root == str(separate)
-    assert remapped_project.remote_root == "/production"
-    assert remapped_project.rules == (SyncRule(1, "exclude", "*.log"),)
-    assert store.load().projects["staging"].local_root == str(staging_root)
+    remapped_profile = store.load().profiles["prod"]
+    assert remapped_profile.local_root == str(separate)
+    assert remapped_profile.remote_root == "/production"
+    assert remapped_profile.rules == (SyncRule(1, "exclude", "*.log"),)
+    assert store.load().profiles["staging"].local_root == str(staging_root)
 
 
 def test_push_reports_partial_failure_after_continuing_independent_paths(
@@ -1038,7 +1038,7 @@ def test_push_reports_partial_failure_after_continuing_independent_paths(
     uploads = []
 
     class PartiallyWritableTransport:
-        def __init__(self, project):
+        def __init__(self, profile):
             pass
 
         def __enter__(self):
@@ -1080,7 +1080,7 @@ def test_push_reports_partial_failure_after_continuing_independent_paths(
         def delete_path(self, path, *, is_directory):
             raise AssertionError("pruning was not requested")
 
-    monkeypatch.setattr("hls.cli.ExplicitFTPSTransport", PartiallyWritableTransport)
+    monkeypatch.setattr("hlsync.cli.ExplicitFTPSTransport", PartiallyWritableTransport)
     result = invoke(["push", "-r"], store)
 
     assert result[0] == 1

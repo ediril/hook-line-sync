@@ -11,6 +11,10 @@ a host, but their local roots may not equal, contain, or be contained by one
 another. Every descendant keeps the same profile-relative path beneath the
 remote root.
 
+Configuration stores these entries under the `profiles` key. The model and
+public APIs use profile terminology consistently; there is no parallel project
+representation.
+
 `hlsync create` always records a local root. It accepts `--local-root` directly
 or proposes the current directory with yes as the default; declining prompts
 for another directory. A profile without a local root cannot synchronize or

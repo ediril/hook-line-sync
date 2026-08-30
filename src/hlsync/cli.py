@@ -9,57 +9,57 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TextIO, TypeVar
 
-from hls import __version__
-from hls.comparison import (
+from hlsync import __version__
+from hlsync.comparison import (
     ComparisonEntry,
     ComparisonPlan,
     build_comparison,
     mark_untraversed_directories,
 )
-from hls.config import (
+from hlsync.config import (
     DEFAULT_PASSWORD_ENV,
     DEFAULT_USERNAME_ENV,
     ApplicationConfiguration,
     ConfigurationError,
     ConfigurationStore,
-    ProjectConfiguration,
+    ProfileConfiguration,
     RuleUpdate,
     canonical_local_root,
-    validate_project_name,
+    validate_profile_name,
 )
-from hls.pattern_operands import (
+from hlsync.pattern_operands import (
     PatternOperandError,
     add_pattern_operands,
     normalize_pattern_operands,
 )
-from hls.rules import (
+from hlsync.rules import (
     RuleError,
     RuleSet,
     SyncRule,
     expand_path_operands,
     patterns_from_operands,
 )
-from hls.selection import (
+from hlsync.selection import (
     DirectoryContentsSelection,
     FileSelection,
     FileSelector,
     FileSelectorSet,
     SelectionError,
 )
-from hls.snapshot import (
+from hlsync.snapshot import (
     SnapshotError,
     TreeEntry,
     TreeSnapshot,
     list_local_directory,
     snapshot_local,
 )
-from hls.transfer import (
+from hlsync.transfer import (
     TransferError,
     TransferOperation,
     TransferResult,
     execute_transfer,
 )
-from hls.transport import ExplicitFTPSTransport, PathOperationError, TransportError
+from hlsync.transport import ExplicitFTPSTransport, PathOperationError, TransportError
 
 _EntryT = TypeVar("_EntryT")
 
@@ -242,7 +242,7 @@ def _resolve_invocation(
         and not raw_arguments[1].startswith("-")
         and _could_be_command(raw_arguments[1])
     ):
-        profile_name = validate_project_name(first)
+        profile_name = validate_profile_name(first)
         raw_arguments = raw_arguments[1:]
         raw_arguments[0] = _resolve_command_name(
             raw_arguments[0], stdin=stdin, stdout=stdout
@@ -282,7 +282,7 @@ def build_parser() -> argparse.ArgumentParser:
     create_parser = subparsers.add_parser(
         "create", help="create an FTPS profile with a mapped local root"
     )
-    create_parser.add_argument("project_name")
+    create_parser.add_argument("profile_name")
     create_parser.add_argument("--host", required=True)
     create_parser.add_argument("--remote-root", required=True)
     create_parser.add_argument("--protocol", choices=("ftps",), default="ftps")
@@ -303,7 +303,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="verify a profile's FTPS connection",
         usage="hlsync connect [PROFILE]\n       hlsync PROFILE connect",
     )
-    connect_parser.add_argument("project_name", nargs="?")
+    connect_parser.add_argument("profile_name", nargs="?")
 
     map_parser = subparsers.add_parser(
         "map",
@@ -313,7 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
             "       hlsync PROFILE map [--local-root PATH] [--remote-root PATH]"
         ),
     )
-    map_parser.add_argument("project_name", nargs="?")
+    map_parser.add_argument("profile_name", nargs="?")
     map_parser.add_argument(
         "--local-root",
         metavar="PATH",
@@ -390,7 +390,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="remove a profile",
         usage="hlsync remove [PROFILE]\n       hlsync PROFILE remove",
     )
-    remove_parser.add_argument("project_name", nargs="?")
+    remove_parser.add_argument("profile_name", nargs="?")
 
     root_parser = subparsers.add_parser(
         "root",
@@ -398,7 +398,7 @@ def build_parser() -> argparse.ArgumentParser:
         usage="hlsync root [PROFILE]\n       hlsync PROFILE root",
     )
     root_parser.add_argument(
-        "project_name",
+        "profile_name",
         nargs="?",
         metavar="PROFILE",
         help="profile name; inferred from the current directory when omitted",
@@ -410,7 +410,7 @@ def build_parser() -> argparse.ArgumentParser:
         usage="hlsync profile [PROFILE]\n       hlsync PROFILE profile",
     )
     profile_parser.add_argument(
-        "project_name",
+        "profile_name",
         nargs="?",
         metavar="PROFILE",
         help="profile name; inferred from the current directory when omitted",
@@ -592,11 +592,11 @@ def _create_profile(
     stdin: TextIO,
     stdout: TextIO,
 ) -> str:
-    name = validate_project_name(arguments.project_name)
+    name = validate_profile_name(arguments.profile_name)
     configuration = store.load()
-    if name in configuration.projects:
+    if name in configuration.profiles:
         raise ConfigurationError(f"profile '{name}' already exists")
-    project = ProjectConfiguration(
+    profile = ProfileConfiguration(
         type=arguments.protocol,
         host=arguments.host,
         remote_root=arguments.remote_root,
@@ -612,14 +612,14 @@ def _create_profile(
             else DEFAULT_PASSWORD_ENV
         ),
     )
-    configuration.projects[name] = project
+    configuration.profiles[name] = profile
     if arguments.local_root is not None:
         local_root = canonical_local_root(arguments.local_root)
     else:
         current_root = canonical_local_root(Path.cwd())
         prompt = (
             f"Map current directory '{current_root}' to "
-            f"'{name}:{project.remote_root}'? [Y/n] "
+            f"'{name}:{profile.remote_root}'? [Y/n] "
         )
         if _confirm(prompt, stdin, stdout, default=True):
             local_root = current_root
@@ -637,54 +637,54 @@ def _create_profile(
     configuration.set_profile_roots(
         name,
         local_root=local_root,
-        remote_root=project.remote_root,
+        remote_root=profile.remote_root,
     )
     message = (
         f"Created FTPS profile '{name}'.\n"
-        f"Mapped '{local_root}' to '{name}:{project.remote_root}'."
+        f"Mapped '{local_root}' to '{name}:{profile.remote_root}'."
     )
     store.save(configuration)
     return message
 
 
-def _resolve_project(
+def _resolve_profile(
     arguments: argparse.Namespace, store: ConfigurationStore
-) -> tuple[ApplicationConfiguration, str, ProjectConfiguration]:
+) -> tuple[ApplicationConfiguration, str, ProfileConfiguration]:
     configuration = store.load()
     prefix_name = getattr(arguments, "profile_prefix", None)
-    positional_name = getattr(arguments, "project_name", None)
+    positional_name = getattr(arguments, "profile_name", None)
     if prefix_name is not None and positional_name is not None:
         raise ConfigurationError(
             "profile was specified both before the command and as an argument"
         )
     supplied_name = prefix_name or positional_name
     if supplied_name is None:
-        active = configuration.project_for_path(Path.cwd().resolve(strict=True))
+        active = configuration.profile_for_path(Path.cwd().resolve(strict=True))
         if active is None:
             raise ConfigurationError(
                 "current directory is not inside a mapped profile; prefix the "
                 "command with a profile (hlsync PROFILE COMMAND)"
             )
-        name, project = active
-        return configuration, name, project
-    name = validate_project_name(supplied_name)
-    if name not in configuration.projects:
+        name, profile = active
+        return configuration, name, profile
+    name = validate_profile_name(supplied_name)
+    if name not in configuration.profiles:
         raise ConfigurationError(f"profile '{name}' does not exist")
-    return configuration, name, configuration.projects[name]
+    return configuration, name, configuration.profiles[name]
 
 
 def _effective_current_directory(
     arguments: argparse.Namespace,
-    project_root: Path,
+    profile_root: Path,
 ) -> Path:
     if getattr(arguments, "profile_prefix", None) is not None:
-        return project_root.resolve(strict=True)
+        return profile_root.resolve(strict=True)
     return Path.cwd().resolve(strict=True)
 
 
 def _connect(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
-    _, name, project = _resolve_project(arguments, store)
-    with ExplicitFTPSTransport(project):
+    _, name, profile = _resolve_profile(arguments, store)
+    with ExplicitFTPSTransport(profile):
         pass
     return f"Verified secure connectivity to profile '{name}'."
 
@@ -695,31 +695,31 @@ def _map(
     stdin: TextIO,
     stdout: TextIO,
 ) -> str:
-    configuration, name, project = _resolve_project(arguments, store)
+    configuration, name, profile = _resolve_profile(arguments, store)
     if arguments.local_root is not None:
         local_root = canonical_local_root(arguments.local_root)
-    elif arguments.remote_root is None or project.local_root is None:
+    elif arguments.remote_root is None or profile.local_root is None:
         local_root = canonical_local_root(Path.cwd())
     else:
-        local_root = project.local_root
+        local_root = profile.local_root
     remote_root = (
         arguments.remote_root
         if arguments.remote_root is not None
-        else project.remote_root
+        else profile.remote_root
     )
-    candidate = project.with_roots(
+    candidate = profile.with_roots(
         local_root=local_root,
         remote_root=remote_root,
     )
     changes = []
-    if project.local_root != candidate.local_root:
+    if profile.local_root != candidate.local_root:
         changes.append(
-            f"  Local root: {project.local_root or 'not mapped'} "
+            f"  Local root: {profile.local_root or 'not mapped'} "
             f"→ {candidate.local_root}"
         )
-    if project.remote_root != candidate.remote_root:
+    if profile.remote_root != candidate.remote_root:
         changes.append(
-            f"  Remote root: {project.remote_root} → {candidate.remote_root}"
+            f"  Remote root: {profile.remote_root} → {candidate.remote_root}"
         )
     if not changes:
         return f"Profile '{name}' mapping is unchanged."
@@ -823,29 +823,29 @@ def _change_rules(
     *,
     include: bool,
 ) -> str:
-    configuration, name, project = _resolve_project(arguments, store)
+    configuration, name, profile = _resolve_profile(arguments, store)
     patterns = normalize_pattern_operands(arguments)
     if not patterns:
         if arguments.pattern:
             raise ConfigurationError("--pattern requires at least one operand")
         action = "include" if include else "exclude"
-        rules = tuple(rule for rule in project.rules if rule.action == action)
+        rules = tuple(rule for rule in profile.rules if rule.action == action)
         kind = "Inclusion" if include else "Exclusion"
         return _format_rules(name, rules, heading=f"{kind} rules", grouped=True)
-    root = _require_local_root(name, project)
+    root = _require_local_root(name, profile)
     current_directory = _effective_current_directory(arguments, root)
     operands = (
         patterns
         if arguments.pattern
         else expand_path_operands(
             patterns,
-            project_root=root,
+            profile_root=root,
             current_directory=current_directory,
         )
     )
     normalized = patterns_from_operands(
         operands,
-        project_root=root,
+        profile_root=root,
         current_directory=current_directory,
     )
     update = configuration.append_rules(
@@ -895,13 +895,13 @@ def _manage_rules(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
 ) -> str:
-    configuration, name, project = _resolve_project(arguments, store)
+    configuration, name, profile = _resolve_profile(arguments, store)
     if arguments.operation is None:
         if arguments.rule_id is not None:
             raise ConfigurationError("a rule id requires the remove operation")
         return _format_rules(
             name,
-            project.rules,
+            profile.rules,
             heading="Synchronization rules",
             grouped=True,
         )
@@ -916,22 +916,22 @@ def _manage_rules(
 
 
 def _remove(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
-    configuration, name, _ = _resolve_project(arguments, store)
-    del configuration.projects[name]
+    configuration, name, _ = _resolve_profile(arguments, store)
+    del configuration.profiles[name]
     store.save(configuration)
     return f"Removed profile '{name}'."
 
 
 def _list_profiles(store: ConfigurationStore) -> str:
     configuration = store.load()
-    if not configuration.projects:
+    if not configuration.profiles:
         return "No profiles configured."
 
-    active = configuration.project_for_path(Path.cwd().resolve(strict=True))
+    active = configuration.profile_for_path(Path.cwd().resolve(strict=True))
     active_name = active[0] if active is not None else None
     return "\n".join(
         f"{'*' if name == active_name else ' '} {name}"
-        for name in sorted(configuration.projects)
+        for name in sorted(configuration.profiles)
     )
 
 
@@ -941,23 +941,23 @@ def _show_profile(
 ) -> str:
     if (
         getattr(arguments, "profile_prefix", None) is None
-        and arguments.project_name is None
+        and arguments.profile_name is None
     ):
         configuration = store.load()
-        active = configuration.project_for_path(Path.cwd().resolve(strict=True))
+        active = configuration.profile_for_path(Path.cwd().resolve(strict=True))
         if active is None:
             return "No active profile. Use hlsync PROFILE COMMAND."
-    _, name, project = _resolve_project(arguments, store)
+    _, name, profile = _resolve_profile(arguments, store)
     return "\n".join(
         (
             f"Profile '{name}':",
-            f"  Protocol: {project.type.upper()}",
-            f"  Host: {project.host}:{project.port}",
-            f"  Remote root: {project.remote_root}",
-            f"  Local root: {project.local_root or 'not mapped'}",
-            f"  Username env: {project.username_env}",
-            f"  Password env: {project.password_env}",
-            f"  Rules: {len(project.rules)}",
+            f"  Protocol: {profile.type.upper()}",
+            f"  Host: {profile.host}:{profile.port}",
+            f"  Remote root: {profile.remote_root}",
+            f"  Local root: {profile.local_root or 'not mapped'}",
+            f"  Username env: {profile.username_env}",
+            f"  Password env: {profile.password_env}",
+            f"  Rules: {len(profile.rules)}",
         )
     )
 
@@ -966,14 +966,14 @@ def _show_root(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
 ) -> str:
-    _, name, project = _resolve_project(arguments, store)
-    return os.fspath(_require_local_root(name, project))
+    _, name, profile = _resolve_profile(arguments, store)
+    return os.fspath(_require_local_root(name, profile))
 
 
-def _require_local_root(name: str, project: ProjectConfiguration) -> Path:
-    if project.local_root is None:
+def _require_local_root(name: str, profile: ProfileConfiguration) -> Path:
+    if profile.local_root is None:
         raise ConfigurationError(f"profile '{name}' has not been mapped")
-    return Path(project.local_root)
+    return Path(profile.local_root)
 
 
 def _list_local(
@@ -981,12 +981,12 @@ def _list_local(
     store: ConfigurationStore,
     output: TextIO,
 ) -> str:
-    _, name, project = _resolve_project(arguments, store)
-    root = _require_local_root(name, project)
+    _, name, profile = _resolve_profile(arguments, store)
+    root = _require_local_root(name, profile)
     selector = _list_selection(arguments, root)
     raw_snapshot = snapshot_local(
         root,
-        RuleSet(project.rules),
+        RuleSet(profile.rules),
         selector,
         include_excluded=True,
         traverse_excluded=True,
@@ -1011,16 +1011,16 @@ def _list_local(
     if options is not None:
         lines.append(options)
     color = _use_color(output)
-    display_base = _project_relative_current_directory(arguments, root)
+    display_base = _profile_relative_current_directory(arguments, root)
     emitted_directories: set[str] = set()
     for entry in _file_browser_order(
         snapshot.entries,
         path_of=lambda item: item.path,
         directory_of=lambda item: item.kind == "directory",
     ):
-        project_path = PurePosixPath(entry.path)
+        profile_path = PurePosixPath(entry.path)
         try:
-            relative = project_path.relative_to(display_base)
+            relative = profile_path.relative_to(display_base)
         except ValueError as error:
             raise SelectionError(
                 f"selected path '{entry.path}' is outside the display scope"
@@ -1254,15 +1254,15 @@ def _scoped_display_path(
     *,
     display_root: PurePosixPath | None,
 ) -> tuple[int, str]:
-    project_path = PurePosixPath(path)
+    profile_path = PurePosixPath(path)
     if display_root is None:
-        return 0, project_path.as_posix()
-    if project_path == display_root and display_root.parts:
+        return 0, profile_path.as_posix()
+    if profile_path == display_root and display_root.parts:
         return 0, display_root.as_posix()
     relative = (
-        project_path.relative_to(display_root)
+        profile_path.relative_to(display_root)
         if display_root.parts
-        else project_path
+        else profile_path
     )
     depth = len(relative.parts) if display_root.parts else max(
         len(relative.parts) - 1,
@@ -1276,14 +1276,14 @@ def _comparison_ancestors(
     *,
     display_root: PurePosixPath | None,
 ) -> tuple[PurePosixPath, ...]:
-    project_path = PurePosixPath(path)
+    profile_path = PurePosixPath(path)
     start = len(display_root.parts) if display_root is not None else 1
     start = max(start, 1)
     return tuple(
-        PurePosixPath(*project_path.parts[:length])
-        for length in range(start, len(project_path.parts))
+        PurePosixPath(*profile_path.parts[:length])
+        for length in range(start, len(profile_path.parts))
         if display_root is None
-        or project_path.parts[: len(display_root.parts)] == display_root.parts
+        or profile_path.parts[: len(display_root.parts)] == display_root.parts
     )
 
 
@@ -1394,7 +1394,7 @@ def _selection_from_values(
     selectors = tuple(
         FileSelector.from_argument(
             value,
-            project_root=root,
+            profile_root=root,
             current_directory=current_directory,
         )
         for value in values
@@ -1521,7 +1521,7 @@ def _descendant_directories(
     )
 
 
-def _project_relative_current_directory(
+def _profile_relative_current_directory(
     arguments: argparse.Namespace,
     root: Path,
 ) -> PurePosixPath:
@@ -1538,14 +1538,14 @@ def _diff_traversal_roots(
     root: Path,
 ) -> tuple[_DiffTraversalRoot, ...]:
     """Find the narrowest deterministic directories needed by the selection."""
-    base = _project_relative_current_directory(arguments, root)
+    base = _profile_relative_current_directory(arguments, root)
     operands = normalize_pattern_operands(arguments)
     if not operands:
         return (_DiffTraversalRoot(base),)
 
     candidates: list[_DiffTraversalRoot] = []
     for operand in operands:
-        project_path = base / PurePosixPath(operand)
+        profile_path = base / PurePosixPath(operand)
         if operand == ".":
             candidates.append(_DiffTraversalRoot(base))
             continue
@@ -1553,22 +1553,22 @@ def _diff_traversal_roots(
         wildcard_index = next(
             (
                 index
-                for index, part in enumerate(project_path.parts)
+                for index, part in enumerate(profile_path.parts)
                 if "*" in part
             ),
             None,
         )
         if wildcard_index is not None:
-            fixed_parts = project_path.parts[:wildcard_index]
+            fixed_parts = profile_path.parts[:wildcard_index]
             fixed = PurePosixPath(*fixed_parts) if fixed_parts else PurePosixPath()
             candidates.append(_DiffTraversalRoot(fixed))
             continue
 
-        local_path = root.joinpath(*project_path.parts)
+        local_path = root.joinpath(*profile_path.parts)
         if local_path.is_dir() and not local_path.is_symlink():
-            candidates.append(_DiffTraversalRoot(project_path, include_container=True))
+            candidates.append(_DiffTraversalRoot(profile_path, include_container=True))
         else:
-            candidates.append(_DiffTraversalRoot(project_path.parent))
+            candidates.append(_DiffTraversalRoot(profile_path.parent))
 
     ordered = sorted(
         candidates,
@@ -1626,7 +1626,7 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
 
 def _build_plan(
     arguments: argparse.Namespace,
-    project: ProjectConfiguration,
+    profile: ProfileConfiguration,
     root: Path,
     transport: ExplicitFTPSTransport,
     *,
@@ -1634,7 +1634,7 @@ def _build_plan(
     progress: TextIO,
     include_excluded: bool = False,
 ) -> tuple[TreeSnapshot, TreeSnapshot, ComparisonPlan]:
-    rules = RuleSet(project.rules)
+    rules = RuleSet(profile.rules)
     selector = _file_selection(arguments, root)
     print("Scanning local files...", file=progress, flush=True)
     local = snapshot_local(
@@ -1684,13 +1684,13 @@ def _diff(
     progress: TextIO,
     output: TextIO,
 ) -> None:
-    _, name, project = _resolve_project(arguments, store)
-    root = _require_local_root(name, project)
+    _, name, profile = _resolve_profile(arguments, store)
+    root = _require_local_root(name, profile)
     if arguments.resume is not None and not arguments.paged:
         raise ConfigurationError("--resume requires --paged")
     resume = _resume_directory(arguments.resume)
     selector = _file_selection(arguments, root)
-    rules = RuleSet(project.rules)
+    rules = RuleSet(profile.rules)
     direction = "pull" if arguments.pull else "push"
     color = _use_color(output)
     print(f"Checking differences for profile '{name}'...", file=progress, flush=True)
@@ -1730,7 +1730,7 @@ def _diff(
     selected_count = 0
     displayed_count = 0
     emitted_directories: set[str] = set()
-    with ExplicitFTPSTransport(project) as transport:
+    with ExplicitFTPSTransport(profile) as transport:
         if pending and arguments.show_all:
             for line in _scope_header_lines(
                 pending[-1].display_root,
@@ -2059,8 +2059,8 @@ def _transfer(
     store: ConfigurationStore,
     progress: TextIO,
 ) -> tuple[str, TransferResult]:
-    _, name, project = _resolve_project(arguments, store)
-    root = _require_local_root(name, project)
+    _, name, profile = _resolve_profile(arguments, store)
+    root = _require_local_root(name, profile)
     print(
         f"Preparing {arguments.command} for profile '{name}'...",
         file=progress,
@@ -2070,7 +2070,7 @@ def _transfer(
     if options is not None:
         print(options, file=progress, flush=True)
     print("Connecting securely over FTPS...", file=progress, flush=True)
-    with ExplicitFTPSTransport(project) as transport:
+    with ExplicitFTPSTransport(profile) as transport:
         if arguments.command == "push":
             print(
                 "Checking for interrupted uploads...",
@@ -2084,7 +2084,7 @@ def _transfer(
                 print(f"  {recovery}", file=progress, flush=True)
         local, remote, plan = _build_plan(
             arguments,
-            project,
+            profile,
             root,
             transport,
             direction=arguments.command,

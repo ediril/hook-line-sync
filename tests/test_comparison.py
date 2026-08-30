@@ -1,11 +1,11 @@
 import pytest
 
-from hls.comparison import build_comparison
-from hls.selection import FileSelector, SelectionError
-from hls.snapshot import TreeEntry, TreeSnapshot
+from hlsync.comparison import build_comparison
+from hlsync.selection import FileSelector, SelectionError
+from hlsync.snapshot import TreeEntry, TreeSnapshot
 
 
-def test_comparison_projects_push_pull_prune_and_timestamp_precision() -> None:
+def test_comparison_profiles_push_pull_prune_and_timestamp_precision() -> None:
     second = 1_700_000_000_000_000_000
     local = TreeSnapshot(
         (
