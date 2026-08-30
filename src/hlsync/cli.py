@@ -61,6 +61,7 @@ from hlsync.transfer import (
     TransferOperation,
     TransferResult,
     execute_transfer,
+    planned_transfer_operations,
 )
 from hlsync.transport import ExplicitFTPSTransport, PathOperationError, TransportError
 
@@ -173,6 +174,8 @@ def _active_options(arguments: argparse.Namespace) -> str | None:
         options.append("included paths only (-i)")
     if getattr(arguments, "keep_remote", False):
         options.append("keep remote-only paths (-k)")
+    if getattr(arguments, "dry", False):
+        options.append("dry run (--dry)")
     if getattr(arguments, "paged", False):
         options.append("paged output (--paged)")
     if getattr(arguments, "resume", None) is not None:
@@ -594,7 +597,8 @@ def build_parser() -> argparse.ArgumentParser:
         "push": (
             "Push local changes. With no PATH, push the current subtree "
             "recursively. A directory PATH is shallow unless -r. Remote-only "
-            "directory PATHs are deleted recursively unless -k."
+            "directory PATHs are deleted recursively unless -k. Use --dry to "
+            "preview the exact push without changing either side."
         ),
         "pull": (
             "Pull requires a PATH. A directory PATH is shallow unless -r; "
@@ -612,7 +616,7 @@ def build_parser() -> argparse.ArgumentParser:
                     if command == "pull"
                     else "hlsync [PROFILE] push [PATH ...] [-r]"
                 )
-                + (" [-k]" if command == "push" else "")
+                + (" [-k] [--dry]" if command == "push" else "")
             ),
         )
         add_pattern_operands(
@@ -641,6 +645,11 @@ def build_parser() -> argparse.ArgumentParser:
                 "--keep-remote",
                 action="store_true",
                 help="retain selected remote-only paths",
+            )
+            transfer_parser.add_argument(
+                "--dry",
+                action="store_true",
+                help="show the exact push without changing either side",
             )
 
     help_parser = subparsers.add_parser("help", help="show command help")
@@ -2090,6 +2099,7 @@ def _build_plan(
     direction: str,
     progress: TextIO,
     include_excluded: bool = False,
+    recover_artifacts: bool = True,
 ) -> tuple[TreeSnapshot, TreeSnapshot, ComparisonPlan]:
     selector = _file_selection(arguments, root)
     prune_remote = direction == "push" and not getattr(
@@ -2119,6 +2129,10 @@ def _build_plan(
     def report_recovery(message: str) -> None:
         print(f"  {message}", file=progress, flush=True)
 
+    artifact_options: dict[str, Callable[[str], None]] = {}
+    if direction == "push":
+        option = "artifact_recovery" if recover_artifacts else "artifact_preview"
+        artifact_options[option] = report_recovery
     remote = transport.snapshot(
         rules,
         remote_selector,
@@ -2131,7 +2145,7 @@ def _build_plan(
                 or expanded_remote_deletion
             )
         ),
-        artifact_recovery=report_recovery if direction == "push" else None,
+        **artifact_options,
     )
     print("Comparing local and remote files...", file=progress, flush=True)
     plan = build_comparison(
@@ -2557,11 +2571,41 @@ def _report_transfer_operation(
     )
 
 
+def _format_dry_push(
+    name: str,
+    plan: ComparisonPlan,
+    remote: TreeSnapshot,
+) -> str:
+    operations = planned_transfer_operations(plan, remote)
+    lines = [f"Dry push for profile '{name}':"]
+    if operations:
+        for operation in operations:
+            suffix = "/" if operation.kind == "directory" else ""
+            lines.append(
+                f"  Would {operation.action:<6} {operation.path}{suffix}"
+            )
+        count = len(operations)
+        lines.append(f"{count} change{'s' if count != 1 else ''} would be made.")
+    else:
+        unchanged_files = sum(
+            entry.action == "unchanged" and entry.local_kind == "file"
+            for entry in plan.entries
+        )
+        nothing = "  Nothing to push"
+        if unchanged_files:
+            noun = "file is" if unchanged_files == 1 else "files are"
+            nothing += f"; {unchanged_files} {noun} up to date in this scope"
+        lines.append(f"{nothing}.")
+    if any(entry.action == "skip" for entry in plan.entries):
+        lines.append("Remote-only paths would be retained by --keep-remote.")
+    return "\n".join(lines)
+
+
 def _transfer(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
     progress: TextIO,
-) -> tuple[str, TransferResult]:
+) -> tuple[str, bool]:
     _, name, profile = _resolve_profile(arguments, store)
     root = _require_local_root(name, profile)
     print(
@@ -2582,7 +2626,10 @@ def _transfer(
             direction=arguments.command,
             progress=progress,
             include_excluded=arguments.command == "push",
+            recover_artifacts=not getattr(arguments, "dry", False),
         )
+        if getattr(arguments, "dry", False):
+            return _format_dry_push(name, plan, remote), True
         executable_actions = {
             "create-remote",
             "upload",
@@ -2606,7 +2653,7 @@ def _transfer(
                 progress,
             ),
         )
-    return name, result
+    return _format_transfer(name, result), result.succeeded
 
 
 def _show_help(
@@ -2683,9 +2730,8 @@ def run(
             _diff(arguments, configuration_store, stderr, stdout)
             message = None
         elif arguments.command in {"push", "pull"}:
-            name, result = _transfer(arguments, configuration_store, stderr)
-            message = _format_transfer(name, result)
-            if not result.succeeded:
+            message, succeeded = _transfer(arguments, configuration_store, stderr)
+            if not succeeded:
                 exit_status = 1
         elif arguments.command == "help":
             message = _show_help(parser, arguments.topic, stdin, stdout)

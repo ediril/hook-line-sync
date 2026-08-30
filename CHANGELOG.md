@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.30.20 — 2026-08-30
+
+### Added
+
+- Add read-only `push --dry` using push's exact traversal, pruning, recovery
+  projection, and ordered operation plan.
+
+### Changed
+
+- Derive dry-run output and transfer execution from one operation sequence.
+
 ## 0.8.30.19 — 2026-08-30
 
 ### Changed

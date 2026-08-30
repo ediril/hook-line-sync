@@ -368,6 +368,27 @@ def test_push_artifact_recovery_cleans_staging_and_restores_missing_destination(
         )
 
     monkeypatch.setattr(transport, "list_directory", list_directory)
+    preview_messages = []
+    preview = transport.snapshot(
+        RuleSet(),
+        FileSelector("templates/*"),
+        artifact_preview=preview_messages.append,
+    )
+
+    assert listed_directories == [".", "templates"]
+    assert client.deleted == []
+    assert client.renamed == []
+    assert [entry.path for entry in preview.entries] == [
+        "templates/about.php",
+        "templates/missing.php",
+    ]
+    assert preview_messages == [
+        f"Would remove abandoned upload '{upload}'.",
+        f"Would remove old backup '{old_backup}'.",
+        "Would restore interrupted replacement 'templates/missing.php'.",
+    ]
+
+    listed_directories.clear()
     messages = []
     transport.snapshot(
         RuleSet(),

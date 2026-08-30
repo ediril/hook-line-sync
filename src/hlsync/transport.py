@@ -39,6 +39,14 @@ class _HLSyncArtifact:
     kind: str
 
 
+@dataclass(frozen=True)
+class _ArtifactRecoveryPlan:
+    projected: TreeSnapshot
+    uploads_to_remove: tuple[str, ...]
+    backups_to_remove: tuple[str, ...]
+    backups_to_restore: tuple[tuple[str, str], ...]
+
+
 def _hlsync_artifact(path: str) -> _HLSyncArtifact | None:
     remote = PurePosixPath(path)
     match = _HLSYNC_ARTIFACT_NAME.fullmatch(remote.name)
@@ -104,6 +112,7 @@ class RemoteTransport(Protocol):
         include_excluded: bool = False,
         traverse_excluded: bool = False,
         artifact_recovery: Callable[[str], None] | None = None,
+        artifact_preview: Callable[[str], None] | None = None,
     ) -> TreeSnapshot: ...
 
     def list_directory(
@@ -194,6 +203,7 @@ class ExplicitFTPSTransport:
         include_excluded: bool = False,
         traverse_excluded: bool = False,
         artifact_recovery: Callable[[str], None] | None = None,
+        artifact_preview: Callable[[str], None] | None = None,
     ) -> TreeSnapshot:
         if self._client is None:
             raise TransportError("FTPS transport is not connected")
@@ -202,11 +212,22 @@ class ExplicitFTPSTransport:
         def walk(relative_directory: PurePosixPath) -> None:
             listing = self.list_directory(relative_directory, rules)
             if artifact_recovery is not None:
-                recoveries = self._recover_artifacts(listing, selector)
+                recoveries = self._recover_artifacts(listing, selector, rules)
                 for recovery in recoveries:
                     artifact_recovery(recovery)
                 if recoveries:
                     listing = self.list_directory(relative_directory, rules)
+            elif artifact_preview is not None:
+                recovery = self._plan_artifact_recovery(listing, selector, rules)
+                for path in recovery.uploads_to_remove:
+                    artifact_preview(f"Would remove abandoned upload '{path}'.")
+                for path in recovery.backups_to_remove:
+                    artifact_preview(f"Would remove old backup '{path}'.")
+                for _, destination in recovery.backups_to_restore:
+                    artifact_preview(
+                        f"Would restore interrupted replacement '{destination}'."
+                    )
+                listing = recovery.projected
             for entry in listing.entries:
                 relative_path = entry.path
                 relative = PurePosixPath(relative_path)
@@ -358,11 +379,12 @@ class ExplicitFTPSTransport:
                 f"could not create remote directory '{path}': {error}"
             ) from error
 
-    def _recover_artifacts(
+    def _plan_artifact_recovery(
         self,
         listing: TreeSnapshot,
         selector: FileSelection | None,
-    ) -> tuple[str, ...]:
+        rules: RuleSet,
+    ) -> _ArtifactRecoveryPlan:
         entries = {entry.path: entry for entry in listing.entries}
         artifacts = tuple(
             artifact
@@ -377,12 +399,12 @@ class ExplicitFTPSTransport:
                     f"reserved HLSync artifact is not a file: '{artifact.path}'"
                 )
 
-        messages: list[str] = []
-        for artifact in artifacts:
-            if artifact.kind != "upload":
-                continue
-            self.delete_path(artifact.path, is_directory=False)
-            messages.append(f"Removed abandoned upload '{artifact.path}'.")
+        uploads = tuple(
+            artifact.path for artifact in artifacts if artifact.kind == "upload"
+        )
+        projected = dict(entries)
+        for path in uploads:
+            projected.pop(path)
 
         backups_by_destination: dict[str, list[_HLSyncArtifact]] = {}
         for artifact in artifacts:
@@ -391,7 +413,8 @@ class ExplicitFTPSTransport:
                     artifact.destination,
                     [],
                 ).append(artifact)
-        client = self._connected_client()
+        obsolete_backups: list[str] = []
+        restorations: list[tuple[str, str]] = []
         for destination, backups in sorted(backups_by_destination.items()):
             if destination not in entries and len(backups) > 1:
                 names = ", ".join(backup.path for backup in backups)
@@ -401,20 +424,55 @@ class ExplicitFTPSTransport:
                 )
             if destination in entries:
                 for backup in backups:
-                    self.delete_path(backup.path, is_directory=False)
-                    messages.append(f"Removed old backup '{backup.path}'.")
+                    projected.pop(backup.path)
+                    obsolete_backups.append(backup.path)
                 continue
             backup = backups[0]
+            projected.pop(backup.path)
+            source = entries[backup.path]
+            projected[destination] = TreeEntry(
+                destination,
+                "file",
+                size=source.size,
+                modified_ns=source.modified_ns,
+                timestamp_precision_ns=source.timestamp_precision_ns,
+                excluded=rules.excludes(destination, target="local"),
+                remote_excluded=rules.excludes(destination, target="remote"),
+            )
+            restorations.append((backup.path, destination))
+        return _ArtifactRecoveryPlan(
+            TreeSnapshot(tuple(projected[path] for path in sorted(projected))),
+            uploads,
+            tuple(obsolete_backups),
+            tuple(restorations),
+        )
+
+    def _recover_artifacts(
+        self,
+        listing: TreeSnapshot,
+        selector: FileSelection | None,
+        rules: RuleSet,
+    ) -> tuple[str, ...]:
+        recovery = self._plan_artifact_recovery(listing, selector, rules)
+        messages: list[str] = []
+        for path in recovery.uploads_to_remove:
+            self.delete_path(path, is_directory=False)
+            messages.append(f"Removed abandoned upload '{path}'.")
+        for path in recovery.backups_to_remove:
+            self.delete_path(path, is_directory=False)
+            messages.append(f"Removed old backup '{path}'.")
+        client = self._connected_client()
+        for backup, destination in recovery.backups_to_restore:
             try:
-                client.rename(backup.path, destination)
+                client.rename(backup, destination)
             except ftplib.error_perm as error:
                 raise PathOperationError(
-                    f"could not restore HLSync backup '{backup.path}' to "
+                    f"could not restore HLSync backup '{backup}' to "
                     f"'{destination}': {error}"
                 ) from error
             except (OSError, ftplib.Error, ssl.SSLError) as error:
                 raise TransportError(
-                    f"could not restore HLSync backup '{backup.path}' to "
+                    f"could not restore HLSync backup '{backup}' to "
                     f"'{destination}': {error}"
                 ) from error
             messages.append(

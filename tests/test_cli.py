@@ -107,6 +107,10 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     push_help = invoke(["help", "push"], store)[1]
     compact_push_help = " ".join(push_help.split())
     assert "-k, --keep-remote" in push_help
+    assert "--dry" in push_help
+    assert "preview the exact push without changing either side" in (
+        compact_push_help
+    )
     assert "--prune-remote" not in push_help
     assert "With no PATH, push the current subtree recursively." in (
         compact_push_help
@@ -652,6 +656,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     operations = []
     listed_directories = []
     snapshot_traversal = []
+    artifact_recovery_callbacks = []
     serve_orphan_directory = False
 
     class FakeTransport:
@@ -672,8 +677,12 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
             include_excluded=False,
             traverse_excluded=False,
             artifact_recovery=None,
+            artifact_preview=None,
         ):
             snapshot_traversal.append(traverse_excluded)
+            artifact_recovery_callbacks.append(
+                (artifact_recovery, artifact_preview)
+            )
             assert rules.rules == expected_rules
             entries = []
             if serve_orphan_directory:
@@ -978,6 +987,16 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         run(["pull"], store=store)
 
     monkeypatch.chdir(source)
+    dry_push = invoke(["push", "--dry"], store)
+    assert dry_push[0] == 0
+    assert "Options: dry run (--dry).\n" in dry_push[2]
+    assert "Dry push for profile 'prod':\n" in dry_push[1]
+    assert "Would add    src/nested/child.py\n" in dry_push[1]
+    assert "would be made.\n" in dry_push[1]
+    assert artifact_recovery_callbacks[-1][0] is None
+    assert artifact_recovery_callbacks[-1][1] is not None
+    assert operations == []
+
     recursive_push = invoke(["push"], store)
     assert recursive_push[0] == 0
     assert ("upload", "src/nested/child.py", b"child", 5, False) in operations

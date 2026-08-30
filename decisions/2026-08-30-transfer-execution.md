@@ -21,6 +21,12 @@ depends on the remote-only retention option.
 Remote-excluded directories are never entered, including for artifact
 recovery.
 
+`push --dry` uses the same selection, comparison, pruning, and ordered operation
+planning as push but executes no operation. Artifact recovery is projected into
+the snapshot and reported without deleting or renaming artifacts, so the dry
+plan reflects the state a real push would compare after recovery while
+remaining read-only.
+
 Pull replaces changed local files but never downloads remote-only paths. Each
 download is written and synced beside its destination, verifies size, preserves
 existing local permissions, applies the remote timestamp, and atomically

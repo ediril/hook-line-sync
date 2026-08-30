@@ -346,6 +346,19 @@ including remote copies of locally excluded paths. `-k` /
 enumerated because deleting that directory requires deleting its contents.
 Bare `push` remains recursive by definition.
 
+Preview the exact push scope and operation order without changing either side:
+
+```console
+hlsync push --dry
+hlsync push templates --dry
+hlsync push templates -r --dry
+```
+
+Unlike bare `diff`, bare `push --dry` inherits push's recursive default. It
+also honors `-k`, remote exclusions, and explicit directory depth exactly as a
+real push would. Interrupted-upload recovery is projected and reported but not
+performed.
+
 Transfers print `Adding`, `Updating`, `Creating`, or `Deleting` with the path
 immediately before each operation begins, then finish with a compact count.
 When no operation is needed, HLSync prints `Nothing to push` or `Nothing to
