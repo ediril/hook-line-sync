@@ -1,6 +1,6 @@
 # Selection and traversal scopes
 
-Date: 2026-08-24
+Date: 2026-08-29
 
 ## Decision
 
@@ -16,9 +16,9 @@ current directory and fails outside every mapped root. A leading profile, such
 as `hlsync staging diff`, is an explicit one-command override whose virtual
 working directory is that profile's root; it does not change the process
 working directory or persist selection. Absolute paths, parent traversal, and
-paths escaping the root are rejected.
-A union that matches no eligible path on either side is an error; one unmatched
-operand does not invalidate an otherwise matched union.
+paths escaping the root are rejected. A union that matches no eligible path on
+either side is an error; one unmatched operand does not invalidate an otherwise
+matched union.
 
 Selection constrains traversal before comparison. A literal directory starts
 directly at that directory; a wildcard starts at its narrowest fixed prefix.
@@ -35,14 +35,21 @@ boundary, not an executable transfer action. It may be displayed with `▸`, but
 push and pull do not create, replace, or delete it. A selected directory itself
 may still be created as a required parent of selected files.
 
+The virtual working directory from a leading profile applies to path-oriented
+inspection and transfer commands. It does not replace the real current
+directory when `map` implicitly proposes a local root. Supplying
+`map --local-root` selects that explicit root, while a remote-root-only change
+preserves the profile's existing local root.
+
 ## Rationale
 
-Shallow explicit scopes make ordinary inspection predictable and avoid needless
-FTP listings. Recursive transfer of the current tree remains convenient for the
-primary deployment operation, while pull requires the user to name what may be
-overwritten locally. Requiring either mapped-directory context or an explicit
-per-command profile prevents hidden state from directing work at an unintended
-deployment target.
+Shallow explicit scopes make ordinary inspection predictable and avoid
+needless FTP listings. Recursive transfer of the current tree remains
+convenient for the primary deployment operation, while pull requires the user
+to name what may be overwritten locally. Selecting before traversal avoids
+unrelated remote work. Keeping implicit remapping tied to the real current
+directory prevents a profile override from disguising which local path would
+be recorded.
 
 ## Intentionally excluded
 
@@ -54,5 +61,4 @@ deployment target.
 - Falling back to a previously selected profile outside mapped roots.
 - Treating a visible untraversed directory as authorization to mutate it.
 - Treating pruning authorization as recursive selection.
-- Applying the virtual working directory to `map`, whose purpose is to map the
-  real current directory.
+- Using a leading profile's virtual root as `map`'s implicit local root.

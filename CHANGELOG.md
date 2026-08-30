@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.29.14 — 2026-08-29
+
+### Changed
+
+- Consolidate obsolete profile-selection and mapping decisions into a current
+  profile model, and replace the traversal decision with a newly dated version
+  that reflects explicit local and remote root editing.
+
 ## 0.8.29.13 — 2026-08-29
 
 ### Changed

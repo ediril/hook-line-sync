@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Consolidate obsolete profile decisions and supersede stale traversal
+  guidance with newly dated decisions.
 - [x] Rename `add` to `create`, standardize profile terminology, and let `map`
   update either mapping root atomically.
 - [x] Clarify the alternate local-folder prompt in `create`.
