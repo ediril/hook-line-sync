@@ -893,6 +893,8 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "\033[31mdeployed.html\033[0m\n" in pruned_comparison[1]
     assert "archive/ ▸" in pruned_comparison[1]
     assert "\033[31m-\033[0m" in pruned_comparison[1]
+    assert "l\033[0m \033[90mx\033[0m" in pruned_comparison[1]
+    assert "node_modules/" in pruned_comparison[1]
     assert "src/" not in pruned_comparison[1]
     assert "same.txt" not in pruned_comparison[1]
     kept_comparison = invoke(["diff", "-k"], store, terminal_output=True)
@@ -951,6 +953,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     all_included = invoke(["diff", "**", "--all", "-i"], store)
     assert "  = same.txt" in all_included[1]
     assert "  r - debug.log\n" in all_included[1]
+    assert "node_modules" not in all_included[1]
     with monkeypatch.context() as no_color:
         no_color.setenv("NO_COLOR", "1")
         uncolored_comparison = invoke(
@@ -1098,6 +1101,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
 
 
 def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("NO_COLOR", raising=False)
     store = ConfigurationStore(tmp_path / "configs.json")
     workspace = tmp_path / "workspace"
     protected = workspace / "future-dir"
@@ -1190,6 +1194,9 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
     remote_listing = invoke(["lsr"], store)
     assert remote_listing[0] == 0
     assert "r x future-dir/\n" in remote_listing[1]
+    colored_boundary = invoke(["diff", "-r"], store, terminal_output=True)[1]
+    assert "\033[38;5;30mr\033[0m \033[90mx\033[0m" in colored_boundary
+    assert "\033[90mfuture-dir/\033[0m" in colored_boundary
 
     pushed = invoke(["push"], store)
     assert pushed[0] == 0

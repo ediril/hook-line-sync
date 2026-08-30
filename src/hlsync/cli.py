@@ -1360,7 +1360,12 @@ def _list_remote(
         entry: TreeEntry,
     ) -> tuple[str, str | None, bool, str | None]:
         if entry.remote_excluded:
-            return "r x", _EXCLUDED_REMOTE_COLOR, True, _EXCLUDED_REMOTE_COLOR
+            return (
+                "r x",
+                _DIFF_MARKER_COLORS["x"],
+                True,
+                _DIFF_MARKER_COLORS["x"],
+            )
         if entry.excluded:
             return "r !", _EXCLUDED_REMOTE_COLOR, True, _EXCLUDED_REMOTE_COLOR
         return " ", None, False, None
@@ -1409,7 +1414,7 @@ def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
 def _comparison_marker_color(marker: str) -> str | None:
     action = marker[-1]
     if marker == "r x":
-        return _EXCLUDED_REMOTE_COLOR
+        return _DIFF_MARKER_COLORS["x"]
     return _DIFF_MARKER_COLORS.get(action) or _DIFF_MARKER_COLORS.get(marker.strip())
 
 
@@ -1590,7 +1595,11 @@ def _format_comparison_entries(
             else _comparison_marker(entry, direction)
         )
         remote_exclusion_color = (
-            _EXCLUDED_REMOTE_COLOR
+            (
+                _DIFF_MARKER_COLORS["x"]
+                if entry.state == "remote-excluded"
+                else _EXCLUDED_REMOTE_COLOR
+            )
             if entry.action == "excluded" and entry.remote_kind is not None
             else None
         )
@@ -2332,7 +2341,7 @@ def _diff(
                             entry.action
                             not in {"unchanged", "excluded", "untraversed"}
                             or (
-                                entry.state == "remote-excluded"
+                                entry.action == "excluded"
                                 and not arguments.included_only
                             )
                             or (

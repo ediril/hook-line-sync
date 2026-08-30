@@ -294,10 +294,10 @@ hlsync diff -k
 ```
 
 `--pull` changes the perspective for changed existing files and retains
-remote-only paths. Diff normally shows only actionable differences, retained
-one-sided paths, and conflicts. Use `-a`/`--all` to restore the exploratory
-view with unchanged and excluded paths. Combine `--all` with
-`-i`/`--inc`/`--included-only` to keep unchanged paths while hiding exclusions.
+remote-only paths. Diff normally shows actionable differences, retained
+one-sided paths, conflicts, and local or remote exclusion boundaries. Use
+`-i`/`--inc`/`--included-only` to hide exclusions. Use `-a`/`--all` to restore
+unchanged and untraversed entries for the complete exploratory view.
 
 For push authority, a locally excluded path is treated as absent. If it exists
 remotely, default diff marks its deletion as `r -`; `diff -k --all` marks the

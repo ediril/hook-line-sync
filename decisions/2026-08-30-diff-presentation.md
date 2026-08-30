@@ -27,9 +27,10 @@ uninspected by diff. `-r` expands the subtree. An explicit shallow operand does
 not inherit bare push recursion, so its unentered remote-only child is retained
 and shown as `r folder/ ▸`.
 
-Diff defaults to operational entries and remote-excluded boundaries, and omits
-unchanged, neutral local exclusions, and untraversed entries. `-a` / `--all`
-restores the complete exploratory view.
+Diff defaults to operational entries plus local- and remote-excluded
+boundaries, and omits unchanged and untraversed entries. `-i` hides neutral
+exclusions while preserving actionable deletion, and `-a` / `--all` restores
+the complete exploratory view.
 Color respects `NO_COLOR` and redirected output and has no command-line
 override. `hlsync --legend` renders the symbol and color reference without
 loading a profile or connecting to FTPS.

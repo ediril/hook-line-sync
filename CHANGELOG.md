@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.30.12 — 2026-08-30
+
+### Changed
+
+- Show neutral local exclusions as `l x` in compact diff alongside remote
+  exclusions shown as `r x`; `-i` hides both.
+- Render remote-exclusion `x` markers and paths in neutral gray rather than the
+  attention color reserved for locally excluded paths still present remotely.
+
 ## 0.8.30.11 — 2026-08-30
 
 ### Changed
