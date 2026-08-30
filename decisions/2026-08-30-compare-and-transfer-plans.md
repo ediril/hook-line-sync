@@ -19,6 +19,11 @@ is deleted by default and retained under `--keep-remote`.
 Remote exclusions are synchronization boundaries instead: the planner emits a
 non-executable excluded entry for the boundary and suppresses every operation
 beneath an excluded remote directory.
+When an explicit operand is absent from local authority but resolves to a
+remote directory, push snapshots the complete remote subtree so the plan can
+delete files and directories deepest-first. A deletion directory containing a
+remote-excluded descendant is retained rather than attempted as an impossible
+nonempty-directory removal.
 
 ## Rationale
 

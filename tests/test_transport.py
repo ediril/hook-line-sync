@@ -13,7 +13,7 @@ from pyftpdlib.servers import FTPServer
 from hlsync.comparison import build_comparison
 from hlsync.config import ProfileConfiguration
 from hlsync.rules import RuleSet, SyncRule
-from hlsync.selection import FileSelector
+from hlsync.selection import FileSelector, FileSelectorSet
 from hlsync.snapshot import TreeEntry, TreeSnapshot, snapshot_local
 from hlsync.transfer import TransferOperation, execute_transfer
 from hlsync.transport import (
@@ -498,11 +498,36 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             progress=progress.append,
         )
         assert not orphan.exists()
+        orphan_directory = remote_root / "orphan-dir"
+        orphan_directory.mkdir()
+        (orphan_directory / "child.txt").write_text("delete me", encoding="utf-8")
+        directory_selector = FileSelectorSet(
+            (FileSelector("orphan-dir"), FileSelector("orphan-dir/**"))
+        )
+        local = snapshot_local(local_root, rules, directory_selector)
+        remote = transport.snapshot(rules, directory_selector)
+        directory_prune = build_comparison(
+            local,
+            remote,
+            prune_remote=True,
+            selector=directory_selector,
+        )
+        execute_transfer(
+            directory_prune,
+            local_root=local_root,
+            local=local,
+            remote=remote,
+            transport=transport,
+            progress=progress.append,
+        )
+        assert not orphan_directory.exists()
         assert progress == [
             TransferOperation("create", "nested", "directory"),
             TransferOperation("add", "nested/selected.txt", "file"),
             TransferOperation("update", "nested/selected.txt", "file"),
             TransferOperation("delete", "orphan.txt", "file"),
+            TransferOperation("delete", "orphan-dir/child.txt", "file"),
+            TransferOperation("delete", "orphan-dir", "directory"),
         ]
 
 

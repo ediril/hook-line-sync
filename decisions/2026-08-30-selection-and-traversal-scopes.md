@@ -40,6 +40,13 @@ boundary, not an executable action. It may be displayed with `▸`, but transfer
 does not create, replace, or delete its contents. A selected directory itself
 may still be created as a required parent of selected files.
 
+An explicitly selected path that is absent from local authority is different:
+if it resolves to a remote directory, push expands that deletion scope through
+the complete remote subtree. FTP cannot remove a nonempty directory, and the
+explicit operand already authorizes deletion of that directory. Remote
+exclusion boundaries remain untouched and force their deletion ancestors to be
+retained.
+
 ## Rationale
 
 Shallow explicit scopes keep inspection predictable and bound deletion to what

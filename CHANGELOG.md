@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.8.30.11 — 2026-08-30
+
+### Changed
+
+- Advertise `lsr` in the main command help and list usage as the shorthand for
+  `list --remote`.
+
+## 0.8.30.10 — 2026-08-30
+
+### Added
+
+- Add `hlsync list --remote` and the `hlsync lsr` shorthand with the
+  same selection and recursion controls as local listing.
+
+### Fixed
+
+- Fully enumerate an explicitly selected remote-only directory before push so
+  its contents are deleted deepest-first instead of issuing `RMD` against a
+  nonempty directory.
+- Retain a deletion ancestor when it contains a remote-excluded boundary.
+
 ## 0.8.30.9 — 2026-08-30
 
 ### Added

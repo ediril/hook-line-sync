@@ -229,7 +229,7 @@ parent traversal, and paths escaping the mapped root are rejected.
 
 | Command | No path | Explicit directory | With `-r` |
 | --- | --- | --- | --- |
-| `list` | Current directory, one level | Directory contents, one level | Include descendants |
+| `list` / `list --remote` | Current directory, one level | Directory contents, one level | Include descendants |
 | `diff` | Current directory, one level | Directory contents, one level | Include descendants |
 | `push` | Complete current subtree | Directory contents, one level | Include descendants |
 | `pull` | Error: path required | Directory contents, one level | Include descendants |
@@ -237,9 +237,11 @@ parent traversal, and paths escaping the mapped root are rejected.
 `.` explicitly selects the current directory. An immediate child directory
 outside the traversal depth appears with `▸` but is diagnostic-only: it is not
 created, replaced, deleted, or entered. The selected directory itself may be
-created when selected files require it as their parent.
+created when selected files require it as their parent. An explicitly selected
+remote-only directory is the deletion target itself, so push enumerates that
+remote subtree and removes its contents deepest-first.
 
-## Local listing
+## Local and remote listing
 
 `list` reads only the local filesystem, includes dotfiles, and applies the
 configured rules:
@@ -251,6 +253,18 @@ hlsync list '*.md'
 hlsync list -r
 hlsync list -r -i
 ```
+
+Use `--remote`—or the `lsr` shorthand—to inspect the equivalent FTPS
+tree with the same operands and traversal controls:
+
+```console
+hlsync list --remote
+hlsync list --remote templates -r
+hlsync lsr
+```
+
+Remote listing connects read-only. Remote-excluded paths use `r x` and their
+directories are shown as boundaries without being entered.
 
 Directories appear before files at each level, with each group sorted by name.
 Directories end in `/`; excluded paths use `x`. `-i`, `--inc`, and
@@ -330,9 +344,10 @@ changed existing local files but never restores a missing local path. Locally
 excluded paths are never uploaded or pulled; remote-excluded paths are not
 traversed or changed. Push deletes selected remote-only paths by default,
 including remote copies of locally excluded paths. `-k` /
-`--keep-remote` retains them. Deletion does not add traversal depth: an explicit
-directory remains shallow unless `-r` is supplied. Bare `push` remains recursive
-by definition.
+`--keep-remote` retains them. An included local directory remains shallow unless
+`-r` is supplied. An explicitly selected remote-only directory is fully
+enumerated because deleting that directory requires deleting its contents.
+Bare `push` remains recursive by definition.
 
 Transfers print `Adding`, `Updating`, `Creating`, or `Deleting` with the path
 immediately before each operation begins, then finish with a compact count.

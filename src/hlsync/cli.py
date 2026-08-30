@@ -123,7 +123,7 @@ CANONICAL_COMMANDS = (
     "help",
     "version",
 )
-COMMAND_ALIASES = {"ls": "list"}
+COMMAND_ALIASES = {"ls": "list", "lsr": "list"}
 PROFILE_AWARE_COMMANDS = frozenset(
     {
         "connect",
@@ -155,6 +155,8 @@ def _add_included_only_argument(parser: argparse.ArgumentParser) -> None:
 
 def _active_options(arguments: argparse.Namespace) -> str | None:
     options: list[str] = []
+    if getattr(arguments, "remote", False):
+        options.append("remote (--remote)")
     if getattr(arguments, "pull", False):
         options.append("pull perspective (--pull)")
     if getattr(arguments, "recursive", False):
@@ -242,11 +244,17 @@ def _resolve_invocation(
     ):
         profile_name = validate_profile_name(first)
         raw_arguments = raw_arguments[1:]
+        remote_list_alias = raw_arguments[0] == "lsr"
         raw_arguments[0] = _resolve_command_name(
             raw_arguments[0], stdin=stdin, stdout=stdout
         )
+        if remote_list_alias:
+            raw_arguments.insert(1, "--remote")
         return raw_arguments, profile_name
+    remote_list_alias = first == "lsr"
     raw_arguments[0] = _resolve_command_name(first, stdin=stdin, stdout=stdout)
+    if remote_list_alias:
+        raw_arguments.insert(1, "--remote")
     return raw_arguments, None
 
 
@@ -452,11 +460,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     list_parser = subparsers.add_parser(
         "list",
-        help="list the current local directory and exclusion status",
-        usage="hlsync [PROFILE] list [-r] [-i] [PATH ...]",
+        aliases=("lsr",),
+        help="list the current local or remote directory",
+        usage=(
+            "hlsync [PROFILE] list [--remote] [-r] [-i] [PATH ...]\n"
+            "       hlsync [PROFILE] lsr [-r] [-i] [PATH ...]"
+        ),
         description=(
-            "List selected paths in the current mapped local directory, "
-            "including dotfiles and exclusion status, without connecting to FTPS."
+            "List selected paths and exclusion status. Local listing is the "
+            "default and does not connect; --remote reads the mapped FTPS tree."
         ),
     )
     add_pattern_operands(
@@ -466,6 +478,11 @@ def build_parser() -> argparse.ArgumentParser:
             "relative file paths or wildcard patterns; defaults to immediate "
             "contents of the current directory"
         ),
+    )
+    list_parser.add_argument(
+        "--remote",
+        action="store_true",
+        help="list the mapped remote directory over FTPS",
     )
     list_parser.add_argument(
         "-r",
@@ -1190,6 +1207,73 @@ def _require_local_root(name: str, profile: ProfileConfiguration) -> Path:
     return Path(profile.local_root)
 
 
+def _format_tree_listing(
+    arguments: argparse.Namespace,
+    snapshot: TreeSnapshot,
+    *,
+    heading: str,
+    empty_message: str,
+    display_base: PurePosixPath,
+    output: TextIO,
+    status_for: Callable[
+        [TreeEntry], tuple[str, str | None, bool, str | None]
+    ],
+) -> str:
+    if not snapshot.entries:
+        return empty_message
+    lines = [heading]
+    options = _active_options(arguments)
+    if options is not None:
+        lines.append(options)
+    color = _use_color(output)
+    emitted_directories: set[str] = set()
+    for entry in _file_browser_order(
+        snapshot.entries,
+        path_of=lambda item: item.path,
+        directory_of=lambda item: item.kind == "directory",
+    ):
+        profile_path = PurePosixPath(entry.path)
+        try:
+            relative = profile_path.relative_to(display_base)
+        except ValueError as error:
+            raise SelectionError(
+                f"selected path '{entry.path}' is outside the display scope"
+            ) from error
+        for index, part in enumerate(relative.parts[:-1]):
+            ancestor = display_base / PurePosixPath(*relative.parts[: index + 1])
+            ancestor_path = ancestor.as_posix()
+            if ancestor_path in emitted_directories:
+                continue
+            lines.append(
+                _format_path_line(
+                    " ",
+                    directory=True,
+                    path=part,
+                    depth=index,
+                    color=color,
+                    marker_color=None,
+                    excluded=False,
+                )
+            )
+            emitted_directories.add(ancestor_path)
+        marker, marker_color, excluded, path_color = status_for(entry)
+        lines.append(
+            _format_path_line(
+                marker,
+                directory=entry.kind == "directory",
+                path=relative.name,
+                depth=max(len(relative.parts) - 1, 0),
+                color=color,
+                marker_color=marker_color,
+                excluded=excluded,
+                path_color=path_color,
+            )
+        )
+        if entry.kind == "directory":
+            emitted_directories.add(entry.path)
+    return "\n".join(lines)
+
+
 def _list_local(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
@@ -1218,59 +1302,78 @@ def _list_local(
             and (not arguments.included_only or not entry.excluded)
         )
     )
-    if not snapshot.entries:
-        return f"Local tree for profile '{name}' is empty."
-    lines = [f"Local tree for profile '{name}':"]
-    options = _active_options(arguments)
-    if options is not None:
-        lines.append(options)
-    color = _use_color(output)
     display_base = _profile_relative_current_directory(arguments, root)
-    emitted_directories: set[str] = set()
-    for entry in _file_browser_order(
-        snapshot.entries,
-        path_of=lambda item: item.path,
-        directory_of=lambda item: item.kind == "directory",
-    ):
-        profile_path = PurePosixPath(entry.path)
-        try:
-            relative = profile_path.relative_to(display_base)
-        except ValueError as error:
-            raise SelectionError(
-                f"selected path '{entry.path}' is outside the display scope"
-            ) from error
-        for index, part in enumerate(relative.parts[:-1]):
-            ancestor = (display_base / PurePosixPath(*relative.parts[: index + 1]))
-            ancestor_path = ancestor.as_posix()
-            if ancestor_path in emitted_directories:
-                continue
-            lines.append(
-                _format_path_line(
-                    " ",
-                    directory=True,
-                    path=part,
-                    depth=index,
-                    color=color,
-                    marker_color=None,
-                    excluded=False,
-                )
-            )
-            emitted_directories.add(ancestor_path)
-        marker = "x" if entry.excluded else " "
-        lines.append(
-            _format_path_line(
-                marker,
+    return _format_tree_listing(
+        arguments,
+        snapshot,
+        heading=f"Local tree for profile '{name}':",
+        empty_message=f"Local tree for profile '{name}' is empty.",
+        display_base=display_base,
+        output=output,
+        status_for=lambda entry: (
+            "x" if entry.excluded else " ",
+            "\033[90m" if entry.excluded else None,
+            entry.excluded,
+            None,
+        ),
+    )
+
+
+def _list_remote(
+    arguments: argparse.Namespace,
+    store: ConfigurationStore,
+    progress: TextIO,
+    output: TextIO,
+) -> str:
+    _, name, profile = _resolve_profile(arguments, store)
+    root = _require_local_root(name, profile)
+    selector = _list_selection(arguments, root)
+    rules = _effective_rules(store, profile)
+    print(f"Listing remote files for profile '{name}'...", file=progress, flush=True)
+    print("Connecting securely over FTPS...", file=progress, flush=True)
+    with ExplicitFTPSTransport(profile) as transport:
+        raw_snapshot = transport.snapshot(
+            rules,
+            selector,
+            include_excluded=True,
+            traverse_excluded=True,
+        )
+    if not raw_snapshot.entries:
+        raise SelectionError(f"file selector '{selector.pattern}' matched no paths")
+    snapshot = TreeSnapshot(
+        tuple(
+            entry
+            for entry in raw_snapshot.entries
+            if selector.includes_result(
+                entry.path,
                 directory=entry.kind == "directory",
-                path=relative.name,
-                depth=max(len(relative.parts) - 1, 0),
-                color=color,
-                marker_color="\033[90m" if entry.excluded else None,
-                excluded=entry.excluded,
+            )
+            and (
+                not arguments.included_only
+                or (not entry.excluded and not entry.remote_excluded)
             )
         )
-        if entry.kind == "directory":
-            emitted_directories.add(entry.path)
-    return "\n".join(lines)
+    )
+    display_base = _profile_relative_current_directory(arguments, root)
+
+    def remote_status(
+        entry: TreeEntry,
+    ) -> tuple[str, str | None, bool, str | None]:
+        if entry.remote_excluded:
+            return "r x", _EXCLUDED_REMOTE_COLOR, True, _EXCLUDED_REMOTE_COLOR
+        if entry.excluded:
+            return "r !", _EXCLUDED_REMOTE_COLOR, True, _EXCLUDED_REMOTE_COLOR
+        return " ", None, False, None
+
+    return _format_tree_listing(
+        arguments,
+        snapshot,
+        heading=f"Remote tree for profile '{name}':",
+        empty_message=f"Remote tree for profile '{name}' is empty.",
+        display_base=display_base,
+        output=output,
+        status_for=remote_status,
+    )
 
 
 def _comparison_kind(entry: ComparisonEntry) -> str:
@@ -1646,6 +1749,42 @@ def _recursive_transfer_scope(arguments: argparse.Namespace) -> bool:
     )
 
 
+def _leaf_selectors(selection: FileSelection) -> tuple[FileSelector, ...]:
+    if isinstance(selection, FileSelector):
+        return (selection,)
+    if isinstance(selection, FileSelectorSet):
+        return selection.selectors
+    return _leaf_selectors(selection.traversal)
+
+
+def _remote_push_selection(
+    arguments: argparse.Namespace,
+    root: Path,
+    local: TreeSnapshot,
+    selection: FileSelection,
+) -> FileSelection:
+    """Fully inspect explicit paths that are absent from local authority."""
+    current_directory = _effective_current_directory(arguments, root)
+    local_entries = {entry.path: entry for entry in local.entries}
+    recursive_roots: list[FileSelector] = []
+    for operand in normalize_pattern_operands(arguments):
+        if operand == "." or any(character in operand for character in "*?["):
+            continue
+        selected = FileSelector.from_argument(
+            operand.rstrip("/"),
+            profile_root=root,
+            current_directory=current_directory,
+        )
+        local_entry = local_entries.get(selected.pattern)
+        if local_entry is None or (
+            local_entry.excluded and local_entry.kind == "directory"
+        ):
+            recursive_roots.append(FileSelector(f"{selected.pattern}/**"))
+    if not recursive_roots:
+        return selection
+    return FileSelectorSet((*_leaf_selectors(selection), *recursive_roots))
+
+
 def _selection_from_values(
     values: Sequence[str],
     root: Path,
@@ -1919,6 +2058,12 @@ def _build_plan(
         ),
         respect_remote_boundaries=True,
     )
+    remote_selector = (
+        _remote_push_selection(arguments, root, local, selector)
+        if direction == "push" and prune_remote
+        else selector
+    )
+    expanded_remote_deletion = remote_selector != selector
     print("Reading remote files over FTPS...", file=progress, flush=True)
 
     def report_recovery(message: str) -> None:
@@ -1926,12 +2071,15 @@ def _build_plan(
 
     remote = transport.snapshot(
         rules,
-        selector,
+        remote_selector,
         include_excluded=include_excluded,
         traverse_excluded=(
             include_excluded
             and prune_remote
-            and _recursive_transfer_scope(arguments)
+            and (
+                _recursive_transfer_scope(arguments)
+                or expanded_remote_deletion
+            )
         ),
         artifact_recovery=report_recovery if direction == "push" else None,
     )
@@ -1941,13 +2089,13 @@ def _build_plan(
         remote,
         direction=direction,
         prune_remote=prune_remote,
-        selector=selector if arguments.pattern_operands else None,
+        selector=remote_selector if arguments.pattern_operands else None,
     )
     untraversed_directories = frozenset(
         entry.path
         for entry in plan.entries
         if _comparison_entry_kind(entry, direction) == "directory"
-        and not selector.may_match_descendant(entry.path)
+        and not remote_selector.may_match_descendant(entry.path)
         and entry.action != "excluded"
     )
     plan = mark_untraversed_directories(plan, untraversed_directories)
@@ -2482,7 +2630,11 @@ def run(
         elif arguments.command == "profiles":
             message = _list_profiles(configuration_store)
         elif arguments.command == "list":
-            message = _list_local(arguments, configuration_store, stdout)
+            message = (
+                _list_remote(arguments, configuration_store, stderr, stdout)
+                if arguments.remote
+                else _list_local(arguments, configuration_store, stdout)
+            )
         elif arguments.command == "diff":
             _diff(arguments, configuration_store, stderr, stdout)
             message = None

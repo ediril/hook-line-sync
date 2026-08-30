@@ -87,7 +87,7 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     assert "list (ls)" not in help_output
     assert "tracked" not in help_output
     assert "lsl" not in help_output
-    assert "lsr" not in help_output
+    assert "list (lsr)" in help_output
     assert "explain" not in help_output
     assert "push                upload local changes to the remote profile" in (
         help_output
@@ -117,7 +117,11 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     assert "[{remove}] [rule_id]" not in rules_help
     assert "profile             show the current profile" in help_output
     assert "profiles            list configured profiles" in help_output
-    assert "list                list the current local directory" in help_output
+    assert "list (lsr)          list the current local or remote directory" in (
+        help_output
+    )
+    list_help = invoke(["help", "list"], store)[1]
+    assert "hlsync [PROFILE] lsr" in list_help
     map_help = invoke(["help", "map"], store)[1]
     assert "--local-root PATH" in map_help
     assert "--remote-root PATH" in map_help
@@ -659,6 +663,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     operations = []
     listed_directories = []
     snapshot_traversal = []
+    serve_orphan_directory = False
 
     class FakeTransport:
         def __init__(self, profile) -> None:
@@ -682,6 +687,21 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
             snapshot_traversal.append(traverse_excluded)
             assert rules.rules == expected_rules
             entries = []
+            if serve_orphan_directory:
+                assert selector is not None
+                assert selector.matches("orphan-dir/child.txt")
+                entries.extend(
+                    (
+                        TreeEntry("orphan-dir", "directory"),
+                        TreeEntry(
+                            "orphan-dir/child.txt",
+                            "file",
+                            size=5,
+                            modified_ns=1_700_000_000_000_000_000,
+                            timestamp_precision_ns=1_000_000_000,
+                        ),
+                    )
+                )
             if selector is None or selector.matches("deployed.html"):
                 entries.append(
                     TreeEntry(
@@ -972,6 +992,13 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     operations.clear()
 
     monkeypatch.chdir(workspace)
+    remote_listing = invoke(["list", "--remote"], store)
+    assert remote_listing[0] == 0
+    assert "Remote tree for profile 'prod':\n" in remote_listing[1]
+    assert "Options: remote (--remote).\n" in remote_listing[1]
+    assert "  deployed.html\n" in remote_listing[1]
+    assert invoke(["lsr"], store)[1] == remote_listing[1]
+
     push_result = invoke(["push", "src", "-k"], store)
     assert push_result[0] == 0
     assert push_result[2].startswith("Preparing push for profile 'prod'...\n")
@@ -996,6 +1023,15 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert unchanged_push[1] == (
         "  Nothing to push; 1 file is up to date in this scope.\n"
     )
+    operations.clear()
+    serve_orphan_directory = True
+    deleted_directory = invoke(["push", "orphan-dir"], store)
+    serve_orphan_directory = False
+    assert deleted_directory[0] == 0
+    assert operations == [
+        ("delete", "orphan-dir/child.txt", False),
+        ("delete", "orphan-dir", True),
+    ]
     operations.clear()
     pruned_exclusion = invoke(["push", "src/debug.log"], store)
     assert pruned_exclusion[0] == 0
@@ -1150,6 +1186,10 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
     assert comparison[0] == 0
     assert comparison[1] == "r x future-dir/\n"
     assert listed == ["."]
+
+    remote_listing = invoke(["lsr"], store)
+    assert remote_listing[0] == 0
+    assert "r x future-dir/\n" in remote_listing[1]
 
     pushed = invoke(["push"], store)
     assert pushed[0] == 0

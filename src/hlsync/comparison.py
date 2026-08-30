@@ -211,6 +211,24 @@ def build_comparison(
             )
         )
 
+    protected_paths = tuple(
+        PurePosixPath(entry.path)
+        for entry in comparison
+        if entry.state == "remote-excluded"
+    )
+    if protected_paths:
+        comparison = [
+            replace(entry, action="skip")
+            if entry.action == "delete-remote"
+            and entry.remote_kind == "directory"
+            and any(
+                PurePosixPath(entry.path) in path.parents
+                for path in protected_paths
+            )
+            else entry
+            for entry in comparison
+        ]
+
     if selector is not None and not comparison:
         raise SelectionError(
             f"file selector '{selector.pattern}' matched no paths"
