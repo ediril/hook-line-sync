@@ -103,7 +103,7 @@ class _PendingDiffOutput:
 
 
 CANONICAL_COMMANDS = (
-    "add",
+    "create",
     "connect",
     "map",
     "remove",
@@ -279,38 +279,51 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    add_parser = subparsers.add_parser(
-        "add", help="add an FTPS project with a mapped local root"
+    create_parser = subparsers.add_parser(
+        "create", help="create an FTPS profile with a mapped local root"
     )
-    add_parser.add_argument("project_name")
-    add_parser.add_argument("--host", required=True)
-    add_parser.add_argument("--remote-root", required=True)
-    add_parser.add_argument("--protocol", choices=("ftps",), default="ftps")
-    add_parser.add_argument("--port", type=int, default=21)
-    add_parser.add_argument("--username-env")
-    add_parser.add_argument("--password-env")
-    add_parser.add_argument(
+    create_parser.add_argument("project_name")
+    create_parser.add_argument("--host", required=True)
+    create_parser.add_argument("--remote-root", required=True)
+    create_parser.add_argument("--protocol", choices=("ftps",), default="ftps")
+    create_parser.add_argument("--port", type=int, default=21)
+    create_parser.add_argument("--username-env")
+    create_parser.add_argument("--password-env")
+    create_parser.add_argument(
         "--local-root",
         metavar="PATH",
         help=(
-            "local project directory; when omitted, offer the current "
+            "local profile directory; when omitted, offer the current "
             "directory and prompt for another if declined"
         ),
     )
 
     connect_parser = subparsers.add_parser(
         "connect",
-        help="verify a project's FTPS connection",
+        help="verify a profile's FTPS connection",
         usage="hlsync connect [PROFILE]\n       hlsync PROFILE connect",
     )
     connect_parser.add_argument("project_name", nargs="?")
 
     map_parser = subparsers.add_parser(
         "map",
-        help="map or remap the current directory to a project",
-        usage="hlsync map [PROFILE]\n       hlsync PROFILE map",
+        help="change a profile's local or remote root",
+        usage=(
+            "hlsync map [PROFILE] [--local-root PATH] [--remote-root PATH]\n"
+            "       hlsync PROFILE map [--local-root PATH] [--remote-root PATH]"
+        ),
     )
     map_parser.add_argument("project_name", nargs="?")
+    map_parser.add_argument(
+        "--local-root",
+        metavar="PATH",
+        help="new local root; defaults to the current directory",
+    )
+    map_parser.add_argument(
+        "--remote-root",
+        metavar="PATH",
+        help="new absolute remote root; omitted leaves it unchanged",
+    )
 
     for command, help_text, rule_name in (
         (
@@ -374,7 +387,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     remove_parser = subparsers.add_parser(
         "remove",
-        help="remove a project",
+        help="remove a profile",
         usage="hlsync remove [PROFILE]\n       hlsync PROFILE remove",
     )
     remove_parser.add_argument("project_name", nargs="?")
@@ -481,17 +494,17 @@ def build_parser() -> argparse.ArgumentParser:
     diff_parser.add_argument(
         "--resume",
         metavar="DIRECTORY",
-        help="resume a paged diff at a project-relative directory",
+        help="resume a paged diff at a profile-relative directory",
     )
     diff_direction.add_argument(
         "-p",
         "--prune-remote",
         action="store_true",
-        help="project deletion of remote-only paths in the push view",
+        help="preview deletion of remote-only paths in the push view",
     )
     transfer_help = {
-        "push": "upload local changes to the remote project",
-        "pull": "replace changed local files from the remote project",
+        "push": "upload local changes to the remote profile",
+        "pull": "replace changed local files from the remote profile",
     }
     transfer_description = {
         "push": (
@@ -499,7 +512,7 @@ def build_parser() -> argparse.ArgumentParser:
             "and left untouched unless --prune-remote is supplied."
         ),
         "pull": (
-            "Replace changed existing local files from the remote project. "
+            "Replace changed existing local files from the remote profile. "
             "Missing local files are not restored."
         ),
     }
@@ -573,7 +586,7 @@ def _confirm(
         print("Please answer yes or no.", file=stdout)
 
 
-def _save_project(
+def _create_profile(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
     stdin: TextIO,
@@ -582,7 +595,7 @@ def _save_project(
     name = validate_project_name(arguments.project_name)
     configuration = store.load()
     if name in configuration.projects:
-        raise ConfigurationError(f"project '{name}' already exists")
+        raise ConfigurationError(f"profile '{name}' already exists")
     project = ProjectConfiguration(
         type=arguments.protocol,
         host=arguments.host,
@@ -621,9 +634,13 @@ def _save_project(
             if supplied_root == "" or not supplied_root.strip():
                 raise ConfigurationError("a local folder is required")
             local_root = canonical_local_root(supplied_root.strip())
-    configuration.map_project(name, local_root)
+    configuration.set_profile_roots(
+        name,
+        local_root=local_root,
+        remote_root=project.remote_root,
+    )
     message = (
-        f"Added FTPS project '{name}'.\n"
+        f"Created FTPS profile '{name}'.\n"
         f"Mapped '{local_root}' to '{name}:{project.remote_root}'."
     )
     store.save(configuration)
@@ -652,7 +669,7 @@ def _resolve_project(
         return configuration, name, project
     name = validate_project_name(supplied_name)
     if name not in configuration.projects:
-        raise ConfigurationError(f"project '{name}' does not exist")
+        raise ConfigurationError(f"profile '{name}' does not exist")
     return configuration, name, configuration.projects[name]
 
 
@@ -669,7 +686,7 @@ def _connect(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     _, name, project = _resolve_project(arguments, store)
     with ExplicitFTPSTransport(project):
         pass
-    return f"Verified secure connectivity to project '{name}'."
+    return f"Verified secure connectivity to profile '{name}'."
 
 
 def _map(
@@ -679,25 +696,46 @@ def _map(
     stdout: TextIO,
 ) -> str:
     configuration, name, project = _resolve_project(arguments, store)
-    local_root = canonical_local_root(Path.cwd())
-    if project.local_root == local_root:
-        return f"Project '{name}' is already mapped to '{local_root}'."
-    if project.local_root is not None:
-        prompt = (
-            f"Project '{name}' is mapped to '{project.local_root}'. Change it "
-            f"to '{local_root}'? [y/N] "
+    if arguments.local_root is not None:
+        local_root = canonical_local_root(arguments.local_root)
+    elif arguments.remote_root is None or project.local_root is None:
+        local_root = canonical_local_root(Path.cwd())
+    else:
+        local_root = project.local_root
+    remote_root = (
+        arguments.remote_root
+        if arguments.remote_root is not None
+        else project.remote_root
+    )
+    candidate = project.with_roots(
+        local_root=local_root,
+        remote_root=remote_root,
+    )
+    changes = []
+    if project.local_root != candidate.local_root:
+        changes.append(
+            f"  Local root: {project.local_root or 'not mapped'} "
+            f"→ {candidate.local_root}"
         )
-        if not _confirm(prompt, stdin, stdout, default=False):
-            return f"Kept existing mapping '{project.local_root}' for '{name}'."
-        configuration.remap_project(name, local_root)
-        store.save(configuration)
-        return (
-            f"Remapped '{name}' from '{project.local_root}' "
-            f"to '{local_root}'."
+    if project.remote_root != candidate.remote_root:
+        changes.append(
+            f"  Remote root: {project.remote_root} → {candidate.remote_root}"
         )
-    configuration.map_project(name, local_root)
+    if not changes:
+        return f"Profile '{name}' mapping is unchanged."
+
+    configuration.set_profile_roots(
+        name,
+        local_root=candidate.local_root,
+        remote_root=candidate.remote_root,
+    )
+    prompt = "\n".join(
+        (f"Change mapping for profile '{name}'?", *changes, "Continue? [y/N] ")
+    )
+    if not _confirm(prompt, stdin, stdout, default=False):
+        return f"Kept profile '{name}' mapping unchanged."
     store.save(configuration)
-    return f"Mapped '{local_root}' to '{name}:{project.remote_root}'."
+    return "\n".join((f"Updated profile '{name}' mapping:", *changes))
 
 
 def _format_rules(
@@ -708,14 +746,14 @@ def _format_rules(
     grouped: bool = False,
 ) -> str:
     if not rules:
-        return f"No {heading.lower()} for project '{name}'."
+        return f"No {heading.lower()} for profile '{name}'."
     width = len(str(max(rule.id for rule in rules)))
     if grouped:
         groups: dict[str, list[tuple[SyncRule, str]]] = {}
         for rule in rules:
             group, expression = _rule_display_location(rule)
             groups.setdefault(group, []).append((rule, expression))
-        lines = [f"{heading} for project '{name}':"]
+        lines = [f"{heading} for profile '{name}':"]
         for group in sorted(groups, key=_rule_group_key):
             lines.extend(("", group))
             for rule, expression in sorted(
@@ -730,7 +768,7 @@ def _format_rules(
         return "\n".join(lines)
     return "\n".join(
         (
-            f"{heading} for project '{name}':",
+            f"{heading} for profile '{name}':",
             *(
                 f"  {rule.id:>{width}}  {rule.action:<7} "
                 f"{_format_rule_expression(rule)}"
@@ -821,7 +859,7 @@ def _change_rules(
 
 def _format_rule_update(name: str, update: RuleUpdate, *, include: bool) -> str:
     if update.added and update.removed:
-        lines = [f"Updated synchronization rules for project '{name}':"]
+        lines = [f"Updated synchronization rules for profile '{name}':"]
         lines.extend(
             f"  added    {rule.id}  {rule.action:<7} {_format_rule_expression(rule)}"
             for rule in update.added
@@ -841,7 +879,7 @@ def _format_rule_update(name: str, update: RuleUpdate, *, include: bool) -> str:
     if update.removed:
         result = "included" if include else "excluded"
         lines = [
-            f"Paths are {result} by the remaining policy for project '{name}';",
+            f"Paths are {result} by the remaining policy for profile '{name}';",
             "removed the unnecessary rules:",
         ]
         width = len(str(max(rule.id for rule in update.removed)))
@@ -850,7 +888,7 @@ def _format_rule_update(name: str, update: RuleUpdate, *, include: bool) -> str:
             for rule in update.removed
         )
         return "\n".join(lines)
-    return f"Synchronization rules for project '{name}' are unchanged."
+    return f"Synchronization rules for profile '{name}' are unchanged."
 
 
 def _manage_rules(
@@ -872,7 +910,7 @@ def _manage_rules(
     removed = configuration.remove_rule(name, arguments.rule_id)
     store.save(configuration)
     return (
-        f"Removed rule {removed.id} from project '{name}': "
+        f"Removed rule {removed.id} from profile '{name}': "
         f"{removed.action} {_format_rule_expression(removed)}"
     )
 
@@ -881,7 +919,7 @@ def _remove(arguments: argparse.Namespace, store: ConfigurationStore) -> str:
     configuration, name, _ = _resolve_project(arguments, store)
     del configuration.projects[name]
     store.save(configuration)
-    return f"Removed project '{name}'."
+    return f"Removed profile '{name}'."
 
 
 def _list_profiles(store: ConfigurationStore) -> str:
@@ -934,7 +972,7 @@ def _show_root(
 
 def _require_local_root(name: str, project: ProjectConfiguration) -> Path:
     if project.local_root is None:
-        raise ConfigurationError(f"project '{name}' has not been mapped")
+        raise ConfigurationError(f"profile '{name}' has not been mapped")
     return Path(project.local_root)
 
 
@@ -967,8 +1005,8 @@ def _list_local(
         )
     )
     if not snapshot.entries:
-        return f"Local tree for project '{name}' is empty."
-    lines = [f"Local tree for project '{name}':"]
+        return f"Local tree for profile '{name}' is empty."
+    lines = [f"Local tree for profile '{name}':"]
     options = _active_options(arguments)
     if options is not None:
         lines.append(options)
@@ -1560,7 +1598,7 @@ def _resume_directory(value: str | None) -> PurePosixPath | None:
     path = PurePosixPath(value)
     if path.is_absolute() or not path.parts or ".." in path.parts:
         raise SelectionError(
-            "resume directory must be a project-relative directory"
+            "resume directory must be a profile-relative directory"
         )
     if any(character in value for character in "*?["):
         raise SelectionError("resume directory cannot contain wildcards")
@@ -1655,7 +1693,7 @@ def _diff(
     rules = RuleSet(project.rules)
     direction = "pull" if arguments.pull else "push"
     color = _use_color(output)
-    print(f"Checking differences for project '{name}'...", file=progress, flush=True)
+    print(f"Checking differences for profile '{name}'...", file=progress, flush=True)
     options = _active_options(arguments)
     if options is not None:
         print(options, file=progress, flush=True)
@@ -1962,7 +2000,7 @@ def _format_transfer(name: str, result: TransferResult) -> str:
     direction = result.plan.direction.capitalize()
     if not result.succeeded:
         lines = [
-            f"{direction} finished with errors for project '{name}': "
+            f"{direction} finished with errors for profile '{name}': "
             f"{result.changed_count} completed, {result.failed_count} failed, "
             f"{result.skipped_count} skipped."
         ]
@@ -2024,7 +2062,7 @@ def _transfer(
     _, name, project = _resolve_project(arguments, store)
     root = _require_local_root(name, project)
     print(
-        f"Preparing {arguments.command} for project '{name}'...",
+        f"Preparing {arguments.command} for profile '{name}'...",
         file=progress,
         flush=True,
     )
@@ -2127,8 +2165,8 @@ def run(
     exit_status = 0
     try:
         _validate_profile_prefix(arguments)
-        if arguments.command == "add":
-            message = _save_project(arguments, configuration_store, stdin, stdout)
+        if arguments.command == "create":
+            message = _create_profile(arguments, configuration_store, stdin, stdout)
         elif arguments.command == "connect":
             message = _connect(arguments, configuration_store)
         elif arguments.command == "map":

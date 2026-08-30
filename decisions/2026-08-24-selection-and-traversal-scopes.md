@@ -42,7 +42,7 @@ FTP listings. Recursive transfer of the current tree remains convenient for the
 primary deployment operation, while pull requires the user to name what may be
 overwritten locally. Requiring either mapped-directory context or an explicit
 per-command profile prevents hidden state from directing work at an unintended
-project.
+deployment target.
 
 ## Intentionally excluded
 

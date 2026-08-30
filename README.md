@@ -46,14 +46,14 @@ PROD_FTPS_PASSWORD
 From the local project root:
 
 ```console
-hlsync add prod --host ftp.example.com --remote-root /public_html/site
+hlsync create prod --host ftp.example.com --remote-root /public_html/site
 hlsync connect
 hlsync exclude .git node_modules
 hlsync diff -r
 hlsync push
 ```
 
-`add` proposes the current directory as the local root; pressing Enter accepts
+`create` proposes the current directory as the local root; pressing Enter accepts
 it. Declining prompts for another local folder. Use `--local-root PATH` to
 provide one directly. Bare `push` is recursive, so `diff -r` is its matching
 preview.
@@ -66,10 +66,10 @@ profiles may use the same server. Credential values are never stored in
 `~/.hls/configs.json`.
 
 FTPS is the default and currently the only protocol. Override credential
-variable names when adding a profile if needed:
+variable names when creating a profile if needed:
 
 ```console
-hlsync add staging \
+hlsync create staging \
   --host ftp.example.com \
   --remote-root /public_html/staging \
   --local-root /path/to/project \
@@ -80,6 +80,14 @@ hlsync add staging \
 HLSync stores the canonical absolute local root and maps every descendant to
 the same relative path under the remote root. Roots may not overlap across
 profiles. Remapping requires confirmation and defaults to no.
+
+Use `map` to change either side after creation. Omit `--local-root` to use the
+current directory; changing only the remote root preserves the local root:
+
+```console
+hlsync map staging --local-root /new/local/path
+hlsync map staging --remote-root /new/remote/root
+```
 
 The normal workflow is to run HLSync inside a mapped root or one of its
 descendants. The current directory selects the containing profile and relative

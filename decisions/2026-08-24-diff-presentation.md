@@ -25,7 +25,7 @@ now an authorized deletion rather than a retained exclusion.
 `hlsync --legend` renders the current symbol and color reference without loading
 a profile or connecting to FTPS.
 
-A coherent scope is headed by one full project-relative anchor at column zero.
+A coherent scope is headed by one full profile-relative anchor at column zero.
 Its children begin one indent beneath it, including neutral directories that do
 not reserve an invisible status column. Children use basenames and hierarchy
 indentation; disjoint roots keep full paths to avoid ambiguity. Entries use

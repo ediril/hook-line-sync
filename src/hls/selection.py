@@ -78,20 +78,20 @@ class FileSelector:
         supplied = PurePosixPath(value)
         if supplied.is_absolute() or ".." in supplied.parts:
             raise SelectionError(
-                "file selector must be relative to the project or current directory"
+                "file selector must be relative to the profile or current directory"
             )
         return cls((base / supplied).as_posix())
 
     def matches(self, project_relative_path: str) -> bool:
         path = PurePosixPath(project_relative_path)
         if path.is_absolute() or ".." in path.parts:
-            raise SelectionError("selected paths must remain inside the project")
+            raise SelectionError("selected paths must remain inside the profile")
         return _matches_parts(PurePosixPath(self.pattern).parts, path.parts)
 
     def may_match_descendant(self, project_relative_directory: str) -> bool:
         directory = PurePosixPath(project_relative_directory)
         if directory.is_absolute() or ".." in directory.parts:
-            raise SelectionError("selected paths must remain inside the project")
+            raise SelectionError("selected paths must remain inside the profile")
         return _can_match_descendant(
             PurePosixPath(self.pattern).parts,
             directory.parts,

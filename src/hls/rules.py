@@ -40,7 +40,7 @@ def expand_path_operands(
         supplied = PurePosixPath(value)
         if supplied.is_absolute() or ".." in supplied.parts:
             raise RuleError(
-                "rule paths must be relative to the project or current directory"
+                "rule paths must be relative to the profile or current directory"
             )
         if "*" not in value:
             expanded.append(value)
@@ -73,7 +73,7 @@ def patterns_from_operands(
         supplied = PurePosixPath(pattern)
         if supplied.is_absolute() or ".." in supplied.parts:
             raise RuleError(
-                "rule patterns must be relative to the project or current directory"
+                "rule patterns must be relative to the profile or current directory"
             )
         rooted = base / supplied
         local_path = project_root.joinpath(*rooted.parts)
@@ -150,7 +150,7 @@ class RuleSet:
         project_relative_path = relative_path
         path = PurePosixPath(project_relative_path)
         if path.is_absolute() or not path.parts or ".." in path.parts:
-            raise RuleError("evaluated paths must be non-empty project-relative paths")
+            raise RuleError("evaluated paths must be non-empty profile-relative paths")
         candidate = path.as_posix()
         winner = next(
             (rule for rule in reversed(self.rules) if rule.matches(candidate)),

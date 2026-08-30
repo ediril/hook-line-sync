@@ -187,7 +187,7 @@ class ExplicitFTPSTransport:
                 client.close()
             finally:
                 raise TransportError(
-                    f"could not open explicit FTPS project at "
+                    f"could not open explicit FTPS profile at "
                     f"{self.configuration.host}:{self.configuration.port}"
                     f"{self.configuration.remote_root}: {error}"
                 ) from error

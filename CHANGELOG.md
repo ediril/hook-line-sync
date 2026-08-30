@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.29.13 — 2026-08-29
+
+### Changed
+
+- Rename the profile creation command from `add` to `create`.
+- Use “profile” consistently for configured deployment targets in CLI output,
+  help, errors, and current documentation.
+- Expand `map` to update a profile's local root, remote root, or both through a
+  validated old → new confirmation that defaults to no.
+
 ## 0.8.29.12 — 2026-08-29
 
 ### Changed

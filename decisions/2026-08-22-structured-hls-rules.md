@@ -6,7 +6,7 @@ Date: 2026-08-22
 
 Synchronization policy is an ordered list of structured rules. Each rule has a
 stable positive integer ID, an explicit `include` or `exclude` action, and a
-normalized project-relative pattern. The last matching rule wins; an unmatched
+normalized profile-relative pattern. The last matching rule wins; an unmatched
 path is included.
 
 Patterns are rooted where the command is run. `*` matches within one path

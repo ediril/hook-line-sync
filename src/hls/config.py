@@ -30,7 +30,7 @@ class RuleUpdate:
 def validate_project_name(name: str) -> str:
     if not PROJECT_NAME_PATTERN.fullmatch(name):
         raise ConfigurationError(
-            "project name must start with a letter or digit and contain "
+            "profile name must start with a letter or digit and contain "
             "only letters, digits, '.', '_', or '-'"
         )
     return name
@@ -52,12 +52,12 @@ def _environment_name(value: Any, field_name: str) -> str:
 
 
 def _normalize_remote_root(value: Any) -> str:
-    remote_value = _required_string(value, "project remote root")
+    remote_value = _required_string(value, "profile remote root")
     remote_path = PurePosixPath(remote_value)
     if not remote_path.is_absolute():
-        raise ConfigurationError("project remote root must be absolute")
+        raise ConfigurationError("profile remote root must be absolute")
     if ".." in remote_path.parts:
-        raise ConfigurationError("project remote root cannot contain '..'")
+        raise ConfigurationError("profile remote root cannot contain '..'")
     components = [part for part in remote_path.parts if part not in {"/", "//"}]
     return "/" + "/".join(components)
 
@@ -78,14 +78,14 @@ def canonical_local_root(directory: str | Path) -> str:
 def _validate_stored_local_root(value: Any) -> str | None:
     if value is None:
         return None
-    local = _required_string(value, "project local root")
+    local = _required_string(value, "profile local root")
     path = Path(local)
     if not path.is_absolute():
-        raise ConfigurationError("project local root must be absolute")
+        raise ConfigurationError("profile local root must be absolute")
     if path.parent == path:
-        raise ConfigurationError("project local root cannot be the filesystem root")
+        raise ConfigurationError("profile local root cannot be the filesystem root")
     if os.path.normpath(local) != local:
-        raise ConfigurationError("project local root must be normalized")
+        raise ConfigurationError("profile local root must be normalized")
     return local
 
 
@@ -128,7 +128,7 @@ class ProjectConfiguration:
             _normalize_remote_root(self.remote_root),
         )
         if self.type != "ftps":
-            raise ConfigurationError("project protocol must be 'ftps'")
+            raise ConfigurationError("profile protocol must be 'ftps'")
         if isinstance(self.port, bool) or not isinstance(self.port, int):
             raise ConfigurationError("port must be an integer")
         if not 1 <= self.port <= 65535:
@@ -162,29 +162,17 @@ class ProjectConfiguration:
         if self.rules and self.next_rule_id <= self.rules[-1].id:
             raise ConfigurationError("next_rule_id must be greater than every rule id")
         if self.local_root is None and self.rules:
-            raise ConfigurationError("an unmapped project cannot have rules")
+            raise ConfigurationError("an unmapped profile cannot have rules")
 
-    def with_local_root(self, local_root: str) -> ProjectConfiguration:
-        if self.local_root is not None:
-            raise ConfigurationError(
-                f"project is already mapped to local root '{self.local_root}'"
-            )
+    def with_roots(
+        self,
+        *,
+        local_root: str,
+        remote_root: str,
+    ) -> ProjectConfiguration:
         return ProjectConfiguration(
             host=self.host,
-            remote_root=self.remote_root,
-            port=self.port,
-            username_env=self.username_env,
-            password_env=self.password_env,
-            type=self.type,
-            local_root=local_root,
-            rules=(),
-            next_rule_id=1,
-        )
-
-    def with_replaced_local_root(self, local_root: str) -> ProjectConfiguration:
-        return ProjectConfiguration(
-            host=self.host,
-            remote_root=self.remote_root,
+            remote_root=remote_root,
             port=self.port,
             username_env=self.username_env,
             password_env=self.password_env,
@@ -201,7 +189,7 @@ class ProjectConfiguration:
         next_rule_id: int | None = None,
     ) -> ProjectConfiguration:
         if self.local_root is None:
-            raise ConfigurationError("cannot change rules for an unmapped project")
+            raise ConfigurationError("cannot change rules for an unmapped profile")
         return ProjectConfiguration(
             host=self.host,
             remote_root=self.remote_root,
@@ -216,12 +204,12 @@ class ProjectConfiguration:
 
     def remote_path_for(self, local_path: Path) -> str:
         if self.local_root is None:
-            raise ConfigurationError("project has no local root mapping")
+            raise ConfigurationError("profile has no local root mapping")
         try:
             relative = local_path.relative_to(Path(self.local_root))
         except ValueError as error:
             raise ConfigurationError(
-                f"local path '{local_path}' is outside project root '{self.local_root}'"
+                f"local path '{local_path}' is outside profile root '{self.local_root}'"
             ) from error
         if not relative.parts:
             return self.remote_root
@@ -243,7 +231,7 @@ class ProjectConfiguration:
     @classmethod
     def from_dict(cls, value: Any) -> ProjectConfiguration:
         if not isinstance(value, dict):
-            raise ConfigurationError("project configuration must be an object")
+            raise ConfigurationError("profile configuration must be an object")
         expected = {
             "type",
             "host",
@@ -258,12 +246,12 @@ class ProjectConfiguration:
         unknown = set(value) - expected
         if unknown:
             raise ConfigurationError(
-                f"unknown project configuration fields: {', '.join(sorted(unknown))}"
+                f"unknown profile configuration fields: {', '.join(sorted(unknown))}"
             )
         try:
             rules = value["rules"]
             if not isinstance(rules, list):
-                raise ConfigurationError("project rules must be an array")
+                raise ConfigurationError("profile rules must be an array")
             try:
                 decoded_rules = tuple(SyncRule.from_dict(rule) for rule in rules)
             except RuleError as error:
@@ -281,7 +269,7 @@ class ProjectConfiguration:
             )
         except KeyError as error:
             raise ConfigurationError(
-                f"project configuration is missing field: {error.args[0]}"
+                f"profile configuration is missing field: {error.args[0]}"
             ) from error
 
 
@@ -301,33 +289,18 @@ class ApplicationConfiguration:
             for other_name, other_root in mapped[:index]:
                 if _paths_overlap(root, other_root):
                     raise ConfigurationError(
-                        f"project '{name}' local root '{root}' overlaps project "
+                        f"profile '{name}' local root '{root}' overlaps profile "
                         f"'{other_name}' root '{other_root}'"
                     )
 
-    def map_project(self, project_name: str, local_root: str) -> None:
+    def set_profile_roots(
+        self,
+        project_name: str,
+        *,
+        local_root: str,
+        remote_root: str,
+    ) -> None:
         project = self.projects[project_name]
-        if project.local_root is not None:
-            raise ConfigurationError(
-                f"project '{project_name}' is already mapped to "
-                f"'{project.local_root}'"
-            )
-        root = Path(local_root)
-        for other_name, other in self.projects.items():
-            if other.local_root is None:
-                continue
-            other_root = Path(other.local_root)
-            if _paths_overlap(root, other_root):
-                raise ConfigurationError(
-                    f"local root '{root}' for project '{project_name}' overlaps "
-                    f"project '{other_name}' root '{other_root}'"
-                )
-        self.projects[project_name] = project.with_local_root(local_root)
-
-    def remap_project(self, project_name: str, local_root: str) -> None:
-        project = self.projects[project_name]
-        if project.local_root is None:
-            raise ConfigurationError(f"project '{project_name}' has not been mapped")
         root = Path(local_root)
         for other_name, other in self.projects.items():
             if other_name == project_name or other.local_root is None:
@@ -335,10 +308,13 @@ class ApplicationConfiguration:
             other_root = Path(other.local_root)
             if _paths_overlap(root, other_root):
                 raise ConfigurationError(
-                    f"local root '{root}' for project '{project_name}' overlaps "
-                    f"project '{other_name}' root '{other_root}'"
+                    f"local root '{root}' for profile '{project_name}' overlaps "
+                    f"profile '{other_name}' root '{other_root}'"
                 )
-        self.projects[project_name] = project.with_replaced_local_root(local_root)
+        self.projects[project_name] = project.with_roots(
+            local_root=local_root,
+            remote_root=remote_root,
+        )
 
     def append_rules(
         self,
@@ -379,7 +355,7 @@ class ApplicationConfiguration:
         removed = next((rule for rule in project.rules if rule.id == rule_id), None)
         if removed is None:
             raise ConfigurationError(
-                f"project '{project_name}' has no rule with id {rule_id}"
+                f"profile '{project_name}' has no rule with id {rule_id}"
             )
         remaining = tuple(rule for rule in project.rules if rule.id != rule_id)
         self.projects[project_name] = project.with_rules(remaining)

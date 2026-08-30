@@ -1,7 +1,9 @@
 # Work Queue
 
-- [x] Clarify the alternate local-folder prompt in `add`.
-- [x] Make `add` always establish a local root, with an explicit option and an
+- [x] Rename `add` to `create`, standardize profile terminology, and let `map`
+  update either mapping root atomically.
+- [x] Clarify the alternate local-folder prompt in `create`.
+- [x] Make `create` always establish a local root, with an explicit option and an
   alternate-folder prompt.
 - [x] Add concise next-step guidance when no profile is active.
 - [x] Treat an unmapped `hlsync profile` lookup as informational.

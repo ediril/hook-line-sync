@@ -34,7 +34,7 @@ def invoke(arguments, store, *, stdin="no\n", terminal_output=False):
     return status, stdout.getvalue(), stderr.getvalue()
 
 
-def test_project_lifecycle_uses_production_credentials_and_version(
+def test_profile_lifecycle_uses_production_credentials_and_version(
     tmp_path, monkeypatch
 ) -> None:
     store = ConfigurationStore(tmp_path / "configs.json")
@@ -42,7 +42,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
 
     add_status, add_stdout, add_stderr = invoke(
         [
-            "add",
+            "create",
             "client-site",
             "--host",
             "ftp.example.com",
@@ -57,7 +57,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
 
     assert (add_status, add_stdout, add_stderr) == (
         0,
-        "Added FTPS project 'client-site'.\n"
+        "Created FTPS profile 'client-site'.\n"
         f"Mapped '{tmp_path}' to 'client-site:/public_html/site'.\n",
         "",
     )
@@ -74,6 +74,8 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert project.password_env == "PROD_FTPS_PASSWORD"
 
     help_output = invoke(["help"], store)[1]
+    assert "create              create an FTPS profile" in help_output
+    assert "add" not in help_output
     assert "--legend" in help_output
     assert "inside a mapped" in help_output
     assert "profile; prefix a command" in help_output
@@ -87,12 +89,12 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert "lsl" not in help_output
     assert "lsr" not in help_output
     assert "explain" not in help_output
-    assert "push                upload local changes to the remote project" in (
+    assert "push                upload local changes to the remote profile" in (
         help_output
     )
     assert "root                print a profile's mapped local root" in help_output
     pull_help = (
-        "pull                replace changed local files from the remote project"
+        "pull                replace changed local files from the remote profile"
     )
     assert pull_help in help_output
     assert "usage: hlsync [PROFILE] diff" in invoke(["help", "d"], store)[1]
@@ -108,6 +110,9 @@ def test_project_lifecycle_uses_production_credentials_and_version(
     assert "profile             show details for one profile" in help_output
     assert "profiles            list configured profiles" in help_output
     assert "list                list the current local directory" in help_output
+    map_help = invoke(["help", "map"], store)[1]
+    assert "--local-root PATH" in map_help
+    assert "--remote-root PATH" in map_help
     assert invoke(["--legend"], store) == (
         0,
         "Diff legend:\n"
@@ -159,7 +164,7 @@ def test_project_lifecycle_uses_production_credentials_and_version(
 
     assert invoke(["remove", "client-site"], store) == (
         0,
-        "Removed project 'client-site'.\n",
+        "Removed profile 'client-site'.\n",
         "",
     )
     assert invoke(["profiles"], store)[1] == "No profiles configured.\n"
@@ -175,7 +180,7 @@ def test_add_maps_the_current_directory_after_confirmation(
 
     result = invoke(
         [
-            "add",
+            "create",
             "prod",
             "--host",
             "ftp.example.com",
@@ -189,7 +194,7 @@ def test_add_maps_the_current_directory_after_confirmation(
     assert result == (
         0,
         f"Map current directory '{workspace}' to 'prod:/public_html'? [Y/n] "
-        "Added FTPS project 'prod'.\n"
+        "Created FTPS profile 'prod'.\n"
         f"Mapped '{workspace}' to 'prod:/public_html'.\n",
         "",
     )
@@ -208,7 +213,7 @@ def test_add_prompts_for_another_local_root_when_current_is_declined(
 
     result = invoke(
         [
-            "add",
+            "create",
             "prod",
             "--host",
             "ftp.example.com",
@@ -223,17 +228,17 @@ def test_add_prompts_for_another_local_root_when_current_is_declined(
         0,
         f"Map current directory '{current}' to 'prod:/public_html'? [Y/n] "
         "What local folder should be mapped instead? "
-        "Added FTPS project 'prod'.\n"
+        "Created FTPS profile 'prod'.\n"
         f"Mapped '{selected}' to 'prod:/public_html'.\n",
         "",
     )
     assert store.load().projects["prod"].local_root == str(selected)
 
 
-def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
+def test_cli_refuses_invalid_profile_mutations(tmp_path) -> None:
     store = ConfigurationStore(tmp_path / "configs.json")
     arguments = [
-        "add",
+        "create",
         "prod",
         "--host",
         "ftp.example.com",
@@ -250,7 +255,7 @@ def test_cli_refuses_invalid_project_mutations(tmp_path) -> None:
     assert duplicate_status == 1 and "already exists" in duplicate_error
     assert missing_status == 1 and "does not exist" in missing_error
     with pytest.raises(SystemExit):
-        run(["add", "unsafe", "--host", "ftp.example.com"], store=store)
+        run(["create", "unsafe", "--host", "ftp.example.com"], store=store)
     with pytest.raises(SystemExit):
         run(["p"], store=store)
 
@@ -270,7 +275,7 @@ def test_add_supports_explicit_protocol_port_and_environment_names(tmp_path) -> 
 
     status, _, _ = invoke(
         [
-            "add",
+            "create",
             "staging",
             "--host",
             "staging.example.com",
@@ -308,7 +313,7 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     workspace.mkdir()
     invoke(
         [
-            "add",
+            "create",
             "prod",
             "--host",
             "ftp.example.com",
@@ -348,7 +353,7 @@ def test_ordered_exclusion_commands_persist_reinclusion(
 
     assert exclude_result == (
         0,
-        "Recorded exclusion rules for project 'prod':\n"
+        "Recorded exclusion rules for profile 'prod':\n"
         "  1  exclude .git/**\n"
         "  2  exclude node_modules/**\n"
         "  3  exclude *.log\n"
@@ -357,19 +362,19 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     )
     assert include_result == (
         0,
-        "Recorded inclusion rules for project 'prod':\n"
+        "Recorded inclusion rules for profile 'prod':\n"
         "  7  include ./node_modules/keep.js\n",
         "",
     )
     assert directory_include_result == (
         0,
-        "Recorded inclusion rules for project 'prod':\n"
+        "Recorded inclusion rules for profile 'prod':\n"
         "  8  include node_modules/package/**\n",
         "",
     )
     assert expanded_exclude_result == (
         0,
-        "Recorded exclusion rules for project 'prod':\n"
+        "Recorded exclusion rules for profile 'prod':\n"
         "  5  exclude ./composer.json\n"
         "  6  exclude ./composer.lock\n",
         "",
@@ -421,7 +426,7 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     assert "      nested.js\n" in recursive_directory_view[1]
     assert invoke(["exc"], store) == (
         0,
-        "Exclusion rules for project 'prod':\n"
+        "Exclusion rules for profile 'prod':\n"
         "\n"
         "./\n"
         "  3  exclude *.log\n"
@@ -443,7 +448,7 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     )
     assert invoke(["inc"], store) == (
         0,
-        "Inclusion rules for project 'prod':\n"
+        "Inclusion rules for profile 'prod':\n"
         "\n"
         "node_modules/\n"
         "  7  include keep.js\n"
@@ -468,13 +473,13 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     assert invoke(["root"], store) == (0, f"{workspace}\n", "")
     assert invoke(["rules", "remove", "8"], store) == (
         0,
-        "Removed rule 8 from project 'prod': include node_modules/package/**\n",
+        "Removed rule 8 from profile 'prod': include node_modules/package/**\n",
         "",
     )
     assert store.load().projects["prod"].next_rule_id == 10
     assert invoke(["inc", "composer.json"], store) == (
         0,
-        "Paths are included by the remaining policy for project 'prod';\n"
+        "Paths are included by the remaining policy for profile 'prod';\n"
         "removed the unnecessary rules:\n"
         "  5  exclude ./composer.json\n",
         "",
@@ -491,13 +496,13 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     monkeypatch.chdir(outside)
     assert invoke(["prod", "exclude", "*.env"], store) == (
         0,
-        "Recorded exclusion rules for project 'prod':\n"
+        "Recorded exclusion rules for profile 'prod':\n"
         "  10  exclude ./root.env\n",
         "",
     )
 
 
-def test_current_project_inference_drives_connect_and_tree_listings(
+def test_current_profile_inference_drives_connect_and_tree_listings(
     tmp_path, monkeypatch
 ) -> None:
     monkeypatch.delenv("NO_COLOR", raising=False)
@@ -522,7 +527,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     (workspace / "linked").symlink_to(outside, target_is_directory=True)
     invoke(
         [
-            "add",
+            "create",
             "prod",
             "--host",
             "ftp.example.com",
@@ -676,12 +681,12 @@ def test_current_project_inference_drives_connect_and_tree_listings(
 
     assert invoke(["connect"], store) == (
         0,
-        "Verified secure connectivity to project 'prod'.\n",
+        "Verified secure connectivity to profile 'prod'.\n",
         "",
     )
     local_listing = (
         0,
-        "Local tree for project 'prod':\n"
+        "Local tree for profile 'prod':\n"
         "  nested/\n"
         "  .env.example\n"
         "x debug.log\n"
@@ -692,7 +697,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     assert invoke(["ls"], store) == local_listing
     assert invoke(["list", "*"], store) == (
         0,
-        "Local tree for project 'prod':\n"
+        "Local tree for profile 'prod':\n"
         "  nested/\n"
         "    child.py\n"
         "  .env.example\n"
@@ -726,7 +731,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     monkeypatch.chdir(source)
     push_comparison = invoke(["diff"], store)
     push_progress = (
-        "Checking differences for project 'prod'...\n"
+        "Checking differences for profile 'prod'...\n"
         "Connecting securely over FTPS...\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
@@ -847,7 +852,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     monkeypatch.chdir(workspace)
     push_result = invoke(["push", "src"], store)
     assert push_result[0] == 0
-    assert push_result[2].startswith("Preparing push for project 'prod'...\n")
+    assert push_result[2].startswith("Preparing push for profile 'prod'...\n")
     assert "Comparing local and remote files...\n" in push_result[2]
     assert push_result[2].endswith(
         "Pushing changes...\n"
@@ -897,7 +902,7 @@ def test_current_project_inference_drives_connect_and_tree_listings(
     )
     pull_result = invoke(["pull", "deployed.html"], store)
     assert pull_result[0] == 0
-    assert pull_result[2].startswith("Preparing pull for project 'prod'...\n")
+    assert pull_result[2].startswith("Preparing pull for profile 'prod'...\n")
     assert "Comparing local and remote files...\n" in pull_result[2]
     assert "Pulling changes..." not in pull_result[2]
     assert pull_result[1] == (
@@ -947,7 +952,7 @@ def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
     for name, local_root in (("prod", root), ("staging", staging_root)):
         invoke(
             [
-                "add",
+                "create",
                 name,
                 "--host",
                 "ftp.example.com",
@@ -968,24 +973,41 @@ def test_map_confirms_replacement_and_rejects_overlapping_local_roots(
     monkeypatch.chdir(separate)
     declined = invoke(["prod", "map"], store)
     remapped = invoke(["map", "prod"], store, stdin="yes\n")
+    remote_remapped = invoke(
+        ["map", "prod", "--remote-root", "/production"],
+        store,
+        stdin="yes\n",
+    )
 
     assert overlap_status == 1
-    assert "overlaps project 'prod'" in overlap_error
+    assert "overlaps profile 'prod'" in overlap_error
     assert str(root) in overlap_error and str(child) in overlap_error
     assert declined == (
         0,
-        f"Project 'prod' is mapped to '{root}'. Change it to '{separate}'? [y/N] "
-        f"Kept existing mapping '{root}' for 'prod'.\n",
+        "Change mapping for profile 'prod'?\n"
+        f"  Local root: {root} → {separate}\n"
+        "Continue? [y/N] Kept profile 'prod' mapping unchanged.\n",
         "",
     )
     assert remapped == (
         0,
-        f"Project 'prod' is mapped to '{root}'. Change it to '{separate}'? [y/N] "
-        f"Remapped 'prod' from '{root}' to '{separate}'.\n",
+        "Change mapping for profile 'prod'?\n"
+        f"  Local root: {root} → {separate}\n"
+        "Continue? [y/N] Updated profile 'prod' mapping:\n"
+        f"  Local root: {root} → {separate}\n",
+        "",
+    )
+    assert remote_remapped == (
+        0,
+        "Change mapping for profile 'prod'?\n"
+        "  Remote root: /prod → /production\n"
+        "Continue? [y/N] Updated profile 'prod' mapping:\n"
+        "  Remote root: /prod → /production\n",
         "",
     )
     remapped_project = store.load().projects["prod"]
     assert remapped_project.local_root == str(separate)
+    assert remapped_project.remote_root == "/production"
     assert remapped_project.rules == (SyncRule(1, "exclude", "*.log"),)
     assert store.load().projects["staging"].local_root == str(staging_root)
 
@@ -1002,7 +1024,7 @@ def test_push_reports_partial_failure_after_continuing_independent_paths(
     monkeypatch.chdir(workspace)
     invoke(
         [
-            "add",
+            "create",
             "prod",
             "--host",
             "ftp.example.com",
@@ -1064,7 +1086,7 @@ def test_push_reports_partial_failure_after_continuing_independent_paths(
     assert result[0] == 1
     assert uploads == [("good.txt", b"good")]
     assert result[1] == (
-        "Push finished with errors for project 'prod': "
+        "Push finished with errors for profile 'prod': "
         "1 completed, 1 failed, 1 skipped.\n"
         "  failed  blocked: 550 Permission denied\n"
         "  skipped blocked/child.txt: parent directory 'blocked' is unavailable\n"

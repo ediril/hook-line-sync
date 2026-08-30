@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.8.29.1';
+$version = '0.8.29.13';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 $title = 'Hook Line Sync — a better way to "just FTP it"';
@@ -169,7 +169,7 @@ function h(string $value): string
                     </div>
                     <div class="terminal-body">
                         <p><span class="prompt">❯</span> <b>hlsync diff -r</b></p>
-                        <p class="muted">Checking differences for project 'discovery'...</p>
+                        <p class="muted">Checking differences for profile 'discovery'...</p>
                         <p><span class="directory">&nbsp; assets/</span></p>
                         <p><span class="added">+</span> &nbsp; index.php</p>
                         <p class="remote-only"><span>r</span> &nbsp; legacy.php</p>
@@ -210,7 +210,7 @@ function h(string $value): string
                     <div class="step-icon" aria-hidden="true">⌖</div>
                     <h3>Map the project</h3>
                     <p>Connect the current local directory to its remote root. HLS recognizes that project from any directory beneath it.</p>
-                    <code>hlsync add prod --host …</code>
+                    <code>hlsync create prod --host …</code>
                 </li>
                 <li>
                     <span class="step-number">02</span>
