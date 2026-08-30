@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.30.16 — 2026-08-30
+
+### Changed
+
+- State the no-path behavior explicitly in file-operation help.
+
+## 0.8.30.15 — 2026-08-30
+
+### Changed
+
+- Clarify that `hlsync push` without a path recursively pushes the current
+  subtree.
+
 ## 0.8.30.14 — 2026-08-30
 
 ### Changed

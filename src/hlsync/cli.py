@@ -522,8 +522,9 @@ def build_parser() -> argparse.ArgumentParser:
             "       hlsync [PROFILE] lsr [-r] [-i] [PATH ...]"
         ),
         description=(
-            "List one directory level locally, or remotely with --remote/lsr. "
-            "Use -r for descendants and -i to hide exclusions."
+            "With no PATH, list the current directory one level. A directory "
+            "PATH is also shallow unless -r. Use --remote/lsr for remote and "
+            "-i to hide exclusions."
         ),
     )
     add_pattern_operands(
@@ -556,9 +557,9 @@ def build_parser() -> argparse.ArgumentParser:
             "       [--resume DIRECTORY]"
         ),
         description=(
-            "Preview push actions one directory level at a time. Use -r for "
-            "descendants, --pull to reverse direction, -i to hide exclusions, "
-            "and -a to show everything."
+            "With no PATH, preview the current directory one level. A directory "
+            "PATH is also shallow unless -r. Use --pull to reverse direction, "
+            "-i to hide exclusions, and -a to show everything."
         ),
     )
     add_pattern_operands(
@@ -611,13 +612,13 @@ def build_parser() -> argparse.ArgumentParser:
     }
     transfer_description = {
         "push": (
-            "Push local changes. No PATH recurses; a directory PATH is shallow "
-            "unless -r. Remote-only directory PATHs are deleted recursively "
-            "unless -k."
+            "Push local changes. With no PATH, push the current subtree "
+            "recursively. A directory PATH is shallow unless -r. Remote-only "
+            "directory PATHs are deleted recursively unless -k."
         ),
         "pull": (
-            "Update existing local files. A directory PATH is shallow unless "
-            "-r; missing local paths stay missing."
+            "Pull requires a PATH. A directory PATH is shallow unless -r; "
+            "missing local paths stay missing."
         ),
     }
     for command in ("push", "pull"):
