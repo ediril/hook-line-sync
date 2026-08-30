@@ -262,13 +262,14 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
     global_path = tmp_path / "rules.json"
     assert global_path.exists()
     assert GlobalRuleStore(global_path).load().rules == DEFAULT_GLOBAL_RULES
+    assert '"next_rule_id"' not in global_path.read_text(encoding="utf-8")
 
     monkeypatch.chdir(outside)
     assert invoke(
         ["exclude", "-g", "--pattern", "*.tmp"], store
     ) == (
         0,
-        "Recorded global exclusion rules:\n  7  exclude *.tmp\n",
+        "Recorded global exclusion rules:\n  g7  exclude *.tmp\n",
         "",
     )
     assert invoke(
@@ -276,7 +277,7 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
     ) == (
         0,
         "Recorded global inclusion rules:\n"
-        "  8  include **/.DS_Store\n",
+        "  g8  include **/.DS_Store\n",
         "",
     )
 
@@ -292,18 +293,29 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
     assert combined.index("Global synchronization rules:") < combined.index(
         "Synchronization rules for profile 'prod':"
     )
+    assert "  g7  exclude *.tmp\n" in combined
     assert combined.endswith(
         "Global rules apply first; profile rules override them.\n"
     )
-    assert invoke(["rules", "-g", "remove", "8"], store) == (
+    invalid_global_id = invoke(["rules", "-g", "remove", "8"], store)
+    assert invalid_global_id[0] == 1
+    assert "rule id must be g-prefixed (for example g3)" in invalid_global_id[2]
+    assert invoke(["rules", "-g", "remove", "g8"], store) == (
         0,
-        "Removed global rule 8: include **/.DS_Store\n",
+        "Removed global rule g8: include **/.DS_Store\n",
         "",
     )
     assert "x .DS_Store\n" not in invoke(["list"], store)[1]
     assert not any(
         rule.pattern == "**/.DS_Store"
         for rule in GlobalRuleStore(global_path).load().rules
+    )
+    assert invoke(
+        ["exclude", "-g", "--pattern", "*.bak"], store
+    ) == (
+        0,
+        "Recorded global exclusion rules:\n  g8  exclude *.bak\n",
+        "",
     )
 
 
@@ -464,7 +476,6 @@ def test_ordered_exclusion_commands_persist_reinclusion(
         SyncRule(8, "include", "node_modules/package/**"),
         SyncRule(9, "exclude", "docs/note.txt"),
     )
-    assert profile.next_rule_id == 10
     rules = RuleSet(profile.rules)
     assert rules.excludes(".git", is_directory=True)
     assert not rules.excludes("node_modules/package/index.js")
@@ -549,7 +560,6 @@ def test_ordered_exclusion_commands_persist_reinclusion(
         "Removed rule 8 from profile 'prod': include node_modules/package/**\n",
         "",
     )
-    assert store.load().profiles["prod"].next_rule_id == 10
     assert invoke(["inc", "composer.json"], store) == (
         0,
         "Paths are included by the remaining policy for profile 'prod';\n"
@@ -560,7 +570,6 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     updated = store.load().profiles["prod"]
     assert 5 not in {rule.id for rule in updated.rules}
     assert not any(rule.pattern == "composer.json" for rule in updated.rules)
-    assert updated.next_rule_id == 10
     assert "profile mapped to the current directory" not in profile_stdout
 
     (workspace / "root.env").write_text("ROOT=1", encoding="utf-8")

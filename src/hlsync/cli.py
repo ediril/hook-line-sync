@@ -379,10 +379,11 @@ def build_parser() -> argparse.ArgumentParser:
         usage=(
             "hlsync [PROFILE] rules\n"
             "       hlsync [PROFILE] rules remove RULE_ID\n"
-            "       hlsync rules -g [remove RULE_ID]"
+            "       hlsync rules -g [remove GLOBAL_RULE_ID]"
         ),
         description=(
-            "List synchronization rules, or remove one rule by its numeric ID."
+            "List synchronization rules, or remove one by its displayed ID. "
+            "Profile IDs are numeric; global IDs use the gN form."
         ),
     )
     rules_parser.add_argument(
@@ -395,9 +396,8 @@ def build_parser() -> argparse.ArgumentParser:
     rules_parser.add_argument(
         "rule_id",
         nargs="?",
-        type=int,
         metavar="RULE_ID",
-        help="numeric rule ID required by remove",
+        help="displayed rule ID required by remove",
     )
     rules_parser.add_argument(
         "-g",
@@ -787,7 +787,10 @@ def _format_rules(
     )
     if not rules:
         return f"No {scope_heading.lower()}."
-    width = len(str(max(rule.id for rule in rules)))
+    identifiers = {
+        rule.id: _format_rule_id(rule, global_scope=global_scope) for rule in rules
+    }
+    width = max(len(identifier) for identifier in identifiers.values())
     if grouped:
         groups: dict[str, list[tuple[SyncRule, str]]] = {}
         for rule in rules:
@@ -801,7 +804,8 @@ def _format_rules(
                 key=lambda item: (item[1].casefold(), item[1], item[0].id),
             ):
                 lines.append(
-                    f"  {rule.id:>{width}}  {rule.action:<7} {expression}"
+                    f"  {identifiers[rule.id]:>{width}}  "
+                    f"{rule.action:<7} {expression}"
                 )
         if _rules_need_precedence_note(rules):
             lines.extend(("", "Higher rule IDs take precedence when rules overlap."))
@@ -810,7 +814,7 @@ def _format_rules(
         (
             f"{scope_heading}:",
             *(
-                f"  {rule.id:>{width}}  {rule.action:<7} "
+                f"  {identifiers[rule.id]:>{width}}  {rule.action:<7} "
                 f"{_format_rule_expression(rule)}"
                 for rule in rules
             ),
@@ -855,6 +859,19 @@ def _rules_need_precedence_note(rules: tuple[SyncRule, ...]) -> bool:
 
 def _format_rule_expression(rule: SyncRule) -> str:
     return rule.pattern if "*" in rule.pattern else f"./{rule.pattern}"
+
+
+def _format_rule_id(rule: SyncRule, *, global_scope: bool) -> str:
+    return f"g{rule.id}" if global_scope else str(rule.id)
+
+
+def _parse_rule_id(value: str, *, global_scope: bool) -> int:
+    identifier = value[1:] if global_scope and value.startswith("g") else value
+    valid_prefix = not global_scope or value.startswith("g")
+    if not valid_prefix or not identifier.isdigit() or int(identifier) < 1:
+        expected = "g-prefixed (for example g3)" if global_scope else "numeric"
+        raise ConfigurationError(f"rule id must be {expected} in this scope")
+    return int(identifier)
 
 
 def _change_rules(
@@ -938,25 +955,32 @@ def _format_rule_update(
     if update.added and update.removed:
         lines = [f"Updated synchronization rules for {scope}:"]
         lines.extend(
-            f"  added    {rule.id}  {rule.action:<7} {_format_rule_expression(rule)}"
+            f"  added    {_format_rule_id(rule, global_scope=global_scope)}  "
+            f"{rule.action:<7} {_format_rule_expression(rule)}"
             for rule in update.added
         )
         lines.extend(
-            f"  removed  {rule.id}  {rule.action:<7} {_format_rule_expression(rule)}"
+            f"  removed  {_format_rule_id(rule, global_scope=global_scope)}  "
+            f"{rule.action:<7} {_format_rule_expression(rule)}"
             for rule in update.removed
         )
         return "\n".join(lines)
     if update.added:
         action = "Inclusion" if include else "Exclusion"
         if global_scope:
-            width = len(str(max(rule.id for rule in update.added)))
+            identifiers = tuple(
+                _format_rule_id(rule, global_scope=True) for rule in update.added
+            )
+            width = max(len(identifier) for identifier in identifiers)
             return "\n".join(
                 (
                     f"Recorded global {action.lower()} rules:",
                     *(
-                        f"  {rule.id:>{width}}  {rule.action:<7} "
+                        f"  {identifier:>{width}}  {rule.action:<7} "
                         f"{_format_rule_expression(rule)}"
-                        for rule in update.added
+                        for rule, identifier in zip(
+                            update.added, identifiers, strict=True
+                        )
                     ),
                 )
             )
@@ -976,10 +1000,15 @@ def _format_rule_update(
             f"Paths are {result} by the remaining {remaining_scope};",
             "removed the unnecessary rules:",
         ]
-        width = len(str(max(rule.id for rule in update.removed)))
-        lines.extend(
-            f"  {rule.id:>{width}}  {rule.action:<7} {_format_rule_expression(rule)}"
+        identifiers = tuple(
+            _format_rule_id(rule, global_scope=global_scope)
             for rule in update.removed
+        )
+        width = max(len(identifier) for identifier in identifiers)
+        lines.extend(
+            f"  {identifier:>{width}}  {rule.action:<7} "
+            f"{_format_rule_expression(rule)}"
+            for rule, identifier in zip(update.removed, identifiers, strict=True)
         )
         return "\n".join(lines)
     return f"Synchronization rules for {scope} are unchanged."
@@ -1005,11 +1034,11 @@ def _manage_rules(
         if arguments.rule_id is None:
             raise ConfigurationError("rules remove requires a rule id")
         global_configuration, removed = global_configuration.without_rule(
-            arguments.rule_id
+            _parse_rule_id(arguments.rule_id, global_scope=True)
         )
         global_store.save(global_configuration)
         return (
-            f"Removed global rule {removed.id}: "
+            f"Removed global rule {_format_rule_id(removed, global_scope=True)}: "
             f"{removed.action} {_format_rule_expression(removed)}"
         )
     configuration, name, profile = _resolve_profile(arguments, store)
@@ -1035,7 +1064,10 @@ def _manage_rules(
         )
     if arguments.rule_id is None:
         raise ConfigurationError("rules remove requires a rule id")
-    removed = configuration.remove_rule(name, arguments.rule_id)
+    removed = configuration.remove_rule(
+        name,
+        _parse_rule_id(arguments.rule_id, global_scope=False),
+    )
     store.save(configuration)
     return (
         f"Removed rule {removed.id} from profile '{name}': "

@@ -1,5 +1,9 @@
 # Work Queue
 
+- [x] Remove persisted rule-ID allocation counters and derive disposable IDs
+  from the rules that currently exist.
+- [x] Namespace global rule identifiers as `gN` in the CLI so they cannot be
+  confused with profile rule IDs.
 - [x] Fold interrupted-upload recovery into selected push traversal so it does
   not recursively pre-scan the remote profile or list its directories twice.
 - [x] Add a user-owned global synchronization policy with conservative defaults,

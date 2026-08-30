@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.30.3 — 2026-08-30
+
+### Changed
+
+- Remove persisted `next_rule_id` counters from global and profile
+  configuration; new disposable IDs now follow the highest current ID.
+
+## 0.8.30.2 — 2026-08-30
+
+### Changed
+
+- Display and accept global rule IDs as `g1`, `g2`, and so on, keeping them
+  unambiguous beside numeric profile rule IDs.
+
 ## 0.8.30.1 — 2026-08-30
 
 ### Changed

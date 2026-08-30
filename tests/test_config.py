@@ -28,7 +28,6 @@ def test_configuration_round_trip_persists_mapping_without_secrets(tmp_path) -> 
                     SyncRule(1, "exclude", "node_modules/**"),
                     SyncRule(2, "exclude", "*.log"),
                 ),
-                next_rule_id=3,
             )
         }
     )
@@ -41,13 +40,13 @@ def test_configuration_round_trip_persists_mapping_without_secrets(tmp_path) -> 
     assert store.load() == configuration
     document = json.loads(path.read_text(encoding="utf-8"))
     profile = document["profiles"]["prod"]
-    assert document["version"] == 8
+    assert document["version"] == 9
     assert profile["local_root"] == str(local_root)
     assert profile["rules"] == [
         {"id": 1, "action": "exclude", "pattern": "node_modules/**"},
         {"id": 2, "action": "exclude", "pattern": "*.log"},
     ]
-    assert profile["next_rule_id"] == 3
+    assert "next_rule_id" not in profile
     assert "username" not in profile and "password" not in profile
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
@@ -62,16 +61,16 @@ def test_profile_rejects_invalid_ports(port) -> None:
 
 def test_store_rejects_old_configuration_schemas(tmp_path) -> None:
     path = tmp_path / "configs.json"
-    path.write_text('{"version": 7, "profiles": {}}')
+    path.write_text('{"version": 8, "profiles": {}}')
 
     message = (
-        r"config version mismatch \(found 7, expected 8\); configuration "
+        r"config version mismatch \(found 8, expected 9\); configuration "
         r"schema changed—recreate config"
     )
     with pytest.raises(ConfigurationError, match=message):
         ConfigurationStore(path).load()
 
-    path.write_text('{"version": 8, "projects": {}}')
+    path.write_text('{"version": 9, "projects": {}}')
     with pytest.raises(
         ConfigurationError,
         match="configuration has unknown or missing fields",

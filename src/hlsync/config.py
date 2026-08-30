@@ -10,7 +10,7 @@ from typing import Any
 from hlsync.rules import RuleAction, RuleError, RuleSet, SyncRule
 from hlsync.storage import write_json_atomic
 
-CONFIG_VERSION = 8
+CONFIG_VERSION = 9
 GLOBAL_RULES_VERSION = 1
 PROFILE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 ENVIRONMENT_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -119,12 +119,11 @@ def _rule_action_already_applies(
 
 def _append_rules(
     rules: tuple[SyncRule, ...],
-    next_rule_id: int,
     action: RuleAction,
     patterns: tuple[str, ...],
     *,
     base_rules: tuple[SyncRule, ...] = (),
-) -> tuple[tuple[SyncRule, ...], int, RuleUpdate]:
+) -> tuple[tuple[SyncRule, ...], RuleUpdate]:
     ordered = list(rules)
     added: list[SyncRule] = []
     removed: list[SyncRule] = []
@@ -140,13 +139,12 @@ def _append_rules(
         ):
             removed.extend(replaced)
             continue
-        rule = SyncRule(next_rule_id, action, pattern)
+        next_id = max((rule.id for rule in ordered), default=0) + 1
+        rule = SyncRule(next_id, action, pattern)
         ordered.append(rule)
         added.append(rule)
-        next_rule_id += 1
     return (
         tuple(ordered),
-        next_rule_id,
         RuleUpdate(tuple(added), tuple(removed)),
     )
 
@@ -163,22 +161,11 @@ def _remove_rule(
     return tuple(rule for rule in rules if rule.id != rule_id), removed
 
 
-def _validate_rule_sequence(
-    rules: tuple[SyncRule, ...],
-    next_rule_id: int,
-) -> tuple[SyncRule, ...]:
+def _validate_rule_sequence(rules: tuple[SyncRule, ...]) -> tuple[SyncRule, ...]:
     try:
         rule_set = RuleSet(rules)
     except RuleError as error:
         raise ConfigurationError(str(error)) from error
-    if (
-        isinstance(next_rule_id, bool)
-        or not isinstance(next_rule_id, int)
-        or next_rule_id < 1
-    ):
-        raise ConfigurationError("next_rule_id must be a positive integer")
-    if rule_set.rules and next_rule_id <= rule_set.rules[-1].id:
-        raise ConfigurationError("next_rule_id must be greater than every rule id")
     return rule_set.rules
 
 
@@ -192,7 +179,6 @@ class ProfileConfiguration:
     type: str = "ftps"
     local_root: str | None = None
     rules: tuple[SyncRule, ...] = ()
-    next_rule_id: int = 1
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "host", _required_string(self.host, "host"))
@@ -225,7 +211,7 @@ class ProfileConfiguration:
         object.__setattr__(
             self,
             "rules",
-            _validate_rule_sequence(self.rules, self.next_rule_id),
+            _validate_rule_sequence(self.rules),
         )
         if self.local_root is None and self.rules:
             raise ConfigurationError("an unmapped profile cannot have rules")
@@ -245,14 +231,11 @@ class ProfileConfiguration:
             type=self.type,
             local_root=local_root,
             rules=self.rules,
-            next_rule_id=self.next_rule_id,
         )
 
     def with_rules(
         self,
         rules: tuple[SyncRule, ...],
-        *,
-        next_rule_id: int | None = None,
     ) -> ProfileConfiguration:
         if self.local_root is None:
             raise ConfigurationError("cannot change rules for an unmapped profile")
@@ -265,7 +248,6 @@ class ProfileConfiguration:
             type=self.type,
             local_root=self.local_root,
             rules=rules,
-            next_rule_id=self.next_rule_id if next_rule_id is None else next_rule_id,
         )
 
     def remote_path_for(self, local_path: Path) -> str:
@@ -291,7 +273,6 @@ class ProfileConfiguration:
             "password_env": self.password_env,
             "local_root": self.local_root,
             "rules": [rule.to_dict() for rule in self.rules],
-            "next_rule_id": self.next_rule_id,
         }
 
     @classmethod
@@ -307,7 +288,6 @@ class ProfileConfiguration:
             "password_env",
             "local_root",
             "rules",
-            "next_rule_id",
         }
         unknown = set(value) - expected
         if unknown:
@@ -331,7 +311,6 @@ class ProfileConfiguration:
                 password_env=value["password_env"],
                 local_root=value["local_root"],
                 rules=decoded_rules,
-                next_rule_id=value["next_rule_id"],
             )
         except KeyError as error:
             raise ConfigurationError(
@@ -391,17 +370,13 @@ class ApplicationConfiguration:
         base_rules: tuple[SyncRule, ...] = (),
     ) -> RuleUpdate:
         profile = self.profiles[profile_name]
-        rules, next_rule_id, update = _append_rules(
+        rules, update = _append_rules(
             profile.rules,
-            profile.next_rule_id,
             action,
             patterns,
             base_rules=base_rules,
         )
-        self.profiles[profile_name] = profile.with_rules(
-            rules,
-            next_rule_id=next_rule_id,
-        )
+        self.profiles[profile_name] = profile.with_rules(rules)
         return update
 
     def remove_rule(self, profile_name: str, rule_id: int) -> SyncRule:
@@ -459,13 +434,12 @@ class ApplicationConfiguration:
 @dataclass(frozen=True)
 class GlobalRuleConfiguration:
     rules: tuple[SyncRule, ...] = DEFAULT_GLOBAL_RULES
-    next_rule_id: int = len(DEFAULT_GLOBAL_RULES) + 1
 
     def __post_init__(self) -> None:
         object.__setattr__(
             self,
             "rules",
-            _validate_rule_sequence(self.rules, self.next_rule_id),
+            _validate_rule_sequence(self.rules),
         )
 
     def with_appended_rules(
@@ -473,13 +447,12 @@ class GlobalRuleConfiguration:
         action: RuleAction,
         patterns: tuple[str, ...],
     ) -> tuple[GlobalRuleConfiguration, RuleUpdate]:
-        rules, next_rule_id, update = _append_rules(
+        rules, update = _append_rules(
             self.rules,
-            self.next_rule_id,
             action,
             patterns,
         )
-        return GlobalRuleConfiguration(rules, next_rule_id), update
+        return GlobalRuleConfiguration(rules), update
 
     def without_rule(
         self,
@@ -490,13 +463,12 @@ class GlobalRuleConfiguration:
             rule_id,
             scope="global synchronization policy",
         )
-        return GlobalRuleConfiguration(rules, self.next_rule_id), removed
+        return GlobalRuleConfiguration(rules), removed
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "version": GLOBAL_RULES_VERSION,
             "rules": [rule.to_dict() for rule in self.rules],
-            "next_rule_id": self.next_rule_id,
         }
 
     @classmethod
@@ -508,7 +480,7 @@ class GlobalRuleConfiguration:
                 "global rules version mismatch "
                 f"(found {value.get('version')!r}, expected {GLOBAL_RULES_VERSION})"
             )
-        if set(value) != {"version", "rules", "next_rule_id"}:
+        if set(value) != {"version", "rules"}:
             raise ConfigurationError(
                 "global rules document has unknown or missing fields"
             )
@@ -519,7 +491,7 @@ class GlobalRuleConfiguration:
             decoded = tuple(SyncRule.from_dict(rule) for rule in rules)
         except RuleError as error:
             raise ConfigurationError(str(error)) from error
-        return cls(decoded, value["next_rule_id"])
+        return cls(decoded)
 
 
 class ConfigurationStore:

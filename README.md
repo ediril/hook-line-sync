@@ -150,13 +150,16 @@ hlsync exclude -g --pattern '*.tmp'
 hlsync include -g --pattern 'public/*.tmp'
 hlsync exclude -g                 # list global exclusions
 hlsync rules -g                   # inspect global rules
-hlsync rules -g remove RULE_ID    # remove one global rule
+hlsync rules -g remove g4         # remove global rule g4
 ```
 
 Global rules apply first and profile rules apply afterward, so an ordinary
 profile inclusion can override a global exclusion. `hlsync rules` shows both
-layers and their precedence. HLSync never silently adds new defaults to an
-existing global rules file.
+layers and their precedence. Global rules have `g`-prefixed IDs such as `g4`;
+profile rule IDs remain numeric, so identifiers cannot be confused between
+the two scopes. IDs identify only current rules and may be reused after a rule
+is removed. HLSync never silently adds new defaults to an existing global rules
+file.
 
 Exclude current paths permanently:
 
