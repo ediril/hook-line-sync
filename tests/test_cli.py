@@ -107,12 +107,15 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     push_help = invoke(["help", "push"], store)[1]
     assert "-k, --keep-remote" in push_help
     assert "--prune-remote" not in push_help
+    profile_help = invoke(["help", "profile"], store)[1]
+    assert "--details" in profile_help
+    assert "--info" not in profile_help
     rules_help = invoke(["help", "rules"], store)[1]
     assert "hlsync [PROFILE] rules" in rules_help
     assert "hlsync [PROFILE] rules remove RULE_ID" in rules_help
     assert "--profile" not in rules_help
     assert "[{remove}] [rule_id]" not in rules_help
-    assert "profile             show details for one profile" in help_output
+    assert "profile             show the current profile" in help_output
     assert "profiles            list configured profiles" in help_output
     assert "list                list the current local directory" in help_output
     map_help = invoke(["help", "map"], store)[1]
@@ -153,7 +156,7 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     list_status, list_stdout, list_stderr = invoke(["profiles"], store)
     assert (list_status, list_stderr) == (0, "")
     assert list_stdout == "* client-site\n"
-    assert invoke(["profile", "client-site"], store) == (
+    profile_details = (
         0,
         "Profile 'client-site':\n"
         "  Protocol: FTPS\n"
@@ -164,6 +167,24 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
         "  Password env: PROD_FTPS_PASSWORD\n"
         "  Rules: 0\n",
         "",
+    )
+    assert invoke(["profile"], store) == (0, "client-site\n", "")
+    assert invoke(["profile", "--details"], store) == profile_details
+    assert invoke(["profile", "client-site"], store) == (
+        0,
+        "client-site\n",
+        "",
+    )
+    assert invoke(["profile", "client-site", "--details"], store) == (
+        profile_details
+    )
+    assert invoke(["client-site", "profile"], store) == (
+        0,
+        "client-site\n",
+        "",
+    )
+    assert invoke(["client-site", "profile", "--details"], store) == (
+        profile_details
     )
     assert invoke(["root", "client-site"], store) == (0, f"{tmp_path}\n", "")
 
@@ -556,7 +577,8 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     )
     list_stdout = invoke(["profiles"], store)[1]
     assert "* prod\n" in list_stdout
-    profile_stdout = invoke(["profile"], store)[1]
+    assert invoke(["profile"], store) == (0, "prod\n", "")
+    profile_stdout = invoke(["profile", "--details"], store)[1]
     assert f"  Local root: {workspace}\n" in profile_stdout
     assert "  Rules: 9\n" in profile_stdout
     assert invoke(["root"], store) == (0, f"{workspace}\n", "")

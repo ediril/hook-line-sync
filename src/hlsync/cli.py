@@ -422,14 +422,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     profile_parser = subparsers.add_parser(
         "profile",
-        help="show details for one profile",
-        usage="hlsync profile [PROFILE]\n       hlsync PROFILE profile",
+        help="show the current profile or detailed profile information",
+        usage=(
+            "hlsync profile [PROFILE] [--details]\n"
+            "       hlsync PROFILE profile [--details]"
+        ),
     )
     profile_parser.add_argument(
         "profile_name",
         nargs="?",
         metavar="PROFILE",
         help="profile name; inferred from the current directory when omitted",
+    )
+    profile_parser.add_argument(
+        "--details",
+        dest="profile_details",
+        action="store_true",
+        help="show endpoint, mapping, credentials, and rule count",
     )
 
     subparsers.add_parser("profiles", help="list configured profiles")
@@ -1093,15 +1102,20 @@ def _show_profile(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
 ) -> str:
-    if (
+    implicit = (
         getattr(arguments, "profile_prefix", None) is None
         and arguments.profile_name is None
-    ):
+    )
+    if implicit:
         configuration = store.load()
         active = configuration.profile_for_path(Path.cwd().resolve(strict=True))
         if active is None:
             return "No active profile. Use hlsync PROFILE COMMAND."
-    _, name, profile = _resolve_profile(arguments, store)
+        name, profile = active
+    else:
+        _, name, profile = _resolve_profile(arguments, store)
+    if not arguments.profile_details:
+        return name
     return "\n".join(
         (
             f"Profile '{name}':",

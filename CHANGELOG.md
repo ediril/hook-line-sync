@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.8.30.7 — 2026-08-30
+
+### Changed
+
+- Apply the compact-by-default `profile` view to named and profile-prefixed
+  lookups; require `--details` consistently for the full view.
+
+## 0.8.30.6 — 2026-08-30
+
+### Changed
+
+- Keep `--details` as the single option for the full `hlsync profile` view;
+  remove the redundant `--info` alias.
+
+## 0.8.30.5 — 2026-08-30
+
+### Changed
+
+- Make bare `hlsync profile` print only the active profile name; add equivalent
+  `--info` and `--details` options for the full profile view.
+
 ## 0.8.30.4 — 2026-08-30
 
 ### Changed

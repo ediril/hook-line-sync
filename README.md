@@ -95,8 +95,10 @@ local scope automatically:
 
 ```console
 hlsync profiles          # all profiles; * marks the current one
-hlsync profile           # current profile details
-hlsync profile staging   # named profile details
+hlsync profile           # current profile name
+hlsync profile --details # current profile details
+hlsync profile staging   # verify and print a named profile
+hlsync profile staging --details
 hlsync root staging      # print the mapped local root only
 hlsync connect            # verify FTPS, then disconnect
 hlsync remove staging    # remove local configuration only
@@ -104,7 +106,8 @@ hlsync remove staging    # remove local configuration only
 
 Outside every mapped root, `hlsync profile` reports that no profile is active
 and suggests `hlsync PROFILE COMMAND`. Commands that require a profile need
-that explicit profile prefix.
+that explicit profile prefix. Named and inferred lookups both require
+`--details` for the full view.
 
 Because `root` writes only the canonical path, it can be composed with the
 shell when you want to switch directories:
