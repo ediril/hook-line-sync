@@ -339,10 +339,10 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
     assert "x .DS_Store\n" not in included
     assert "x scratch.tmp\n" not in included
     combined = invoke(["rules"], store)[1]
-    assert combined.index("Global rules:") < combined.index("Profile 'prod' rules:")
-    assert "    g7  exclude *.tmp\n" in combined
+    assert combined.startswith("Rules for profile 'prod':\n")
+    assert "    g7  exclude *.tmp\n     1  include *.tmp\n" in combined
     assert combined.endswith(
-        "Later rules win; profile rules override global rules.\n"
+        "Profile rules override global rules; later matching rules win.\n"
     )
     invalid_global_id = invoke(["rules", "-g", "--remove", "8"], store)
     assert invalid_global_id[0] == 1
@@ -564,9 +564,9 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     assert rules_view[0] == 0
     assert rules_view[1].index("./\n") < rules_view[1].index(".git/\n")
     assert rules_view[1].index(".git/\n") < rules_view[1].index("docs/\n")
-    assert "    2  exclude all contents\n    7  include keep.js\n" in rules_view[1]
+    assert "     2  exclude all contents\n     7  include keep.js\n" in rules_view[1]
     assert rules_view[1].endswith(
-        "Later rules win; profile rules override global rules.\n"
+        "Profile rules override global rules; later matching rules win.\n"
     )
     list_stdout = invoke(["profiles"], store)[1]
     assert "* prod\n" in list_stdout
@@ -1122,7 +1122,7 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
         SyncRule(1, "exclude", "future-dir", "remote"),
     )
     rules_view = invoke(["rules"], store)[1]
-    assert "  Remote:\n    ./\n      1  exclude future-dir\n" in rules_view
+    assert "  Remote:\n    ./\n       1  exclude future-dir\n" in rules_view
 
     listed = []
     operations = []

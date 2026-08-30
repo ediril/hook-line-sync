@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.30.19 — 2026-08-30
+
+### Changed
+
+- Merge global and profile rules into one folder-grouped overview, retaining
+  `g`-prefixed global IDs and profile-over-global display precedence.
+
 ## 0.8.30.18 — 2026-08-30
 
 ### Changed

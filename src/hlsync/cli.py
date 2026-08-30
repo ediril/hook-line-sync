@@ -105,6 +105,16 @@ class _PendingDiffOutput:
     lines: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class _DisplayedRule:
+    rule: SyncRule
+    global_scope: bool
+
+    @property
+    def identifier(self) -> str:
+        return _format_rule_id(self.rule, global_scope=self.global_scope)
+
+
 CANONICAL_COMMANDS = (
     "create",
     "connect",
@@ -832,58 +842,19 @@ def _format_rules(
     rules: tuple[SyncRule, ...],
     *,
     heading: str,
-    grouped: bool = False,
     global_scope: bool = False,
-    show_targets: bool = False,
 ) -> str:
-    if grouped and heading == "Rules":
-        scope_heading = "Global rules" if global_scope else f"Profile '{name}' rules"
-    else:
-        scope_heading = (
-            f"Global {heading.lower()}"
-            if global_scope
-            else f"{heading} for profile '{name}'"
-        )
+    scope_heading = (
+        f"Global {heading.lower()}"
+        if global_scope
+        else f"{heading} for profile '{name}'"
+    )
     if not rules:
         return f"No {scope_heading.lower()}."
     identifiers = {
         rule.id: _format_rule_id(rule, global_scope=global_scope) for rule in rules
     }
     width = max(len(identifier) for identifier in identifiers.values())
-    if grouped:
-        populated_targets = tuple(
-            (label, tuple(rule for rule in rules if rule.target == target))
-            for label, target in (("Local", "local"), ("Remote", "remote"))
-            if any(rule.target == target for rule in rules)
-        )
-        show_target_headings = show_targets and (
-            len(populated_targets) > 1
-            or (populated_targets and populated_targets[0][0] == "Remote")
-        )
-        target_groups = populated_targets if show_targets else (("", rules),)
-        lines = [f"{scope_heading}:"]
-        for target_heading, target_rules in target_groups:
-            if not target_rules:
-                continue
-            group_indent = "  "
-            if show_target_headings:
-                lines.append(f"  {target_heading}:")
-                group_indent = "    "
-            groups: dict[str, list[tuple[SyncRule, str]]] = {}
-            for rule in target_rules:
-                group, expression = _rule_display_location(rule)
-                groups.setdefault(group, []).append((rule, expression))
-            for group in sorted(groups, key=_rule_group_key):
-                lines.append(f"{group_indent}{group}")
-                for rule, expression in sorted(
-                    groups[group],
-                    key=lambda item: (item[1].casefold(), item[1], item[0].id),
-                ):
-                    lines.append(
-                        f"{group_indent}  {identifiers[rule.id]:>{width}}  "
-                        f"{rule.action:<7} {expression}"
-                    )
-        return "\n".join(lines)
     return "\n".join(
         (
             f"{scope_heading}:",
@@ -894,6 +865,64 @@ def _format_rules(
             ),
         )
     )
+
+
+def _format_rule_overview(
+    *,
+    profile_name: str | None,
+    global_rules: tuple[SyncRule, ...],
+    profile_rules: tuple[SyncRule, ...] = (),
+) -> str:
+    displayed = tuple(
+        _DisplayedRule(rule, True) for rule in global_rules
+    ) + tuple(_DisplayedRule(rule, False) for rule in profile_rules)
+    scope = (
+        "global rules"
+        if profile_name is None
+        else f"rules for profile '{profile_name}'"
+    )
+    if not displayed:
+        return f"No {scope}."
+    heading = (
+        "Global rules:"
+        if profile_name is None
+        else f"Rules for profile '{profile_name}':"
+    )
+    width = max(len(entry.identifier) for entry in displayed)
+    populated_targets = tuple(
+        (label, tuple(entry for entry in displayed if entry.rule.target == target))
+        for label, target in (("Local", "local"), ("Remote", "remote"))
+        if any(entry.rule.target == target for entry in displayed)
+    )
+    show_target_headings = len(populated_targets) > 1 or (
+        populated_targets and populated_targets[0][0] == "Remote"
+    )
+    lines = [heading]
+    for target_heading, target_rules in populated_targets:
+        group_indent = "  "
+        if show_target_headings:
+            lines.append(f"  {target_heading}:")
+            group_indent = "    "
+        groups: dict[str, list[tuple[_DisplayedRule, str]]] = {}
+        for entry in target_rules:
+            group, expression = _rule_display_location(entry.rule)
+            groups.setdefault(group, []).append((entry, expression))
+        for group in sorted(groups, key=_rule_group_key):
+            lines.append(f"{group_indent}{group}")
+            for entry, expression in sorted(
+                groups[group],
+                key=lambda item: (
+                    item[1].casefold(),
+                    item[1],
+                    item[0].global_scope is False,
+                    item[0].rule.id,
+                ),
+            ):
+                lines.append(
+                    f"{group_indent}  {entry.identifier:>{width}}  "
+                    f"{entry.rule.action:<7} {expression}"
+                )
+    return "\n".join(lines)
 
 
 def _rule_display_location(rule: SyncRule) -> tuple[str, str]:
@@ -1107,13 +1136,9 @@ def _manage_rules(
         global_store = _global_rule_store(store)
         global_configuration = global_store.load()
         if arguments.rule_id is None:
-            formatted = _format_rules(
-                "",
-                global_configuration.rules,
-                heading="Rules",
-                grouped=True,
-                global_scope=True,
-                show_targets=True,
+            formatted = _format_rule_overview(
+                profile_name=None,
+                global_rules=global_configuration.rules,
             )
             if _rules_need_precedence_note(global_configuration.rules):
                 return f"{formatted}\nLater rules win."
@@ -1129,24 +1154,14 @@ def _manage_rules(
     configuration, name, profile = _resolve_profile(arguments, store)
     if arguments.rule_id is None:
         global_configuration = _global_rule_store(store).load()
-        global_rules = _format_rules(
-            "",
-            global_configuration.rules,
-            heading="Rules",
-            grouped=True,
-            global_scope=True,
-            show_targets=True,
-        )
-        profile_rules = _format_rules(
-            name,
-            profile.rules,
-            heading="Rules",
-            grouped=True,
-            show_targets=True,
+        overview = _format_rule_overview(
+            profile_name=name,
+            global_rules=global_configuration.rules,
+            profile_rules=profile.rules,
         )
         return (
-            f"{global_rules}\n\n{profile_rules}\n\n"
-            "Later rules win; profile rules override global rules."
+            f"{overview}\n\n"
+            "Profile rules override global rules; later matching rules win."
         )
     removed = configuration.remove_rule(
         name,

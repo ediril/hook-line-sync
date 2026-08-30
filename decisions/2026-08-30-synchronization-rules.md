@@ -22,6 +22,11 @@ inclusions with `-i` / `--include`, and removes a displayed ID with `--remove`.
 Global operands are reusable patterns rooted at each profile root; a trailing
 slash denotes a complete directory tree.
 
+The default overview presents global and profile rules as one folder-grouped
+policy. Global IDs retain their `g` prefix, and matching profile entries appear
+after global entries to expose precedence without requiring the user to merge
+two lists mentally. `rules -g` remains a global-only administrative view.
+
 Stored IDs are positive integers scoped to their separate files and calculated
 as the highest current ID plus one. Deleting the highest rule permits its ID to
 be reused; deleting every rule restarts numbering at one. No allocation counter
@@ -38,10 +43,11 @@ segment, and a complete
 `**` segment matches across directory levels. Empty patterns, absolute paths,
 parent traversal, `?`, bracket patterns, and partial-segment `**` are rejected.
 
-Adding the same normalized pattern removes its prior rule before evaluating
-the requested action. Further cleanup occurs only where equivalence can be
-proved without changing the effective layered policy. Rule inspection may
-group and sort for readability, but evaluation remains ordered.
+Adding the same normalized pattern removes its prior rule within that storage
+layer before evaluating the requested action. Further cleanup occurs only where
+equivalence can be proved without changing the effective layered policy. Rule
+inspection may merge layers, group, and sort for readability, but evaluation
+remains ordered.
 
 Local rules define the authoritative local set. Remote rules define boundaries
 that must not be traversed, uploaded, replaced, or deleted. Remote operands are
