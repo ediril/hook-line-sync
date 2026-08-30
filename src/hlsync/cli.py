@@ -288,15 +288,36 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     create_parser = subparsers.add_parser(
-        "create", help="create an FTPS profile with a mapped local root"
+        "create",
+        help="create an FTPS profile with a mapped local root",
+        description=(
+            "Create an FTPS profile. Credentials remain in environment "
+            "variables. Without --local-root, confirm the current directory "
+            "or enter another local directory."
+        ),
     )
-    create_parser.add_argument("profile_name")
-    create_parser.add_argument("--host", required=True)
-    create_parser.add_argument("--remote-root", required=True)
-    create_parser.add_argument("--protocol", choices=("ftps",), default="ftps")
-    create_parser.add_argument("--port", type=int, default=21)
-    create_parser.add_argument("--username-env")
-    create_parser.add_argument("--password-env")
+    create_parser.add_argument("profile_name", help="new profile name")
+    create_parser.add_argument("--host", required=True, help="FTPS server host")
+    create_parser.add_argument(
+        "--remote-root", required=True, help="absolute server directory"
+    )
+    create_parser.add_argument(
+        "--protocol",
+        choices=("ftps",),
+        default="ftps",
+        help="transfer protocol (default: ftps)",
+    )
+    create_parser.add_argument(
+        "--port", type=int, default=21, help="server port (default: 21)"
+    )
+    create_parser.add_argument(
+        "--username-env",
+        help=f"username environment variable (default: {DEFAULT_USERNAME_ENV})",
+    )
+    create_parser.add_argument(
+        "--password-env",
+        help=f"password environment variable (default: {DEFAULT_PASSWORD_ENV})",
+    )
     create_parser.add_argument(
         "--local-root",
         metavar="PATH",
@@ -310,8 +331,14 @@ def build_parser() -> argparse.ArgumentParser:
         "connect",
         help="verify a profile's FTPS connection",
         usage="hlsync connect [PROFILE]\n       hlsync PROFILE connect",
+        description=(
+            "Verify one secure FTPS connection, then disconnect. The profile "
+            "is inferred from the current directory unless named explicitly."
+        ),
     )
-    connect_parser.add_argument("profile_name", nargs="?")
+    connect_parser.add_argument(
+        "profile_name", nargs="?", help="profile; inferred when omitted"
+    )
 
     map_parser = subparsers.add_parser(
         "map",
@@ -320,8 +347,16 @@ def build_parser() -> argparse.ArgumentParser:
             "hlsync map [PROFILE] [--local-root PATH] [--remote-root PATH]\n"
             "       hlsync PROFILE map [--local-root PATH] [--remote-root PATH]"
         ),
+        description=(
+            "Change either mapped root after confirmation; confirmation "
+            "defaults to no. Omitted roots remain unchanged, except an "
+            "when neither root is supplied, the local root defaults to the "
+            "current directory."
+        ),
     )
-    map_parser.add_argument("profile_name", nargs="?")
+    map_parser.add_argument(
+        "profile_name", nargs="?", help="profile; inferred when omitted"
+    )
     map_parser.add_argument(
         "--local-root",
         metavar="PATH",
@@ -353,6 +388,12 @@ def build_parser() -> argparse.ArgumentParser:
                 f"       hlsync [PROFILE] {command} --pattern PATTERN ...\n"
                 f"       hlsync [PROFILE] {command} --remote PATH ...\n"
                 f"       hlsync {command} -g [PATTERN ...]"
+            ),
+            description=(
+                f"Record {rule_name} rules, or list them when no paths are "
+                "given. Ordinary operands resolve existing local paths; "
+                "--pattern records future matches, --remote targets protected "
+                "remote paths, and -g targets every profile."
             ),
         )
         add_pattern_operands(
@@ -420,13 +461,23 @@ def build_parser() -> argparse.ArgumentParser:
         "remove",
         help="remove a profile",
         usage="hlsync remove [PROFILE]\n       hlsync PROFILE remove",
+        description=(
+            "Remove only the local profile configuration. Remote files are "
+            "not changed. The current profile is used when omitted."
+        ),
     )
-    remove_parser.add_argument("profile_name", nargs="?")
+    remove_parser.add_argument(
+        "profile_name", nargs="?", help="profile; inferred when omitted"
+    )
 
     root_parser = subparsers.add_parser(
         "root",
         help="print a profile's mapped local root",
         usage="hlsync root [PROFILE]\n       hlsync PROFILE root",
+        description=(
+            "Print only the canonical mapped local root, suitable for shell "
+            "composition such as cd \"$(hlsync root PROFILE)\"."
+        ),
     )
     root_parser.add_argument(
         "profile_name",
@@ -442,6 +493,10 @@ def build_parser() -> argparse.ArgumentParser:
             "hlsync profile [PROFILE] [--details]\n"
             "       hlsync PROFILE profile [--details]"
         ),
+        description=(
+            "Print the inferred or named profile. The default is its name "
+            "only; --details adds endpoint, mapping, credentials, and rules."
+        ),
     )
     profile_parser.add_argument(
         "profile_name",
@@ -456,7 +511,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="show endpoint, mapping, credentials, and rule count",
     )
 
-    subparsers.add_parser("profiles", help="list configured profiles")
+    subparsers.add_parser(
+        "profiles",
+        help="list configured profiles",
+        description=(
+            "List configured profile names. An asterisk marks the profile "
+            "containing the current directory."
+        ),
+    )
 
     list_parser = subparsers.add_parser(
         "list",
@@ -468,12 +530,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         description=(
             "List selected paths and exclusion status. Local listing is the "
-            "default and does not connect; --remote reads the mapped FTPS tree."
+            "default and does not connect; --remote/lsr reads FTPS. With no "
+            "path, list the current directory one level deep. An explicit "
+            "directory also lists one level; -r includes descendants."
         ),
     )
     add_pattern_operands(
         list_parser,
         required=False,
+        metavar="PATH",
         help_text=(
             "relative file paths or wildcard patterns; defaults to immediate "
             "contents of the current directory"
@@ -502,14 +567,18 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         description=(
             "Preview file changes without modifying local or remote files. "
-            "Shows actionable differences from the local perspective by "
-            "default; use --all for the complete comparison or --pull for the "
-            "remote perspective."
+            "With no path or an explicit directory, inspect one level; -r "
+            "includes descendants. The default projects push actions from "
+            "local authority; --pull reverses perspective, -i hides exclusions, "
+            "and --all also shows unchanged and untraversed entries. Bare diff "
+            "marks remote-only directories as collapsed subtree deletions to "
+            "match recursive bare push."
         ),
     )
     add_pattern_operands(
         diff_parser,
         required=False,
+        metavar="PATH",
         help_text=(
             "relative file paths or wildcard patterns; defaults to immediate "
             "contents of the current directory"
@@ -533,7 +602,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--all",
         dest="show_all",
         action="store_true",
-        help="also show unchanged and excluded paths",
+        help="also show unchanged and untraversed paths",
     )
     diff_parser.add_argument(
         "--paged",
@@ -558,11 +627,15 @@ def build_parser() -> argparse.ArgumentParser:
     transfer_description = {
         "push": (
             "Upload new and changed local files and delete selected remote-only "
-            "paths. Use --keep-remote to retain them."
+            "paths. With no path, push the complete current subtree recursively. "
+            "An explicit included directory is shallow unless -r is supplied. "
+            "An explicit remote-only directory is fully walked so it can be "
+            "deleted; -k retains remote-only paths."
         ),
         "pull": (
             "Replace changed existing local files from the remote profile. "
-            "Missing local files are not restored."
+            "A path is required. An explicit directory is shallow unless -r "
+            "is supplied. Missing local files are not restored."
         ),
     }
     for command in ("push", "pull"):
@@ -571,7 +644,11 @@ def build_parser() -> argparse.ArgumentParser:
             help=transfer_help[command],
             description=transfer_description[command],
             usage=(
-                f"hlsync [PROFILE] {command} [PATH ...] [-r]"
+                (
+                    "hlsync [PROFILE] pull PATH [PATH ...] [-r]"
+                    if command == "pull"
+                    else "hlsync [PROFILE] push [PATH ...] [-r]"
+                )
                 + (" [-k]" if command == "push" else "")
             ),
         )

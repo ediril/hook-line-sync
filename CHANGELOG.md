@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.30.13 — 2026-08-30
+
+### Changed
+
+- Make command help state implicit defaults and safety-relevant behavior
+  concisely, including traversal for list, diff, push, and pull; profile
+  inference; rule scopes; confirmation; and commands that never mutate remote
+  state.
+
 ## 0.8.30.12 — 2026-08-30
 
 ### Changed
