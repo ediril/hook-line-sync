@@ -1422,7 +1422,11 @@ def _list_remote(
                 "r x",
                 _DIFF_MARKER_COLORS["x"],
                 True,
-                _DIFF_MARKER_COLORS["x"],
+                (
+                    _EXCLUDED_DIRECTORY_COLOR
+                    if entry.kind == "directory"
+                    else _DIFF_MARKER_COLORS["x"]
+                ),
             )
         if entry.excluded:
             return "r !", _EXCLUDED_REMOTE_COLOR, True, _EXCLUDED_REMOTE_COLOR
@@ -1654,7 +1658,11 @@ def _format_comparison_entries(
         )
         remote_exclusion_color = (
             (
-                _DIFF_MARKER_COLORS["x"]
+                (
+                    _EXCLUDED_DIRECTORY_COLOR
+                    if directory
+                    else _DIFF_MARKER_COLORS["x"]
+                )
                 if entry.state == "remote-excluded"
                 else _EXCLUDED_REMOTE_COLOR
             )

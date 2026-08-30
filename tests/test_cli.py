@@ -1219,7 +1219,9 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
     assert "r x future-dir/\n" in remote_listing[1]
     colored_boundary = invoke(["diff", "-r"], store, terminal_output=True)[1]
     assert "\033[38;5;30mr\033[0m \033[90mx\033[0m" in colored_boundary
-    assert "\033[90mfuture-dir/\033[0m" in colored_boundary
+    assert "\033[38;5;24mfuture-dir/\033[0m" in colored_boundary
+    colored_remote_listing = invoke(["lsr"], store, terminal_output=True)[1]
+    assert "\033[38;5;24mfuture-dir/\033[0m" in colored_remote_listing
 
     pushed = invoke(["push"], store)
     assert pushed[0] == 0

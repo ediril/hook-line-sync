@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.30.17 — 2026-08-30
+
+### Changed
+
+- Render remote-excluded directories in dark blue while keeping excluded files
+  gray.
+
 ## 0.8.30.16 — 2026-08-30
 
 ### Changed
