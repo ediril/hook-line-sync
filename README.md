@@ -129,6 +129,35 @@ No profile selection is persisted between commands.
 
 ## Synchronization rules
 
+Global rules live in `~/.hlsync/rules.json`, apply to every profile, and are
+created with a conservative metadata-only policy:
+
+```text
+**/.git/**
+**/.svn/**
+**/.hg/**
+**/.DS_Store
+**/Thumbs.db
+**/desktop.ini
+```
+
+Manage global exclusions and inclusions from any directory with `-g` /
+`--global`. Global operands are reusable patterns rooted at every profile's
+local root; append `/` to target a complete directory tree:
+
+```console
+hlsync exclude -g --pattern '*.tmp'
+hlsync include -g --pattern 'public/*.tmp'
+hlsync exclude -g                 # list global exclusions
+hlsync rules -g                   # inspect global rules
+hlsync rules -g remove RULE_ID    # remove one global rule
+```
+
+Global rules apply first and profile rules apply afterward, so an ordinary
+profile inclusion can override a global exclusion. `hlsync rules` shows both
+layers and their precedence. HLSync never silently adds new defaults to an
+existing global rules file.
+
 Exclude current paths permanently:
 
 ```console

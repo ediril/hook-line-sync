@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Add a user-owned global synchronization policy with conservative defaults,
+  `-g` management, and profile-level override precedence.
 - [x] Unify the command, Python package, configuration directory, persisted
   profile schema, and staging artifacts under the `hlsync` identity.
 - [x] Consolidate obsolete profile decisions and supersede stale traversal

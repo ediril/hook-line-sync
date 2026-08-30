@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.29.16 — 2026-08-29
+
+### Added
+
+- Seed an editable `~/.hlsync/rules.json` with conservative global metadata
+  exclusions and add `-g` / `--global` rule management that works outside
+  mapped profiles.
+
+### Changed
+
+- Evaluate global rules before profile rules, allow profile-specific overrides,
+  and show both layers together through `hlsync rules`.
+
 ## 0.8.29.15 — 2026-08-29
 
 ### Changed

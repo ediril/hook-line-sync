@@ -93,6 +93,25 @@ def patterns_from_operands(
     return tuple(normalized)
 
 
+def patterns_from_global_operands(values: tuple[str, ...]) -> tuple[str, ...]:
+    """Normalize reusable patterns rooted at every profile's local root."""
+    normalized: list[str] = []
+    for value in values:
+        if not isinstance(value, str) or not value.strip():
+            raise RuleError("global rule patterns must be non-empty strings")
+        pattern = value.strip()
+        supplied = PurePosixPath(pattern)
+        if supplied.is_absolute() or ".." in supplied.parts:
+            raise RuleError("global rules must be relative to the profile root")
+        if pattern.endswith("/"):
+            supplied = supplied / "**"
+        try:
+            normalized.append(FileSelector(supplied.as_posix()).pattern)
+        except SelectionError as error:
+            raise RuleError(str(error)) from error
+    return tuple(normalized)
+
+
 @dataclass(frozen=True)
 class SyncRule:
     id: int
@@ -144,6 +163,18 @@ class RuleSet:
             raise RuleError("rule ids must be unique")
         if ids != tuple(sorted(ids)):
             raise RuleError("rules must be ordered by increasing id")
+
+    @classmethod
+    def layered(cls, *layers: tuple[SyncRule, ...]) -> RuleSet:
+        return cls(
+            tuple(
+                SyncRule(index, rule.action, rule.pattern)
+                for index, rule in enumerate(
+                    (rule for layer in layers for rule in layer),
+                    start=1,
+                )
+            )
+        )
 
     def excludes(self, relative_path: str, *, is_directory: bool = False) -> bool:
         del is_directory

@@ -22,6 +22,7 @@ from hlsync.config import (
     ApplicationConfiguration,
     ConfigurationError,
     ConfigurationStore,
+    GlobalRuleStore,
     ProfileConfiguration,
     RuleUpdate,
     canonical_local_root,
@@ -37,6 +38,7 @@ from hlsync.rules import (
     RuleSet,
     SyncRule,
     expand_path_operands,
+    patterns_from_global_operands,
     patterns_from_operands,
 )
 from hlsync.selection import (
@@ -254,6 +256,8 @@ def _resolve_invocation(
 
 def _validate_profile_prefix(arguments: argparse.Namespace) -> None:
     profile_name = getattr(arguments, "profile_prefix", None)
+    if profile_name is not None and getattr(arguments, "global_rules", False):
+        raise ConfigurationError("a profile prefix cannot be combined with --global")
     if profile_name is not None and arguments.command not in PROFILE_AWARE_COMMANDS:
         raise ConfigurationError(
             f"profile prefix '{profile_name}' cannot be used with "
@@ -342,7 +346,8 @@ def build_parser() -> argparse.ArgumentParser:
             help=help_text,
             usage=(
                 f"hlsync [PROFILE] {command} [PATH ...]\n"
-                f"       hlsync [PROFILE] {command} --pattern PATTERN ..."
+                f"       hlsync [PROFILE] {command} --pattern PATTERN ...\n"
+                f"       hlsync {command} -g [PATTERN ...]"
             ),
         )
         add_pattern_operands(
@@ -351,7 +356,8 @@ def build_parser() -> argparse.ArgumentParser:
             metavar="PATH",
             help_text=(
                 "local paths, wildcard expressions, or comma-separated groups; "
-                f"omit to list {rule_name} rules"
+                f"omit to list {rule_name} rules; with -g, operands are "
+                "reusable profile-root patterns"
             ),
         )
         rules_parser.add_argument(
@@ -359,13 +365,21 @@ def build_parser() -> argparse.ArgumentParser:
             action="store_true",
             help="record operands as reusable wildcard patterns",
         )
+        rules_parser.add_argument(
+            "-g",
+            "--global",
+            dest="global_rules",
+            action="store_true",
+            help="manage rules shared by every profile",
+        )
 
     rules_parser = subparsers.add_parser(
         "rules",
         help="list or remove synchronization rules",
         usage=(
             "hlsync [PROFILE] rules\n"
-            "       hlsync [PROFILE] rules remove RULE_ID"
+            "       hlsync [PROFILE] rules remove RULE_ID\n"
+            "       hlsync rules -g [remove RULE_ID]"
         ),
         description=(
             "List synchronization rules, or remove one rule by its numeric ID."
@@ -384,6 +398,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         metavar="RULE_ID",
         help="numeric rule ID required by remove",
+    )
+    rules_parser.add_argument(
+        "-g",
+        "--global",
+        dest="global_rules",
+        action="store_true",
+        help="show or remove rules shared by every profile",
     )
     remove_parser = subparsers.add_parser(
         "remove",
@@ -643,8 +664,21 @@ def _create_profile(
         f"Created FTPS profile '{name}'.\n"
         f"Mapped '{local_root}' to '{name}:{profile.remote_root}'."
     )
+    _global_rule_store(store).load()
     store.save(configuration)
     return message
+
+
+def _global_rule_store(store: ConfigurationStore) -> GlobalRuleStore:
+    return GlobalRuleStore(store.path.with_name("rules.json"))
+
+
+def _effective_rules(
+    store: ConfigurationStore,
+    profile: ProfileConfiguration,
+) -> RuleSet:
+    global_rules = _global_rule_store(store).load().rules
+    return RuleSet.layered(global_rules, profile.rules)
 
 
 def _resolve_profile(
@@ -744,16 +778,22 @@ def _format_rules(
     *,
     heading: str,
     grouped: bool = False,
+    global_scope: bool = False,
 ) -> str:
+    scope_heading = (
+        f"Global {heading.lower()}"
+        if global_scope
+        else f"{heading} for profile '{name}'"
+    )
     if not rules:
-        return f"No {heading.lower()} for profile '{name}'."
+        return f"No {scope_heading.lower()}."
     width = len(str(max(rule.id for rule in rules)))
     if grouped:
         groups: dict[str, list[tuple[SyncRule, str]]] = {}
         for rule in rules:
             group, expression = _rule_display_location(rule)
             groups.setdefault(group, []).append((rule, expression))
-        lines = [f"{heading} for profile '{name}':"]
+        lines = [f"{scope_heading}:"]
         for group in sorted(groups, key=_rule_group_key):
             lines.extend(("", group))
             for rule, expression in sorted(
@@ -768,7 +808,7 @@ def _format_rules(
         return "\n".join(lines)
     return "\n".join(
         (
-            f"{heading} for profile '{name}':",
+            f"{scope_heading}:",
             *(
                 f"  {rule.id:>{width}}  {rule.action:<7} "
                 f"{_format_rule_expression(rule)}"
@@ -823,15 +863,44 @@ def _change_rules(
     *,
     include: bool,
 ) -> str:
-    configuration, name, profile = _resolve_profile(arguments, store)
     patterns = normalize_pattern_operands(arguments)
     if not patterns:
         if arguments.pattern:
             raise ConfigurationError("--pattern requires at least one operand")
         action = "include" if include else "exclude"
-        rules = tuple(rule for rule in profile.rules if rule.action == action)
         kind = "Inclusion" if include else "Exclusion"
+        if arguments.global_rules:
+            rules = tuple(
+                rule
+                for rule in _global_rule_store(store).load().rules
+                if rule.action == action
+            )
+            return _format_rules(
+                "",
+                rules,
+                heading=f"{kind} rules",
+                grouped=True,
+                global_scope=True,
+            )
+        _, name, profile = _resolve_profile(arguments, store)
+        rules = tuple(rule for rule in profile.rules if rule.action == action)
         return _format_rules(name, rules, heading=f"{kind} rules", grouped=True)
+    if arguments.global_rules:
+        global_store = _global_rule_store(store)
+        configuration = global_store.load()
+        normalized = patterns_from_global_operands(patterns)
+        configuration, update = configuration.with_appended_rules(
+            "include" if include else "exclude",
+            normalized,
+        )
+        global_store.save(configuration)
+        return _format_rule_update(
+            "",
+            update,
+            include=include,
+            global_scope=True,
+        )
+    configuration, name, profile = _resolve_profile(arguments, store)
     root = _require_local_root(name, profile)
     current_directory = _effective_current_directory(arguments, root)
     operands = (
@@ -852,14 +921,22 @@ def _change_rules(
         name,
         "include" if include else "exclude",
         normalized,
+        base_rules=_global_rule_store(store).load().rules,
     )
     store.save(configuration)
     return _format_rule_update(name, update, include=include)
 
 
-def _format_rule_update(name: str, update: RuleUpdate, *, include: bool) -> str:
+def _format_rule_update(
+    name: str,
+    update: RuleUpdate,
+    *,
+    include: bool,
+    global_scope: bool = False,
+) -> str:
+    scope = "global synchronization policy" if global_scope else f"profile '{name}'"
     if update.added and update.removed:
-        lines = [f"Updated synchronization rules for profile '{name}':"]
+        lines = [f"Updated synchronization rules for {scope}:"]
         lines.extend(
             f"  added    {rule.id}  {rule.action:<7} {_format_rule_expression(rule)}"
             for rule in update.added
@@ -871,6 +948,18 @@ def _format_rule_update(name: str, update: RuleUpdate, *, include: bool) -> str:
         return "\n".join(lines)
     if update.added:
         action = "Inclusion" if include else "Exclusion"
+        if global_scope:
+            width = len(str(max(rule.id for rule in update.added)))
+            return "\n".join(
+                (
+                    f"Recorded global {action.lower()} rules:",
+                    *(
+                        f"  {rule.id:>{width}}  {rule.action:<7} "
+                        f"{_format_rule_expression(rule)}"
+                        for rule in update.added
+                    ),
+                )
+            )
         return _format_rules(
             name,
             update.added,
@@ -878,8 +967,13 @@ def _format_rule_update(name: str, update: RuleUpdate, *, include: bool) -> str:
         )
     if update.removed:
         result = "included" if include else "excluded"
+        remaining_scope = (
+            "global synchronization policy"
+            if global_scope
+            else f"policy for profile '{name}'"
+        )
         lines = [
-            f"Paths are {result} by the remaining policy for profile '{name}';",
+            f"Paths are {result} by the remaining {remaining_scope};",
             "removed the unnecessary rules:",
         ]
         width = len(str(max(rule.id for rule in update.removed)))
@@ -888,22 +982,56 @@ def _format_rule_update(name: str, update: RuleUpdate, *, include: bool) -> str:
             for rule in update.removed
         )
         return "\n".join(lines)
-    return f"Synchronization rules for profile '{name}' are unchanged."
+    return f"Synchronization rules for {scope} are unchanged."
 
 
 def _manage_rules(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
 ) -> str:
+    if arguments.global_rules:
+        global_store = _global_rule_store(store)
+        global_configuration = global_store.load()
+        if arguments.operation is None:
+            if arguments.rule_id is not None:
+                raise ConfigurationError("a rule id requires the remove operation")
+            return _format_rules(
+                "",
+                global_configuration.rules,
+                heading="Synchronization rules",
+                grouped=True,
+                global_scope=True,
+            )
+        if arguments.rule_id is None:
+            raise ConfigurationError("rules remove requires a rule id")
+        global_configuration, removed = global_configuration.without_rule(
+            arguments.rule_id
+        )
+        global_store.save(global_configuration)
+        return (
+            f"Removed global rule {removed.id}: "
+            f"{removed.action} {_format_rule_expression(removed)}"
+        )
     configuration, name, profile = _resolve_profile(arguments, store)
     if arguments.operation is None:
         if arguments.rule_id is not None:
             raise ConfigurationError("a rule id requires the remove operation")
-        return _format_rules(
+        global_rules = _format_rules(
+            "",
+            _global_rule_store(store).load().rules,
+            heading="Synchronization rules",
+            grouped=True,
+            global_scope=True,
+        )
+        profile_rules = _format_rules(
             name,
             profile.rules,
             heading="Synchronization rules",
             grouped=True,
+        )
+        return (
+            f"{global_rules}\n\n{profile_rules}\n\n"
+            "Global rules apply first; profile rules override them."
         )
     if arguments.rule_id is None:
         raise ConfigurationError("rules remove requires a rule id")
@@ -986,7 +1114,7 @@ def _list_local(
     selector = _list_selection(arguments, root)
     raw_snapshot = snapshot_local(
         root,
-        RuleSet(profile.rules),
+        _effective_rules(store, profile),
         selector,
         include_excluded=True,
         traverse_excluded=True,
@@ -1626,15 +1754,14 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
 
 def _build_plan(
     arguments: argparse.Namespace,
-    profile: ProfileConfiguration,
     root: Path,
     transport: ExplicitFTPSTransport,
+    rules: RuleSet,
     *,
     direction: str,
     progress: TextIO,
     include_excluded: bool = False,
 ) -> tuple[TreeSnapshot, TreeSnapshot, ComparisonPlan]:
-    rules = RuleSet(profile.rules)
     selector = _file_selection(arguments, root)
     print("Scanning local files...", file=progress, flush=True)
     local = snapshot_local(
@@ -1690,7 +1817,7 @@ def _diff(
         raise ConfigurationError("--resume requires --paged")
     resume = _resume_directory(arguments.resume)
     selector = _file_selection(arguments, root)
-    rules = RuleSet(profile.rules)
+    rules = _effective_rules(store, profile)
     direction = "pull" if arguments.pull else "push"
     color = _use_color(output)
     print(f"Checking differences for profile '{name}'...", file=progress, flush=True)
@@ -2084,9 +2211,9 @@ def _transfer(
                 print(f"  {recovery}", file=progress, flush=True)
         local, remote, plan = _build_plan(
             arguments,
-            profile,
             root,
             transport,
+            _effective_rules(store, profile),
             direction=arguments.command,
             progress=progress,
             include_excluded=arguments.command == "push",

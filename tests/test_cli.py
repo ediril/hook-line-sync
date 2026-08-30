@@ -4,7 +4,7 @@ import pytest
 
 from hlsync import __version__
 from hlsync.cli import run
-from hlsync.config import ConfigurationStore
+from hlsync.config import DEFAULT_GLOBAL_RULES, ConfigurationStore, GlobalRuleStore
 from hlsync.rules import RuleSet, SyncRule
 from hlsync.snapshot import TreeEntry, TreeSnapshot, snapshot_local
 from hlsync.transport import PathOperationError
@@ -235,6 +235,78 @@ def test_add_prompts_for_another_local_root_when_current_is_declined(
     assert store.load().profiles["prod"].local_root == str(selected)
 
 
+def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
+    tmp_path, monkeypatch
+) -> None:
+    store = ConfigurationStore(tmp_path / "configs.json")
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    (workspace / ".DS_Store").write_text("metadata", encoding="utf-8")
+    (workspace / "scratch.tmp").write_text("temporary", encoding="utf-8")
+
+    assert invoke(
+        [
+            "create",
+            "prod",
+            "--host",
+            "ftp.example.com",
+            "--remote-root",
+            "/public_html",
+            "--local-root",
+            str(workspace),
+        ],
+        store,
+    )[0] == 0
+    global_path = tmp_path / "rules.json"
+    assert global_path.exists()
+    assert GlobalRuleStore(global_path).load().rules == DEFAULT_GLOBAL_RULES
+
+    monkeypatch.chdir(outside)
+    assert invoke(
+        ["exclude", "-g", "--pattern", "*.tmp"], store
+    ) == (
+        0,
+        "Recorded global exclusion rules:\n  7  exclude *.tmp\n",
+        "",
+    )
+    assert invoke(
+        ["include", "-g", "--pattern", "**/.DS_Store"], store
+    ) == (
+        0,
+        "Recorded global inclusion rules:\n"
+        "  8  include **/.DS_Store\n",
+        "",
+    )
+
+    monkeypatch.chdir(workspace)
+    excluded = invoke(["list"], store)[1]
+    assert "x .DS_Store\n" not in excluded
+    assert "x scratch.tmp\n" in excluded
+    assert invoke(["include", "--pattern", "*.tmp"], store)[0] == 0
+    included = invoke(["list"], store)[1]
+    assert "x .DS_Store\n" not in included
+    assert "x scratch.tmp\n" not in included
+    combined = invoke(["rules"], store)[1]
+    assert combined.index("Global synchronization rules:") < combined.index(
+        "Synchronization rules for profile 'prod':"
+    )
+    assert combined.endswith(
+        "Global rules apply first; profile rules override them.\n"
+    )
+    assert invoke(["rules", "-g", "remove", "8"], store) == (
+        0,
+        "Removed global rule 8: include **/.DS_Store\n",
+        "",
+    )
+    assert "x .DS_Store\n" not in invoke(["list"], store)[1]
+    assert not any(
+        rule.pattern == "**/.DS_Store"
+        for rule in GlobalRuleStore(global_path).load().rules
+    )
+
+
 def test_cli_refuses_invalid_profile_mutations(tmp_path) -> None:
     store = ConfigurationStore(tmp_path / "configs.json")
     arguments = [
@@ -462,8 +534,9 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     assert rules_view[1].index("./\n") < rules_view[1].index(".git/\n")
     assert rules_view[1].index(".git/\n") < rules_view[1].index("docs/\n")
     assert "  2  exclude all contents\n  7  include keep.js\n" in rules_view[1]
+    assert "Higher rule IDs take precedence when rules overlap.\n" in rules_view[1]
     assert rules_view[1].endswith(
-        "Higher rule IDs take precedence when rules overlap.\n"
+        "Global rules apply first; profile rules override them.\n"
     )
     list_stdout = invoke(["profiles"], store)[1]
     assert "* prod\n" in list_stdout
@@ -542,6 +615,10 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert invoke(
         ["exclude", "--pattern", "node_modules/,**/*.log"], store
     )[0] == 0
+    expected_rules = RuleSet.layered(
+        DEFAULT_GLOBAL_RULES,
+        store.load().profiles["prod"].rules,
+    ).rules
 
     operations = []
     listed_directories = []
@@ -566,10 +643,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
             traverse_excluded=False,
         ):
             snapshot_traversal.append(traverse_excluded)
-            assert rules.rules == (
-                SyncRule(1, "exclude", "node_modules/**"),
-                SyncRule(2, "exclude", "**/*.log"),
-            )
+            assert rules.rules == expected_rules
             entries = []
             if selector is None or selector.matches("deployed.html"):
                 entries.append(
@@ -610,10 +684,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
 
         def list_directory(self, relative_directory, rules):
             listed_directories.append(relative_directory.as_posix())
-            assert rules.rules == (
-                SyncRule(1, "exclude", "node_modules/**"),
-                SyncRule(2, "exclude", "**/*.log"),
-            )
+            assert rules.rules == expected_rules
             if relative_directory.as_posix() == "src":
                 debug_stat = (source / "debug.log").stat()
                 return TreeSnapshot(
