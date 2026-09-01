@@ -2561,17 +2561,34 @@ def _format_dry_push(
     name: str,
     plan: ComparisonPlan,
     remote: TreeSnapshot,
+    output: TextIO,
 ) -> str:
     operations = planned_transfer_operations(plan, remote)
+    color = _use_color(output)
+    markers = {
+        "add": "+",
+        "update": "~",
+        "delete": "-",
+        "create": "+",
+    }
     lines = [f"Dry push for profile '{name}':"]
     if operations:
         for operation in operations:
-            suffix = "/" if operation.kind == "directory" else ""
             lines.append(
-                f"  Would {operation.action:<6} {operation.path}{suffix}"
+                _format_path_line(
+                    markers[operation.action],
+                    directory=operation.kind == "directory",
+                    path=operation.path,
+                    depth=1,
+                    color=color,
+                    marker_color=_DIFF_MARKER_COLORS[
+                        markers[operation.action]
+                    ],
+                    excluded=False,
+                )
             )
         count = len(operations)
-        lines.append(f"{count} change{'s' if count != 1 else ''} would be made.")
+        lines.append(f"{count} planned change{'s' if count != 1 else ''}.")
     else:
         unchanged_files = sum(
             entry.action == "unchanged" and entry.local_kind == "file"
@@ -2591,6 +2608,7 @@ def _transfer(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
     progress: TextIO,
+    output: TextIO,
 ) -> tuple[str, bool]:
     _, name, profile = _resolve_profile(arguments, store)
     root = _require_local_root(name, profile)
@@ -2615,7 +2633,7 @@ def _transfer(
             recover_artifacts=not getattr(arguments, "dry", False),
         )
         if getattr(arguments, "dry", False):
-            return _format_dry_push(name, plan, remote), True
+            return _format_dry_push(name, plan, remote, output), True
         executable_actions = {
             "create-remote",
             "upload",
@@ -2716,7 +2734,12 @@ def run(
             _diff(arguments, configuration_store, stderr, stdout)
             message = None
         elif arguments.command in {"push", "pull"}:
-            message, succeeded = _transfer(arguments, configuration_store, stderr)
+            message, succeeded = _transfer(
+                arguments,
+                configuration_store,
+                stderr,
+                stdout,
+            )
             if not succeeded:
                 exit_status = 1
         elif arguments.command == "help":

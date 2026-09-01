@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.1.3 — 2026-09-01
+
+### Changed
+
+- Render dry-push additions, updates, and deletions with the compact colored
+  `+`, `~`, and `-` notation used by diff.
+
 ## 0.9.1.2 — 2026-09-01
 
 ### Changed

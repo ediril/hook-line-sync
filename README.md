@@ -365,7 +365,8 @@ performed.
 
 Dry and live push identify each local and remote directory as they scan it. A
 parent is fully classified before HLSync enters eligible children, and excluded
-directories are never entered.
+directories are never entered. Dry-run plans use diff's compact colored `+`,
+`~`, and `-` action markers under an explicit dry-push heading.
 
 Transfers print `Adding`, `Updating`, `Creating`, or `Deleting` with the path
 immediately before each operation begins, then finish with a compact count.
