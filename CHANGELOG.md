@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.1.1 — 2026-09-01
+
+### Changed
+
+- Treat locally and remotely excluded directories as traversal boundaries;
+  retain them remotely instead of entering them for pruning.
+- Continue pruning locally excluded files and honoring explicit local
+  descendant inclusions.
+
 ## 0.8.30.20 — 2026-08-30
 
 ### Added

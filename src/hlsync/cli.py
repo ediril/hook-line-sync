@@ -1801,13 +1801,6 @@ def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection:
     )
 
 
-def _recursive_transfer_scope(arguments: argparse.Namespace) -> bool:
-    return arguments.recursive or (
-        arguments.command == "push"
-        and not normalize_pattern_operands(arguments)
-    )
-
-
 def _leaf_selectors(selection: FileSelection) -> tuple[FileSelector, ...]:
     if isinstance(selection, FileSelector):
         return (selection,)
@@ -1952,7 +1945,6 @@ def _descendant_directories(
     selector: FileSelection | None,
     *,
     descend_remote_only: bool,
-    descend_excluded: bool,
 ) -> tuple[tuple[PurePosixPath, bool, bool], ...]:
     local_directories = {
         entry.path: entry for entry in local.entries if entry.kind == "directory"
@@ -1973,7 +1965,6 @@ def _descendant_directories(
             local_entry is not None
             and local_entry.excluded
             and not rules.may_include_descendant(path, target="local")
-            and not descend_excluded
         ):
             continue
         if any(
@@ -2111,11 +2102,7 @@ def _build_plan(
         rules,
         selector,
         include_excluded=include_excluded,
-        traverse_excluded=(
-            include_excluded
-            and prune_remote
-            and _recursive_transfer_scope(arguments)
-        ),
+        traverse_excluded=False,
         respect_remote_boundaries=True,
     )
     remote_selector = (
@@ -2123,7 +2110,6 @@ def _build_plan(
         if direction == "push" and prune_remote
         else selector
     )
-    expanded_remote_deletion = remote_selector != selector
     print("Reading remote files over FTPS...", file=progress, flush=True)
 
     def report_recovery(message: str) -> None:
@@ -2137,14 +2123,7 @@ def _build_plan(
         rules,
         remote_selector,
         include_excluded=include_excluded,
-        traverse_excluded=(
-            include_excluded
-            and prune_remote
-            and (
-                _recursive_transfer_scope(arguments)
-                or expanded_remote_deletion
-            )
-        ),
+        traverse_excluded=False,
         **artifact_options,
     )
     print("Comparing local and remote files...", file=progress, flush=True)
@@ -2260,9 +2239,6 @@ def _diff(
                 rules,
                 selector,
                 descend_remote_only=prune_remote,
-                descend_excluded=(
-                    prune_remote and _recursive_transfer_scope(arguments)
-                ),
             )
             pending_descendants = tuple(
                 _PendingDiffDirectory(

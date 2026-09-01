@@ -136,7 +136,18 @@ def build_comparison(
             entry is not None and entry.excluded
             for entry in (local_entry, remote_entry)
         ):
-            if direction == "push" and prune_remote and remote_entry is not None:
+            excluded_directory = any(
+                entry is not None
+                and entry.excluded
+                and entry.kind == "directory"
+                for entry in (local_entry, remote_entry)
+            )
+            if (
+                direction == "push"
+                and prune_remote
+                and remote_entry is not None
+                and not excluded_directory
+            ):
                 comparison.append(
                     ComparisonEntry(
                         path=path,

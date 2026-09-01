@@ -47,6 +47,7 @@ def test_comparison_profiles_push_pull_prune_and_timestamp_precision() -> None:
                 timestamp_precision_ns=1,
                 excluded=True,
             ),
+            TreeEntry("excluded-dir", "directory", excluded=True),
         )
     )
     remote = TreeSnapshot(
@@ -82,6 +83,7 @@ def test_comparison_profiles_push_pull_prune_and_timestamp_precision() -> None:
                 timestamp_precision_ns=1_000_000_000,
                 excluded=True,
             ),
+            TreeEntry("excluded-dir", "directory", excluded=True),
         )
     )
 
@@ -114,6 +116,7 @@ def test_comparison_profiles_push_pull_prune_and_timestamp_precision() -> None:
         pruned_push["excluded.txt"].state,
         pruned_push["excluded.txt"].action,
     ) == ("remote-only", "delete-remote")
+    assert pruned_push["excluded-dir"].action == "excluded"
     assert pull["remote.txt"].action == "delete-remote"
     assert push["conflict"].action == "conflict"
     assert push["linked"].action == "conflict"

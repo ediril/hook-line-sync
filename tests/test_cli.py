@@ -1060,7 +1060,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         "Options: recursive (-r).\n"
         in recursive_pruned_exclusion[2]
     )
-    assert snapshot_traversal[-1] is True
+    assert snapshot_traversal[-1] is False
     assert operations == [("delete", "src/debug.log", False)]
     operations.clear()
     retained_push = invoke(["push", "deployed.html", "-k"], store)

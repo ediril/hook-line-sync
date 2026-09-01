@@ -296,9 +296,11 @@ one-sided paths, conflicts, and local or remote exclusion boundaries. Use
 `-i`/`--inc`/`--included-only` to hide exclusions. Use `-a`/`--all` to restore
 unchanged and untraversed entries for the complete exploratory view.
 
-For push authority, a locally excluded path is treated as absent. If it exists
+For push authority, a locally excluded file is treated as absent. If it exists
 remotely, default diff marks its deletion as `r -`; `diff -k --all` marks the
-retained remote copy as `r !`. `-i` never hides an actionable deletion.
+retained remote copy as `r !`. An excluded directory is instead a hard
+traversal boundary and is retained remotely as `r !`. `-i` never hides an
+actionable deletion.
 
 Bare diff keeps traversal shallow but projects the recursive scope of bare
 push: an immediate remote-only directory appears as `r - folder/ ▸`, warning that
@@ -340,11 +342,13 @@ Push uploads local-only files and replaces changed remote files. Pull replaces
 changed existing local files but never restores a missing local path. Locally
 excluded paths are never uploaded or pulled; remote-excluded paths are not
 traversed or changed. Push deletes selected remote-only paths by default,
-including remote copies of locally excluded paths. `-k` /
-`--keep-remote` retains them. An included local directory remains shallow unless
-`-r` is supplied. An explicitly selected remote-only directory is fully
-enumerated because deleting that directory requires deleting its contents.
-Bare `push` remains recursive by definition.
+including remote copies of locally excluded files. Excluded directories on
+either side are retained and never entered; an explicit local inclusion beneath
+an excluded local directory is the only reason to enter that local boundary.
+`-k` / `--keep-remote` retains remote-only paths. An included local directory
+remains shallow unless `-r` is supplied. An explicitly selected remote-only
+directory is fully enumerated because deleting that directory requires deleting
+its contents. Bare `push` remains recursive by definition.
 
 Preview the exact push scope and operation order without changing either side:
 
