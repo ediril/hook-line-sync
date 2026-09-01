@@ -113,6 +113,7 @@ class RemoteTransport(Protocol):
         traverse_excluded: bool = False,
         artifact_recovery: Callable[[str], None] | None = None,
         artifact_preview: Callable[[str], None] | None = None,
+        directory_progress: Callable[[PurePosixPath], None] | None = None,
     ) -> TreeSnapshot: ...
 
     def list_directory(
@@ -204,12 +205,15 @@ class ExplicitFTPSTransport:
         traverse_excluded: bool = False,
         artifact_recovery: Callable[[str], None] | None = None,
         artifact_preview: Callable[[str], None] | None = None,
+        directory_progress: Callable[[PurePosixPath], None] | None = None,
     ) -> TreeSnapshot:
         if self._client is None:
             raise TransportError("FTPS transport is not connected")
         entries: list[TreeEntry] = []
 
         def walk(relative_directory: PurePosixPath) -> None:
+            if directory_progress is not None:
+                directory_progress(relative_directory)
             listing = self.list_directory(relative_directory, rules)
             if artifact_recovery is not None:
                 recoveries = self._recover_artifacts(listing, selector, rules)
@@ -228,6 +232,7 @@ class ExplicitFTPSTransport:
                         f"Would restore interrupted replacement '{destination}'."
                     )
                 listing = recovery.projected
+            descendants: list[PurePosixPath] = []
             for entry in listing.entries:
                 relative_path = entry.path
                 relative = PurePosixPath(relative_path)
@@ -254,7 +259,9 @@ class ExplicitFTPSTransport:
                     and local_exclusion_may_descend
                     and not entry.remote_excluded
                 ):
-                    walk(relative)
+                    descendants.append(relative)
+            for descendant in descendants:
+                walk(descendant)
 
         walk(PurePosixPath())
         return TreeSnapshot(tuple(entries))

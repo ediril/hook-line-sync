@@ -369,13 +369,19 @@ def test_push_artifact_recovery_cleans_staging_and_restores_missing_destination(
 
     monkeypatch.setattr(transport, "list_directory", list_directory)
     preview_messages = []
+    previewed_directories = []
     preview = transport.snapshot(
         RuleSet(),
         FileSelector("templates/*"),
         artifact_preview=preview_messages.append,
+        directory_progress=previewed_directories.append,
     )
 
     assert listed_directories == [".", "templates"]
+    assert [path.as_posix() for path in previewed_directories] == [
+        ".",
+        "templates",
+    ]
     assert client.deleted == []
     assert client.renamed == []
     assert [entry.path for entry in preview.entries] == [

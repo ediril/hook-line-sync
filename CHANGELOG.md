@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.1.2 — 2026-09-01
+
+### Changed
+
+- Keep included but untraversed directories visible in shallow diff output.
+- Process each parent before entering eligible children and identify the
+  directory currently being scanned during dry and live push planning.
+
 ## 0.9.1.1 — 2026-09-01
 
 ### Changed

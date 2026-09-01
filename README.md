@@ -363,6 +363,10 @@ also honors `-k`, remote exclusions, and explicit directory depth exactly as a
 real push would. Interrupted-upload recovery is projected and reported but not
 performed.
 
+Dry and live push identify each local and remote directory as they scan it. A
+parent is fully classified before HLSync enters eligible children, and excluded
+directories are never entered.
+
 Transfers print `Adding`, `Updating`, `Creating`, or `Deleting` with the path
 immediately before each operation begins, then finish with a compact count.
 When no operation is needed, HLSync prints `Nothing to push` or `Nothing to

@@ -1,4 +1,5 @@
 import io
+from pathlib import PurePosixPath
 
 import pytest
 
@@ -541,12 +542,23 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     assert rules.excludes("debug.log")
     assert not rules.excludes("src/debug.log")
     assert not rules.excludes("src/main.py")
-    snapshot = snapshot_local(workspace, rules)
+    visited_local_directories = []
+    snapshot = snapshot_local(
+        workspace,
+        rules,
+        directory_progress=visited_local_directories.append,
+    )
     assert [entry.path for entry in snapshot.entries] == [
         "docs",
         "node_modules/keep.js",
         "node_modules/package",
         "node_modules/package/nested.js",
+    ]
+    assert [path.as_posix() for path in visited_local_directories] == [
+        ".",
+        "docs",
+        "node_modules",
+        "node_modules/package",
     ]
     local_view = invoke(["list", "--recursive"], store)
     assert local_view[0] == 0 and local_view[2] == ""
@@ -678,11 +690,14 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
             traverse_excluded=False,
             artifact_recovery=None,
             artifact_preview=None,
+            directory_progress=None,
         ):
             snapshot_traversal.append(traverse_excluded)
             artifact_recovery_callbacks.append(
                 (artifact_recovery, artifact_preview)
             )
+            if directory_progress is not None:
+                directory_progress(PurePosixPath())
             assert rules.rules == expected_rules
             entries = []
             if serve_orphan_directory:
@@ -744,6 +759,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
                 debug_stat = (source / "debug.log").stat()
                 return TreeSnapshot(
                     (
+                        TreeEntry("src/nested", "directory"),
                         TreeEntry(
                             "src/debug.log",
                             "file",
@@ -860,7 +876,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert push_comparison[1].startswith("src/\n")
     assert "l + main.py\n" in push_comparison[1]
-    assert "nested" not in push_comparison[1]
+    assert "  nested/ ▸\n" in push_comparison[1]
     assert "src/nested/child.py" not in push_comparison[1]
     assert "README.md" not in push_comparison[1]
     assert "deployed.html" not in push_comparison[1]
@@ -880,8 +896,8 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert recursive_comparison[1].index("nested/\n") < (
         recursive_comparison[1].index("  l + child.py\n")
     )
-    assert recursive_comparison[1].index("  l + child.py\n") < (
-        recursive_comparison[1].index("l + .env.example\n")
+    assert recursive_comparison[1].index("l + .env.example\n") < (
+        recursive_comparison[1].index("  l + child.py\n")
     )
 
     monkeypatch.chdir(workspace)
@@ -893,7 +909,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "\033[31m-\033[0m" in pruned_comparison[1]
     assert "l\033[0m \033[90mx\033[0m" in pruned_comparison[1]
     assert "node_modules/" in pruned_comparison[1]
-    assert "src/" not in pruned_comparison[1]
+    assert "src/ ▸" in pruned_comparison[1]
     assert "same.txt" not in pruned_comparison[1]
     kept_comparison = invoke(["diff", "-k"], store, terminal_output=True)
     assert "Options: keep remote-only paths (-k).\n" in kept_comparison[2]
@@ -916,7 +932,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     directory_comparison = invoke(["diff", "src"], store)
     assert "= src/\n" not in directory_comparison[1]
     assert directory_comparison[1].startswith("src/\n")
-    assert "nested" not in directory_comparison[1]
+    assert "  nested/ ▸\n" in directory_comparison[1]
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
     assert "    l + child.py\n" in recursive_directory_comparison[1]
@@ -1335,8 +1351,11 @@ def test_push_reports_partial_failure_after_continuing_independent_paths(
             include_excluded=False,
             traverse_excluded=False,
             artifact_recovery=None,
+            directory_progress=None,
         ):
             del traverse_excluded, artifact_recovery
+            if directory_progress is not None:
+                directory_progress(PurePosixPath())
             return TreeSnapshot()
 
         def make_directory(self, path):

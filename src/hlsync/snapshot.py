@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Literal
@@ -75,13 +76,17 @@ def snapshot_local(
     include_excluded: bool = False,
     traverse_excluded: bool = False,
     respect_remote_boundaries: bool = False,
+    directory_progress: Callable[[PurePosixPath], None] | None = None,
 ) -> TreeSnapshot:
     if not root.is_dir():
         raise SnapshotError(f"local root is not an accessible directory: {root}")
     entries: list[TreeEntry] = []
 
     def walk(relative_directory: PurePosixPath) -> None:
+        if directory_progress is not None:
+            directory_progress(relative_directory)
         listing = list_local_directory(root, relative_directory, rules)
+        descendants: list[PurePosixPath] = []
         for entry in listing.entries:
             relative_path = entry.path
             relative = PurePosixPath(relative_path)
@@ -110,7 +115,9 @@ def snapshot_local(
                 and exclusion_may_descend
                 and remote_may_descend
             ):
-                walk(relative)
+                descendants.append(relative)
+        for descendant in descendants:
+            walk(descendant)
 
     walk(PurePosixPath())
     return TreeSnapshot(tuple(entries))

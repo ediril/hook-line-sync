@@ -2097,6 +2097,10 @@ def _build_plan(
         arguments, "keep_remote", False
     )
     print("Scanning local files...", file=progress, flush=True)
+
+    def report_local_directory(directory: PurePosixPath) -> None:
+        print(f"  Scanning {directory.as_posix()}", file=progress, flush=True)
+
     local = snapshot_local(
         root,
         rules,
@@ -2104,6 +2108,7 @@ def _build_plan(
         include_excluded=include_excluded,
         traverse_excluded=False,
         respect_remote_boundaries=True,
+        directory_progress=report_local_directory,
     )
     remote_selector = (
         _remote_push_selection(arguments, root, local, selector)
@@ -2115,6 +2120,9 @@ def _build_plan(
     def report_recovery(message: str) -> None:
         print(f"  {message}", file=progress, flush=True)
 
+    def report_remote_directory(directory: PurePosixPath) -> None:
+        print(f"  Reading {directory.as_posix()}", file=progress, flush=True)
+
     artifact_options: dict[str, Callable[[str], None]] = {}
     if direction == "push":
         option = "artifact_recovery" if recover_artifacts else "artifact_preview"
@@ -2124,6 +2132,7 @@ def _build_plan(
         remote_selector,
         include_excluded=include_excluded,
         traverse_excluded=False,
+        directory_progress=report_remote_directory,
         **artifact_options,
     )
     print("Comparing local and remote files...", file=progress, flush=True)
@@ -2377,7 +2386,6 @@ def _diff(
                             )
                             or (
                                 entry.action == "untraversed"
-                                and entry.state == "remote-only"
                             )
                         )
                     )
@@ -2459,9 +2467,17 @@ def _diff(
                     entry_lines = format_entries((entry,))
                     if entry_lines:
                         events.append(_PendingDiffOutput(entry_lines))
-                descendant = descendants_by_path.get(entry.path)
-                if descendant is not None:
-                    events.append(descendant)
+            events.extend(
+                _PendingDiffOutput(entry_lines)
+                for entry in file_entries
+                for entry_lines in (format_entries((entry,)),)
+                if entry_lines
+            )
+            events.extend(
+                descendants_by_path[entry.path]
+                for entry in directory_entries
+                if entry.path in descendants_by_path
+            )
             scheduled_paths = {
                 event.path.as_posix()
                 for event in events
@@ -2471,12 +2487,6 @@ def _diff(
                 descendant
                 for descendant in pending_descendants
                 if descendant.path.as_posix() not in scheduled_paths
-            )
-            events.extend(
-                _PendingDiffOutput(entry_lines)
-                for entry in file_entries
-                for entry_lines in (format_entries((entry,)),)
-                if entry_lines
             )
             pending.extend(reversed(events))
 

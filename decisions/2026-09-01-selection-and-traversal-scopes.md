@@ -31,8 +31,8 @@ ancestors.
 Bare diff remains shallow but marks an immediate included remote-only directory
 as a collapsed recursive deletion because bare push will enter it. An explicit
 shallow operand does not project implicit recursion. A directory outside
-selected traversal depth is diagnostic only and is not authorization to create
-or delete its contents.
+selected traversal depth remains visible with a collapsed marker, but is
+diagnostic only and is not authorization to create or delete its contents.
 
 ## Rationale
 
