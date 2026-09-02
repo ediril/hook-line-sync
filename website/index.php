@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.9.1.3';
+$version = '0.9.2.2';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 $title = 'Hook Line Sync — a better way to "just FTP it"';
@@ -177,10 +177,10 @@ function h(string $value): string
                         <p><span class="added">l +</span> <span class="directory">icons/</span></p>
                         <p class="terminal-gap"><span class="prompt">❯</span> <b>hlsync push</b></p>
                         <p class="muted">Pushing changes...</p>
-                        <p>&nbsp; Adding&nbsp;&nbsp;&nbsp;index.php</p>
-                        <p>&nbsp; Updating site.css</p>
-                        <p>&nbsp; Creating icons/</p>
-                        <p>&nbsp; Deleting&nbsp; legacy.php</p>
+                        <p>&nbsp; <span class="added">+</span> index.php</p>
+                        <p>&nbsp; <span class="changed">~</span> site.css</p>
+                        <p>&nbsp; <span class="added">+</span> <span class="directory">icons/</span></p>
+                        <p>&nbsp; <span class="removed">-</span> legacy.php</p>
                         <p><span class="success">✓</span> Push complete: 4 changes.</p>
                         <span class="cursor" aria-hidden="true"></span>
                     </div>

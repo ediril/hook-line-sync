@@ -361,15 +361,17 @@ hlsync push templates -r --dry
 Unlike bare `diff`, bare `push --dry` inherits push's recursive default. It
 also honors `-k`, remote exclusions, and explicit directory depth exactly as a
 real push would. Interrupted-upload recovery is projected and reported but not
-performed.
+performed. After planning, dry push runs the live transfer executor and skips
+only its mutation calls, preserving preflight, operation order, feedback, and
+counts.
 
 Dry and live push identify each local and remote directory as they scan it. A
 parent is fully classified before HLSync enters eligible children, and excluded
 directories are never entered. Dry-run plans use diff's compact colored `+`,
 `~`, and `-` action markers under an explicit dry-push heading.
 
-Transfers print `Adding`, `Updating`, `Creating`, or `Deleting` with the path
-immediately before each operation begins, then finish with a compact count.
+Transfers print the colored `+`, `~`, or `-` action and path immediately before
+each operation begins, then finish with a compact count.
 When no operation is needed, HLSync prints `Nothing to push` or `Nothing to
 pull` without announcing an empty transfer phase. An empty push also reports
 how many included files are up to date in the selected scope. A push that

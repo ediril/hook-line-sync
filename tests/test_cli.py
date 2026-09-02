@@ -21,10 +21,17 @@ class TerminalOutput(io.StringIO):
         return True
 
 
-def invoke(arguments, store, *, stdin="no\n", terminal_output=False):
+def invoke(
+    arguments,
+    store,
+    *,
+    stdin="no\n",
+    terminal_output=False,
+    terminal_progress=False,
+):
     input_stream = stdin if hasattr(stdin, "readline") else io.StringIO(stdin)
     stdout = TerminalOutput() if terminal_output else io.StringIO()
-    stderr = io.StringIO()
+    stderr = TerminalOutput() if terminal_progress else io.StringIO()
     status = run(
         arguments,
         store=store,
@@ -1006,12 +1013,16 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     dry_push = invoke(["push", "--dry"], store)
     assert dry_push[0] == 0
     assert "Options: dry run (--dry).\n" in dry_push[2]
-    assert "Dry push for profile 'prod':\n" in dry_push[1]
-    assert "  + src/nested/child.py\n" in dry_push[1]
+    assert "Dry push...\n" in dry_push[2]
+    assert "  + src/nested/child.py\n" in dry_push[2]
     assert "planned changes.\n" in dry_push[1]
-    colored_dry_push = invoke(["push", "--dry"], store, terminal_output=True)
+    colored_dry_push = invoke(
+        ["push", "--dry"],
+        store,
+        terminal_progress=True,
+    )
     assert "\033[38;5;82m+ src/nested/child.py\033[0m\n" in (
-        colored_dry_push[1]
+        colored_dry_push[2]
     )
     assert artifact_recovery_callbacks[-1][0] is None
     assert artifact_recovery_callbacks[-1][1] is not None
@@ -1036,9 +1047,9 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "Comparing local and remote files...\n" in push_result[2]
     assert push_result[2].endswith(
         "Pushing changes...\n"
-        "  Creating src/\n"
-        "  Adding   src/.env.example\n"
-        "  Adding   src/main.py\n"
+        "  + src/\n"
+        "  + src/.env.example\n"
+        "  + src/main.py\n"
     )
     assert push_result[1] == (
         "Push complete: 3 changes.\n"
@@ -1049,6 +1060,13 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         ("upload", "src/.env.example", b"KEY=value", 9, False),
         ("upload", "src/main.py", b"print('hello')", 14, False),
     ]
+    operations.clear()
+    colored_push = invoke(
+        ["push", "src", "-k"],
+        store,
+        terminal_progress=True,
+    )
+    assert "\033[38;5;82m+ src/main.py\033[0m\n" in colored_push[2]
     unchanged_push = invoke(["push", "same.txt"], store)
     assert "Pushing changes..." not in unchanged_push[2]
     assert unchanged_push[1] == (
@@ -1068,7 +1086,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert pruned_exclusion[0] == 0
     assert snapshot_traversal[-1] is False
     assert operations == [("delete", "src/debug.log", False)]
-    assert "  Deleting src/debug.log\n" in pruned_exclusion[2]
+    assert "  - src/debug.log\n" in pruned_exclusion[2]
     assert pruned_exclusion[1] == "Push complete: 1 change.\n"
     operations.clear()
     recursive_pruned_exclusion = invoke(

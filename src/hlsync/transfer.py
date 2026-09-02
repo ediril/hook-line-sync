@@ -172,6 +172,7 @@ def _push_files(
     transport: RemoteTransport,
     progress: TransferProgress | None,
     operations: tuple[TransferOperation, ...],
+    dry_run: bool,
 ) -> tuple[set[str], list[TransferIssue]]:
     local_entries = _entry_map(local)
     completed: set[str] = set()
@@ -212,7 +213,8 @@ def _push_files(
         try:
             if progress is not None:
                 progress(operation)
-            transport.make_directory(directory)
+            if not dry_run:
+                transport.make_directory(directory)
         except PathOperationError as error:
             unavailable_directories.add(directory)
             issues.append(TransferIssue(directory, "failed", str(error)))
@@ -241,14 +243,15 @@ def _push_files(
         try:
             if progress is not None:
                 progress(operation)
-            with path.open("rb") as source:
-                transport.upload_file(
-                    source,
-                    operation.path,
-                    size=metadata.size,
-                    modified_ns=metadata.modified_ns,
-                    replace=operation.action == "update",
-                )
+            if not dry_run:
+                with path.open("rb") as source:
+                    transport.upload_file(
+                        source,
+                        operation.path,
+                        size=metadata.size,
+                        modified_ns=metadata.modified_ns,
+                        replace=operation.action == "update",
+                    )
         except PathOperationError as error:
             issues.append(TransferIssue(operation.path, "failed", str(error)))
             continue
@@ -351,6 +354,7 @@ def _delete_remote(
     transport: RemoteTransport,
     progress: TransferProgress | None,
     operations: tuple[TransferOperation, ...],
+    dry_run: bool,
 ) -> tuple[set[str], list[TransferIssue]]:
     completed: set[str] = set()
     issues: list[TransferIssue] = []
@@ -358,10 +362,11 @@ def _delete_remote(
         try:
             if progress is not None:
                 progress(operation)
-            transport.delete_path(
-                operation.path,
-                is_directory=operation.kind == "directory",
-            )
+            if not dry_run:
+                transport.delete_path(
+                    operation.path,
+                    is_directory=operation.kind == "directory",
+                )
         except PathOperationError as error:
             issues.append(TransferIssue(operation.path, "failed", str(error)))
             continue
@@ -377,7 +382,10 @@ def execute_transfer(
     remote: TreeSnapshot,
     transport: RemoteTransport,
     progress: TransferProgress | None = None,
+    dry_run: bool = False,
 ) -> TransferResult:
+    if dry_run and plan.direction != "push":
+        raise TransferError("dry run is supported only for push")
     _preflight(plan, local_root, local)
     operations = planned_transfer_operations(plan, remote)
     if plan.direction == "push":
@@ -388,6 +396,7 @@ def execute_transfer(
             transport,
             progress,
             operations,
+            dry_run,
         )
     else:
         completed = _pull_files(
@@ -415,6 +424,7 @@ def execute_transfer(
             transport,
             progress,
             operations,
+            dry_run,
         )
         completed.update(deleted)
         issues.extend(deletion_issues)

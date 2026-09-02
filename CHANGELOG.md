@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.2.2 — 2026-09-02
+
+### Changed
+
+- Run dry push through the live transfer executor, skipping only mutation
+  calls while retaining preflight, operation ordering, feedback, and counts.
+
+## 0.9.2.1 — 2026-09-02
+
+### Changed
+
+- Use the same compact colored `+`, `~`, and `-` operation display for live
+  push feedback and dry-push plans.
+
 ## 0.9.1.3 — 2026-09-01
 
 ### Changed

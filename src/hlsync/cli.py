@@ -61,7 +61,6 @@ from hlsync.transfer import (
     TransferOperation,
     TransferResult,
     execute_transfer,
-    planned_transfer_operations,
 )
 from hlsync.transport import ExplicitFTPSTransport, PathOperationError, TransportError
 
@@ -81,6 +80,12 @@ _DIFF_MARKER_COLORS = {
     "!": _EXCLUDED_REMOTE_COLOR,
     "r": "\033[38;5;30m",
     "l": "\033[38;5;51m",
+}
+_TRANSFER_MARKERS = {
+    "add": "+",
+    "update": "~",
+    "delete": "-",
+    "create": "+",
 }
 
 
@@ -2499,7 +2504,12 @@ def _diff(
         print("  no differences", file=output, flush=True)
 
 
-def _format_transfer(name: str, result: TransferResult) -> str:
+def _format_transfer(
+    name: str,
+    result: TransferResult,
+    *,
+    dry_run: bool = False,
+) -> str:
     direction = result.plan.direction.capitalize()
     if not result.succeeded:
         lines = [
@@ -2522,7 +2532,11 @@ def _format_transfer(name: str, result: TransferResult) -> str:
         lines = [f"{nothing}."]
     else:
         changes = f"{count} change{'s' if count != 1 else ''}"
-        lines = [f"{direction} complete: {changes}."]
+        lines = (
+            [f"Dry push: {count} planned change{'s' if count != 1 else ''}."]
+            if dry_run
+            else [f"{direction} complete: {changes}."]
+        )
     skipped = [entry for entry in result.plan.entries if entry.action == "skip"]
     if result.plan.direction == "push":
         retained_remote = any(
@@ -2543,72 +2557,26 @@ def _report_transfer_operation(
     operation: TransferOperation,
     progress: TextIO,
 ) -> None:
-    labels = {
-        "add": "Adding",
-        "update": "Updating",
-        "delete": "Deleting",
-        "create": "Creating",
-    }
-    suffix = "/" if operation.kind == "directory" else ""
+    marker = _TRANSFER_MARKERS[operation.action]
     print(
-        f"  {labels[operation.action]:<8} {operation.path}{suffix}",
+        _format_path_line(
+            marker,
+            directory=operation.kind == "directory",
+            path=operation.path,
+            depth=1,
+            color=_use_color(progress),
+            marker_color=_DIFF_MARKER_COLORS[marker],
+            excluded=False,
+        ),
         file=progress,
         flush=True,
     )
-
-
-def _format_dry_push(
-    name: str,
-    plan: ComparisonPlan,
-    remote: TreeSnapshot,
-    output: TextIO,
-) -> str:
-    operations = planned_transfer_operations(plan, remote)
-    color = _use_color(output)
-    markers = {
-        "add": "+",
-        "update": "~",
-        "delete": "-",
-        "create": "+",
-    }
-    lines = [f"Dry push for profile '{name}':"]
-    if operations:
-        for operation in operations:
-            lines.append(
-                _format_path_line(
-                    markers[operation.action],
-                    directory=operation.kind == "directory",
-                    path=operation.path,
-                    depth=1,
-                    color=color,
-                    marker_color=_DIFF_MARKER_COLORS[
-                        markers[operation.action]
-                    ],
-                    excluded=False,
-                )
-            )
-        count = len(operations)
-        lines.append(f"{count} planned change{'s' if count != 1 else ''}.")
-    else:
-        unchanged_files = sum(
-            entry.action == "unchanged" and entry.local_kind == "file"
-            for entry in plan.entries
-        )
-        nothing = "  Nothing to push"
-        if unchanged_files:
-            noun = "file is" if unchanged_files == 1 else "files are"
-            nothing += f"; {unchanged_files} {noun} up to date in this scope"
-        lines.append(f"{nothing}.")
-    if any(entry.action == "skip" for entry in plan.entries):
-        lines.append("Remote-only paths would be retained by --keep-remote.")
-    return "\n".join(lines)
 
 
 def _transfer(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
     progress: TextIO,
-    output: TextIO,
 ) -> tuple[str, bool]:
     _, name, profile = _resolve_profile(arguments, store)
     root = _require_local_root(name, profile)
@@ -2632,8 +2600,7 @@ def _transfer(
             include_excluded=arguments.command == "push",
             recover_artifacts=not getattr(arguments, "dry", False),
         )
-        if getattr(arguments, "dry", False):
-            return _format_dry_push(name, plan, remote, output), True
+        dry_run = getattr(arguments, "dry", False)
         executable_actions = {
             "create-remote",
             "upload",
@@ -2642,10 +2609,16 @@ def _transfer(
             "delete-remote",
         }
         if any(entry.action in executable_actions for entry in plan.entries):
-            progress_action = (
-                "Pushing" if arguments.command == "push" else "Pulling"
+            progress_message = (
+                "Dry push..."
+                if dry_run
+                else (
+                    "Pushing changes..."
+                    if arguments.command == "push"
+                    else "Pulling changes..."
+                )
             )
-            print(f"{progress_action} changes...", file=progress, flush=True)
+            print(progress_message, file=progress, flush=True)
         result = execute_transfer(
             plan,
             local_root=root,
@@ -2656,8 +2629,12 @@ def _transfer(
                 operation,
                 progress,
             ),
+            dry_run=dry_run,
         )
-    return _format_transfer(name, result), result.succeeded
+    return (
+        _format_transfer(name, result, dry_run=dry_run),
+        result.succeeded,
+    )
 
 
 def _show_help(
@@ -2738,7 +2715,6 @@ def run(
                 arguments,
                 configuration_store,
                 stderr,
-                stdout,
             )
             if not succeeded:
                 exit_status = 1
