@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.2.3 — 2026-09-02
+
+### Fixed
+
+- Preserve file-browser hierarchy in recursive diff output, including
+  `--all`, by emitting each directory subtree before parent-level files.
+
 ## 0.9.2.2 — 2026-09-02
 
 ### Changed

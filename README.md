@@ -295,6 +295,8 @@ remote-only paths. Diff normally shows actionable differences, retained
 one-sided paths, conflicts, and local or remote exclusion boundaries. Use
 `-i`/`--inc`/`--included-only` to hide exclusions. Use `-a`/`--all` to restore
 unchanged and untraversed entries for the complete exploratory view.
+Recursive diff keeps file-browser order in both views: directories and their
+indented contents appear before files at the parent level.
 
 For push authority, a locally excluded file is treated as absent. If it exists
 remotely, default diff marks its deletion as `r -`; `diff -k --all` marks the

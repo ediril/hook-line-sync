@@ -2472,16 +2472,14 @@ def _diff(
                     entry_lines = format_entries((entry,))
                     if entry_lines:
                         events.append(_PendingDiffOutput(entry_lines))
+                descendant = descendants_by_path.get(entry.path)
+                if descendant is not None:
+                    events.append(descendant)
             events.extend(
                 _PendingDiffOutput(entry_lines)
                 for entry in file_entries
                 for entry_lines in (format_entries((entry,)),)
                 if entry_lines
-            )
-            events.extend(
-                descendants_by_path[entry.path]
-                for entry in directory_entries
-                if entry.path in descendants_by_path
             )
             scheduled_paths = {
                 event.path.as_posix()

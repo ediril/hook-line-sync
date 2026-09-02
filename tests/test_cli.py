@@ -903,8 +903,8 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert recursive_comparison[1].index("nested/\n") < (
         recursive_comparison[1].index("  l + child.py\n")
     )
-    assert recursive_comparison[1].index("l + .env.example\n") < (
-        recursive_comparison[1].index("  l + child.py\n")
+    assert recursive_comparison[1].index("  l + child.py\n") < (
+        recursive_comparison[1].index("l + .env.example\n")
     )
 
     monkeypatch.chdir(workspace)
@@ -969,6 +969,9 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         colored_comparison[1].index("src/")
     )
     assert colored_comparison[1].index("src/") < (
+        colored_comparison[1].index("README.md")
+    )
+    assert colored_comparison[1].index("child.py") < (
         colored_comparison[1].index("README.md")
     )
     all_included = invoke(["diff", "**", "--all", "-i"], store)
