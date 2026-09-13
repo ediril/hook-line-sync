@@ -23,6 +23,8 @@ DEFAULT_GLOBAL_RULES = (
     SyncRule(4, "exclude", "**/.DS_Store"),
     SyncRule(5, "exclude", "**/Thumbs.db"),
     SyncRule(6, "exclude", "**/desktop.ini"),
+    SyncRule(7, "exclude", "**/.gitignore"),
+    SyncRule(8, "exclude", "**/.gitmodules"),
 )
 
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.13.2 — 2026-09-13
+
+### Changed
+
+- Exclude `.gitignore` and `.gitmodules` at every depth in new global rules files.
+
 ## 0.9.13.1 — 2026-09-13
 
 ### Added

@@ -144,6 +144,8 @@ created with a conservative metadata-only policy:
 **/.DS_Store
 **/Thumbs.db
 **/desktop.ini
+**/.gitignore
+**/.gitmodules
 ```
 
 Manage global exclusions and inclusions from any directory with `-g` /
