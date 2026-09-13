@@ -409,6 +409,14 @@ paths.
 
 ### Safe file replacement
 
+Remote ownership and permissions are controlled by the server. HLSync does not
+apply local modes or issue remote chmod/chown commands. Staging files are created
+beside their destinations and retain server-assigned permissions when installed.
+For shared writable app-data trees (for example, `ftps-deploy` and `www-data`),
+configure setgid directories and an appropriate umask or default ACL to create
+`664` files and `2775` directories. Setgid alone does not grant group write;
+replacement files receive the staging file's mode, not the old file's mode.
+
 HLSync never uploads directly over a live destination. A direct FTP upload can
 truncate or expose a partial live file when the connection fails. Instead,
 HLSync:
