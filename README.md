@@ -157,7 +157,7 @@ local root; append `/` to target a complete directory tree:
 hlsync rules -e -g --pattern '*.tmp'
 hlsync rules -i -g --pattern 'public/*.tmp'
 hlsync rules -g                    # inspect global rules
-hlsync rules -g --remove g4        # remove global rule g4
+hlsync rules --remove g4           # g prefix selects global rules
 ```
 
 Global rules apply first and profile rules apply afterward, so an ordinary

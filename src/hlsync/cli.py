@@ -1146,7 +1146,9 @@ def _manage_rules(
         raise ConfigurationError("rule paths require -e/--exclude or -i/--include")
     if arguments.remote or arguments.pattern:
         raise ConfigurationError("--remote and --pattern require -e or -i")
-    if arguments.global_rules:
+    if arguments.global_rules or (
+        arguments.rule_id is not None and arguments.rule_id.startswith("g")
+    ):
         global_store = _global_rule_store(store)
         global_configuration = global_store.load()
         if arguments.rule_id is None:

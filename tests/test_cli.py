@@ -363,11 +363,13 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
     invalid_global_id = invoke(["rules", "-g", "--remove", "8"], store)
     assert invalid_global_id[0] == 1
     assert "rule id must be g-prefixed (for example g3)" in invalid_global_id[2]
-    assert invoke(["rules", "-g", "--remove", f"g{inclusion_id}"], store) == (
+    monkeypatch.chdir(outside)
+    assert invoke(["rules", "--remove", f"g{inclusion_id}"], store) == (
         0,
         f"Removed global rule g{inclusion_id}: include **/.DS_Store\n",
         "",
     )
+    monkeypatch.chdir(workspace)
     assert "x .DS_Store\n" not in invoke(["list"], store)[1]
     assert not any(
         rule.pattern == "**/.DS_Store"

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.13.5 — 2026-09-13
+
+### Changed
+
+- Infer global scope from g-prefixed rule IDs when removing rules, without -g.
+
 ## 0.9.13.4 — 2026-09-13
 
 ### Fixed

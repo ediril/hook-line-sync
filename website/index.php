@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.9.13.4';
+$version = '0.9.13.5';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 $title = 'Hook Line Sync — a better way to "just FTP it"';
