@@ -150,6 +150,7 @@ class ExplicitFTPSTransport:
     def __post_init__(self) -> None:
         self._client: ftplib.FTP_TLS | None = None
         self._use_mlsd = True
+        self._timestamp_command = "MFMT"
 
     def connect(self) -> None:
         username = os.environ.get(self.configuration.username_env)
@@ -178,6 +179,16 @@ class ExplicitFTPSTransport:
             client.prot_p()
             client.cwd(self.configuration.remote_root)
             features = client.sendcmd("FEAT")
+            advertised = {
+                line.strip().upper().split(" ", 1)[0]
+                for line in features.splitlines()
+            }
+            self._timestamp_command = (
+                "MDTM"
+                if "MFMT" not in advertised
+                and "vsftpd" in client.getwelcome().lower()
+                else "MFMT"
+            )
             self._use_mlsd = any(
                 line.strip().upper().split(" ", 1)[0] in {"MLST", "MLSD"}
                 for line in features.splitlines()
@@ -568,20 +579,26 @@ class ExplicitFTPSTransport:
             except (OSError, ftplib.Error):
                 pass
 
+        stage = "upload staging file (STOR)"
         try:
             client.storbinary(f"STOR {temporary}", local_path)
+            stage = "verify upload size (SIZE)"
             uploaded_size = client.size(temporary)
             if uploaded_size != size:
                 raise TransportError(
                     f"remote upload size mismatch for '{path}': "
                     f"expected {size}, got {uploaded_size}"
                 )
-            response = client.sendcmd(f"MFMT {timestamp} {temporary}")
+            stage = f"set timestamp ({self._timestamp_command})"
+            response = client.sendcmd(
+                f"{self._timestamp_command} {timestamp} {temporary}"
+            )
             if len(response) < 3 or not response[:3].isdigit() or response[0] != "2":
                 raise TransportError(
                     f"remote server did not accept modification time for "
                     f"'{path}': {response}"
                 )
+            stage = "verify timestamp (MDTM)"
             verification = client.sendcmd(f"MDTM {temporary}")
             remote_modified_ns, remote_precision_ns = _parse_mdtm_response(
                 verification,
@@ -616,13 +633,18 @@ class ExplicitFTPSTransport:
             raise
         except ftplib.error_perm as error:
             discard(temporary)
+            hint = (
+                " Check mdtm_write and file permissions on the FTP server."
+                if stage == "set timestamp (MDTM)"
+                else ""
+            )
             raise PathOperationError(
-                f"could not stage remote file '{path}': {error}"
+                f"could not {stage} for '{path}': {error}.{hint}"
             ) from error
         except (OSError, ftplib.Error, ssl.SSLError) as error:
             discard(temporary)
             raise TransportError(
-                f"could not stage remote file '{path}': {error}"
+                f"could not {stage} for '{path}': {error}"
             ) from error
 
         if not replace:

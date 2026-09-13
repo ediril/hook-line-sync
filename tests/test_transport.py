@@ -235,8 +235,9 @@ def test_rejects_an_inaccessible_profile_root(tls_ftp_server, monkeypatch) -> No
         transport.connect()
 
 
+@pytest.mark.parametrize("timestamp_command", ["MFMT", "MDTM"])
 def test_upload_verifies_timestamp_independently_of_mfmt_response(
-    tmp_path,
+    tmp_path, timestamp_command,
 ) -> None:
     source_path = tmp_path / "asset.txt"
     source_path.write_text("asset", encoding="utf-8")
@@ -261,7 +262,7 @@ def test_upload_verifies_timestamp_independently_of_mfmt_response(
 
         def sendcmd(self, command):
             self.commands.append(command)
-            if command.startswith("MFMT "):
+            if command.startswith(f"{timestamp_command} 20231114221320 "):
                 return "213 UTIME OK"
             assert command == f"MDTM {self.staged_path}"
             return f"213 {self.mdtm_timestamp}"
@@ -276,6 +277,7 @@ def test_upload_verifies_timestamp_independently_of_mfmt_response(
         ProfileConfiguration(host="ftp.example.com", remote_root="/")
     )
     matching = TimestampClient("20231114221320")
+    transport._timestamp_command = timestamp_command
     transport._client = matching
     with source_path.open("rb") as source:
         transport.upload_file(
@@ -286,7 +288,7 @@ def test_upload_verifies_timestamp_independently_of_mfmt_response(
             replace=False,
         )
     assert matching.commands == [
-        f"MFMT 20231114221320 {matching.staged_path}",
+        f"{timestamp_command} 20231114221320 {matching.staged_path}",
         f"MDTM {matching.staged_path}",
     ]
     assert matching.renamed == [(matching.staged_path, "asset.txt")]

@@ -34,7 +34,8 @@ The FTPS server must support explicit TLS with protected data connections
 (`AUTH TLS` and `PROT P`). HLSync prefers MLSD listings; servers without MLSD
 use Unix-style LIST listings with SIZE and MDTM for exact file metadata.
 LIST mode includes dotfiles and requires two extra requests per file. Push additionally
-requires MFMT and MDTM to apply and verify uploaded-file timestamps.
+requires MFMT (or writable MDTM on vsFTPd) and MDTM read-back to apply and verify
+uploaded-file timestamps.
 
 ## Quick start
 
@@ -403,7 +404,8 @@ HLSync:
 
 1. Uploads to a uniquely named staging file beside the destination.
 2. Verifies its size.
-3. Applies the local whole-second UTC timestamp with MFMT and independently
+3. Applies the local whole-second UTC timestamp with MFMT (writable MDTM on
+   vsFTPd) and independently
    reads it back with MDTM.
 4. Moves the existing destination to a temporary backup.
 5. Renames the verified staging file into place, then removes the backup.

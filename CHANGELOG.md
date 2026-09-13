@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.13.4 — 2026-09-13
+
+### Fixed
+
+- Preserve upload timestamps with writable MDTM on vsFTPd while retaining MFMT
+  on other servers and independent timestamp verification for both.
+- Identify the failed staging step and FTP command in upload errors.
+
 ## 0.9.13.3 — 2026-09-13
 
 ### Fixed
