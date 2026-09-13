@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import os
 import shlex
+import shutil
 import sys
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -2580,6 +2582,87 @@ def _report_transfer_operation(
     )
 
 
+def _byte_label(size: int) -> str:
+    value = float(size)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if value < 1024 or unit == "TiB":
+            return f"{value:.1f} {unit}" if unit != "B" else f"{size} B"
+        value /= 1024
+    raise AssertionError("unreachable byte unit")
+
+
+class _UploadProgress:
+    def __init__(
+        self, output: TextIO, uploads: dict[str, int], *, dry_run: bool,
+    ) -> None:
+        self.output = output
+        self.uploads = uploads
+        self.total_bytes = sum(uploads.values())
+        self.sent = 0
+        self.completed = 0
+        self.issues = 0
+        self.last_draw = 0.0
+        self.visible = False
+        self.terminal = bool(
+            uploads and not dry_run and output.isatty()
+            and os.environ.get("TERM") != "dumb"
+        )
+        if uploads:
+            label = "Planned uploads" if dry_run else "Uploading"
+            print(
+                f"{label}: {len(uploads)} files · {_byte_label(self.total_bytes)}.",
+                file=output, flush=True,
+            )
+
+    def clear(self) -> None:
+        if self.visible:
+            print("\r\033[2K", end="", file=self.output, flush=True)
+            self.visible = False
+
+    def draw(self, *, force: bool = False) -> None:
+        if not self.terminal:
+            return
+        now = time.monotonic()
+        if not force and now - self.last_draw < 0.1:
+            return
+        self.last_draw = now
+        fraction = (
+            self.sent / self.total_bytes if self.total_bytes
+            else self.completed / len(self.uploads)
+        )
+        filled = min(16, int(fraction * 16))
+        bar = "#" * filled + "-" * (16 - filled)
+        line = (
+            f"  [{bar}] {self.completed}/{len(self.uploads)} installed · "
+            f"{_byte_label(self.sent)}/{_byte_label(self.total_bytes)} sent"
+        )
+        if self.issues:
+            line += f" · {self.issues} failed/skipped"
+        width = max(1, shutil.get_terminal_size().columns - 1)
+        print(f"\r\033[2K{line[:width]}", end="", file=self.output, flush=True)
+        self.visible = True
+
+    def advance(self, count: int) -> None:
+        self.sent += count
+        self.draw()
+
+    def report(self, event: TransferOperation | TransferIssue) -> None:
+        self.clear()
+        if event.path in self.uploads:
+            if isinstance(event, TransferIssue):
+                self.issues += 1
+            else:
+                self.completed += 1
+        _report_transfer_operation(event, self.output)
+        self.draw(force=True)
+
+    def finish(self) -> None:
+        if self.terminal:
+            self.draw(force=True)
+            print(file=self.output, flush=True)
+            self.visible = False
+
+
 def _transfer(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
@@ -2608,6 +2691,16 @@ def _transfer(
             recover_artifacts=not getattr(arguments, "dry", False),
         )
         dry_run = getattr(arguments, "dry", False)
+        upload_paths = {
+            entry.path for entry in plan.entries
+            if entry.action in {"upload", "replace-remote"}
+        }
+        uploads = {
+            entry.path: entry.size or 0
+            for entry in local.entries
+            if entry.path in upload_paths
+        } if arguments.command == "push" else {}
+        feedback = _UploadProgress(progress, uploads, dry_run=dry_run)
         executable_actions = {
             "create-remote",
             "upload",
@@ -2626,18 +2719,20 @@ def _transfer(
                 )
             )
             print(progress_message, file=progress, flush=True)
-        result = execute_transfer(
-            plan,
-            local_root=root,
-            local=local,
-            remote=remote,
-            transport=transport,
-            progress=lambda operation: _report_transfer_operation(
-                operation,
-                progress,
-            ),
-            dry_run=dry_run,
-        )
+        try:
+            feedback.draw(force=True)
+            result = execute_transfer(
+                plan,
+                local_root=root,
+                local=local,
+                remote=remote,
+                transport=transport,
+                progress=feedback.report,
+                dry_run=dry_run,
+                byte_progress=feedback.advance if uploads and not dry_run else None,
+            )
+        finally:
+            feedback.finish()
     return (
         _format_transfer(name, result, dry_run=dry_run),
         result.succeeded,

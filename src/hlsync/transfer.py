@@ -183,6 +183,7 @@ def _push_files(
     progress: TransferProgress | None,
     operations: tuple[TransferOperation, ...],
     dry_run: bool,
+    byte_progress: Callable[[int], None] | None,
 ) -> tuple[set[str], list[TransferIssue]]:
     local_entries = _entry_map(local)
     completed: set[str] = set()
@@ -265,6 +266,7 @@ def _push_files(
                         size=metadata.size,
                         modified_ns=metadata.modified_ns,
                         replace=operation.action == "update",
+                        byte_progress=byte_progress,
                     )
         except PathOperationError as error:
             _record_issue(
@@ -405,6 +407,7 @@ def execute_transfer(
     transport: RemoteTransport,
     progress: TransferProgress | None = None,
     dry_run: bool = False,
+    byte_progress: Callable[[int], None] | None = None,
 ) -> TransferResult:
     if dry_run and plan.direction != "push":
         raise TransferError("dry run is supported only for push")
@@ -419,6 +422,7 @@ def execute_transfer(
             progress,
             operations,
             dry_run,
+            byte_progress,
         )
     else:
         completed = _pull_files(

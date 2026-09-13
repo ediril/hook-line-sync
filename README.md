@@ -387,6 +387,12 @@ how many included files are up to date in the selected scope. A push that
 uses `--keep-remote` confirms retention without
 repeating the paths already available through `diff`.
 
+After scanning, push shows the planned upload count and total size. Interactive
+terminals display a progress bar with bytes sent and files installed. File
+counts advance only after timestamp verification and installation; failures
+remain visible immediately. Redirected output keeps ordinary per-file logs.
+Dry runs show planned totals without simulating byte progress.
+
 Retain remote-only paths for an exceptional push with:
 
 ```console

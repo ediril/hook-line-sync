@@ -252,9 +252,11 @@ def test_upload_verifies_timestamp_independently_of_mfmt_response(
             self.deleted = []
             self.renamed = []
 
-        def storbinary(self, command, source):
+        def storbinary(self, command, source, callback=None):
             self.staged_path = command.removeprefix("STOR ")
             assert source.read() == b"asset"
+            if callback is not None:
+                callback(b"asset")
 
         def size(self, path):
             assert path == self.staged_path
@@ -279,6 +281,12 @@ def test_upload_verifies_timestamp_independently_of_mfmt_response(
     matching = TimestampClient("20231114221320")
     transport._timestamp_command = timestamp_command
     transport._client = matching
+    byte_updates = []
+
+    def uploaded_bytes(count):
+        assert matching.renamed == []
+        byte_updates.append(count)
+
     with source_path.open("rb") as source:
         transport.upload_file(
             source,
@@ -286,7 +294,9 @@ def test_upload_verifies_timestamp_independently_of_mfmt_response(
             size=5,
             modified_ns=modified_ns,
             replace=False,
+            byte_progress=uploaded_bytes,
         )
+    assert byte_updates == [5]
     assert matching.commands == [
         f"{timestamp_command} 20231114221320 {matching.staged_path}",
         f"MDTM {matching.staged_path}",
@@ -464,6 +474,12 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             remote,
             selector=selector,
         )
+        sent_bytes = []
+
+        def track_bytes(count):
+            assert not (remote_root / "nested" / "selected.txt").exists()
+            sent_bytes.append(count)
+
         execute_transfer(
             push,
             local_root=local_root,
@@ -471,7 +487,9 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             remote=remote,
             transport=transport,
             progress=progress.append,
+            byte_progress=track_bytes,
         )
+        assert sum(sent_bytes) == len(b"local version")
         assert (remote_root / "nested" / "selected.txt").read_text() == (
             "local version"
         )
@@ -606,6 +624,7 @@ def test_push_skips_an_unwritable_subtree_and_continues_independent_files(
             size,
             modified_ns,
             replace,
+            byte_progress=None,
         ):
             assert [(event.status, event.path) for event in events] == [
                 ("failed", "blocked"), ("skipped", "blocked/child.txt")

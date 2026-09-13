@@ -820,8 +820,12 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
             size,
             modified_ns,
             replace,
+            byte_progress=None,
         ):
-            operations.append(("upload", path, source.read(), size, replace))
+            data = source.read()
+            if byte_progress is not None:
+                byte_progress(len(data))
+            operations.append(("upload", path, data, size, replace))
 
         def download_file(self, path, destination):
             operations.append(("download", path))
@@ -1083,6 +1087,11 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         terminal_progress=True,
     )
     assert "\033[38;5;82m+ src/main.py\033[0m\n" in colored_push[2]
+    assert "Uploading: 2 files · 23 B." in colored_push[2]
+    assert "0/2 installed" in colored_push[2]
+    assert "2/2 installed · 23 B/23 B sent" in colored_push[2]
+    assert "\r" not in push_result[2]
+    assert "installed ·" not in colored_dry_push[2]
     unchanged_push = invoke(["push", "same.txt"], store)
     assert "Pushing changes..." not in unchanged_push[2]
     assert unchanged_push[1] == (
@@ -1408,6 +1417,7 @@ def test_push_reports_partial_failure_after_continuing_independent_paths(
             size,
             modified_ns,
             replace,
+            byte_progress=None,
         ):
             uploads.append((path, source.read()))
 

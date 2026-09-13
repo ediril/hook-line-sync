@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.13.7 — 2026-09-13
+
+### Added
+
+- Show planned upload file/byte totals and a terminal progress bar with bytes
+  sent and files installed. Preserve plain logs when redirected and keep dry
+  runs explicitly planned rather than displaying simulated byte progress.
+
 ## 0.9.13.6 — 2026-09-13
 
 ### Fixed

@@ -132,6 +132,7 @@ class RemoteTransport(Protocol):
         size: int,
         modified_ns: int,
         replace: bool,
+        byte_progress: Callable[[int], None] | None = None,
     ) -> None: ...
 
     def download_file(self, relative_path: str, destination: BinaryIO) -> None: ...
@@ -561,6 +562,7 @@ class ExplicitFTPSTransport:
         size: int,
         modified_ns: int,
         replace: bool,
+        byte_progress: Callable[[int], None] | None = None,
     ) -> None:
         path = _relative_remote_path(relative_path)
         remote = PurePosixPath(path)
@@ -581,7 +583,11 @@ class ExplicitFTPSTransport:
 
         stage = "upload staging file (STOR)"
         try:
-            client.storbinary(f"STOR {temporary}", local_path)
+            callback = (
+                (lambda block: byte_progress(len(block)))
+                if byte_progress is not None else None
+            )
+            client.storbinary(f"STOR {temporary}", local_path, callback=callback)
             stage = "verify upload size (SIZE)"
             uploaded_size = client.size(temporary)
             if uploaded_size != size:
