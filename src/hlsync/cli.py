@@ -2142,6 +2142,7 @@ def _build_plan(
             include_excluded=include_excluded,
             traverse_excluded=False,
             directory_progress=reading.reading,
+            directory_counts=reading.counts,
             **artifact_options,
         )
     print("Comparing local and remote files...", file=progress, flush=True)

@@ -114,6 +114,7 @@ class RemoteTransport(Protocol):
         artifact_recovery: Callable[[str], None] | None = None,
         artifact_preview: Callable[[str], None] | None = None,
         directory_progress: Callable[[PurePosixPath], None] | None = None,
+        directory_counts: Callable[[int, int], None] | None = None,
     ) -> TreeSnapshot: ...
 
     def list_directory(
@@ -224,12 +225,18 @@ class ExplicitFTPSTransport:
         artifact_recovery: Callable[[str], None] | None = None,
         artifact_preview: Callable[[str], None] | None = None,
         directory_progress: Callable[[PurePosixPath], None] | None = None,
+        directory_counts: Callable[[int, int], None] | None = None,
     ) -> TreeSnapshot:
         if self._client is None:
             raise TransportError("FTPS transport is not connected")
         entries: list[TreeEntry] = []
+        completed_directories = 0
+        discovered_directories = 1
+        if directory_counts is not None:
+            directory_counts(0, 1)
 
         def walk(relative_directory: PurePosixPath) -> None:
+            nonlocal completed_directories, discovered_directories
             if directory_progress is not None:
                 directory_progress(relative_directory)
             listing = self.list_directory(relative_directory, rules)
@@ -278,6 +285,10 @@ class ExplicitFTPSTransport:
                     and not entry.remote_excluded
                 ):
                     descendants.append(relative)
+            discovered_directories += len(descendants)
+            completed_directories += 1
+            if directory_counts is not None:
+                directory_counts(completed_directories, discovered_directories)
             for descendant in descendants:
                 walk(descendant)
 

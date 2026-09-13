@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.13.9 — 2026-09-13
+
+### Changed
+
+- Replace remote-read animation with completed/discovered directory counts.
+  Count eligible traversal work as it is discovered, excluding skipped trees.
+
 ## 0.9.13.8 — 2026-09-13
 
 ### Added

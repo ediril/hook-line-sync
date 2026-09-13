@@ -705,6 +705,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
             artifact_recovery=None,
             artifact_preview=None,
             directory_progress=None,
+            directory_counts=None,
         ):
             snapshot_traversal.append(traverse_excluded)
             artifact_recovery_callbacks.append(
@@ -712,6 +713,8 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
             )
             if directory_progress is not None:
                 directory_progress(PurePosixPath())
+            if directory_counts is not None:
+                directory_counts(1, 1)
             assert rules.rules == expected_rules
             entries = []
             if serve_orphan_directory:
@@ -1088,8 +1091,8 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     assert "\033[38;5;82m+ src/main.py\033[0m\n" in colored_push[2]
     assert "Uploading: 2 files · 23 B." in colored_push[2]
-    assert "directories read" in colored_push[2]
-    assert "Read 1 directories." in colored_push[2]
+    assert "1/1 discovered directories read" in colored_push[2]
+    assert "Read 1/1 directories." in colored_push[2]
     assert "0/2 installed" in colored_push[2]
     assert "2/2 installed · 23 B/23 B sent" in colored_push[2]
     assert "\r" not in push_result[2]
@@ -1401,10 +1404,13 @@ def test_push_reports_partial_failure_after_continuing_independent_paths(
             traverse_excluded=False,
             artifact_recovery=None,
             directory_progress=None,
+            directory_counts=None,
         ):
             del traverse_excluded, artifact_recovery
             if directory_progress is not None:
                 directory_progress(PurePosixPath())
+            if directory_counts is not None:
+                directory_counts(1, 1)
             return TreeSnapshot()
 
         def make_directory(self, path):

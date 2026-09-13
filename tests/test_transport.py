@@ -146,7 +146,11 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
     with transport:
         # The fixture refuses unprotected data connections, so recursive MLSD
         # success proves that PROT P was negotiated rather than merely called.
-        snapshot = transport.snapshot(rules)
+        counts = []
+        snapshot = transport.snapshot(
+            rules, directory_counts=lambda done, total: counts.append((done, total))
+        )
+        assert counts == [(0, 1), (1, 3), (2, 3), (3, 3)]
         transport._use_mlsd = False
         assert transport.snapshot(rules) == snapshot
         transport._use_mlsd = True
