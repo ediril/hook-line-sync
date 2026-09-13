@@ -326,11 +326,13 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
     assert '"next_rule_id"' not in global_path.read_text(encoding="utf-8")
 
     monkeypatch.chdir(outside)
+    exclusion_id = max(rule.id for rule in DEFAULT_GLOBAL_RULES) + 1
+    inclusion_id = exclusion_id + 1
     assert invoke(
         ["rules", "-e", "-g", "--pattern", "*.tmp"], store
     ) == (
         0,
-        "Recorded global exclusion rules:\n  g7  exclude *.tmp\n",
+        f"Recorded global exclusion rules:\n  g{exclusion_id}  exclude *.tmp\n",
         "",
     )
     assert invoke(
@@ -338,7 +340,7 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
     ) == (
         0,
         "Recorded global inclusion rules:\n"
-        "  g8  include **/.DS_Store\n",
+        f"  g{inclusion_id}  include **/.DS_Store\n",
         "",
     )
 
@@ -352,16 +354,18 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
     assert "x scratch.tmp\n" not in included
     combined = invoke(["rules"], store)[1]
     assert combined.startswith("Rules for profile 'prod':\n")
-    assert "    g7  exclude *.tmp\n     1  include *.tmp\n" in combined
+    combined_lines = [line.strip() for line in combined.splitlines()]
+    rule_index = combined_lines.index(f"g{exclusion_id}  exclude *.tmp")
+    assert combined_lines[rule_index + 1] == "1  include *.tmp"
     assert combined.endswith(
         "Profile rules override global rules; later matching rules win.\n"
     )
     invalid_global_id = invoke(["rules", "-g", "--remove", "8"], store)
     assert invalid_global_id[0] == 1
     assert "rule id must be g-prefixed (for example g3)" in invalid_global_id[2]
-    assert invoke(["rules", "-g", "--remove", "g8"], store) == (
+    assert invoke(["rules", "-g", "--remove", f"g{inclusion_id}"], store) == (
         0,
-        "Removed global rule g8: include **/.DS_Store\n",
+        f"Removed global rule g{inclusion_id}: include **/.DS_Store\n",
         "",
     )
     assert "x .DS_Store\n" not in invoke(["list"], store)[1]
@@ -373,7 +377,7 @@ def test_global_rules_seed_outside_profiles_and_allow_profile_overrides(
         ["rules", "-e", "-g", "--pattern", "*.bak"], store
     ) == (
         0,
-        "Recorded global exclusion rules:\n  g8  exclude *.bak\n",
+        f"Recorded global exclusion rules:\n  g{inclusion_id}  exclude *.bak\n",
         "",
     )
 
@@ -677,6 +681,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     snapshot_traversal = []
     artifact_recovery_callbacks = []
     serve_orphan_directory = False
+    serve_nested_directory = True
 
     class FakeTransport:
         def __init__(self, profile) -> None:
@@ -766,7 +771,8 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
                 debug_stat = (source / "debug.log").stat()
                 return TreeSnapshot(
                     (
-                        TreeEntry("src/nested", "directory"),
+                        *((TreeEntry("src/nested", "directory"),)
+                          if serve_nested_directory else ()),
                         TreeEntry(
                             "src/debug.log",
                             "file",
@@ -884,6 +890,11 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert push_comparison[1].startswith("src/\n")
     assert "l + main.py\n" in push_comparison[1]
     assert "  nested/ ▸\n" in push_comparison[1]
+    serve_nested_directory = False
+    local_only_directory = invoke(["diff", "."], store)
+    assert "  l   nested/ ▸\n" in local_only_directory[1]
+    assert "child.py" not in local_only_directory[1]
+    serve_nested_directory = True
     assert "src/nested/child.py" not in push_comparison[1]
     assert "README.md" not in push_comparison[1]
     assert "deployed.html" not in push_comparison[1]

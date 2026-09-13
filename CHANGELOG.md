@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.13.3 — 2026-09-13
+
+### Fixed
+
+- Preserve the local-only `l` marker on untraversed directories in diff output.
+
 ## 0.9.13.2 — 2026-09-13
 
 ### Changed

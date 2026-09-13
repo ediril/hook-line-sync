@@ -1452,7 +1452,10 @@ def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
     if entry.action == "unchanged":
         return "  ="
     if entry.action == "untraversed":
-        return "r  " if entry.state == "remote-only" else "   "
+        return {
+            "remote-only": "r  ",
+            "local-only": "l  ",
+        }.get(entry.state, "   ")
     if entry.action == "skip":
         return "r  " if entry.state == "remote-only" else "l  "
     if entry.state == "changed":
