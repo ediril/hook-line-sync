@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.13.6 — 2026-09-13
+
+### Fixed
+
+- Emit transfer success markers after completion and report failures/skips
+  immediately. Final failure summaries contain counts without repeating paths.
+
 ## 0.9.13.5 — 2026-09-13
 
 ### Changed

@@ -1422,6 +1422,9 @@ def test_push_reports_partial_failure_after_continuing_independent_paths(
     assert result[1] == (
         "Push finished with errors for profile 'prod': "
         "1 completed, 1 failed, 1 skipped.\n"
+    )
+    assert result[2].endswith(
         "  failed  blocked: 550 Permission denied\n"
         "  skipped blocked/child.txt: parent directory 'blocked' is unavailable\n"
+        "  + good.txt\n"
     )

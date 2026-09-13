@@ -58,6 +58,7 @@ from hlsync.snapshot import (
 )
 from hlsync.transfer import (
     TransferError,
+    TransferIssue,
     TransferOperation,
     TransferResult,
     execute_transfer,
@@ -2520,10 +2521,6 @@ def _format_transfer(
             f"{result.changed_count} completed, {result.failed_count} failed, "
             f"{result.skipped_count} skipped."
         ]
-        lines.extend(
-            f"  {issue.status:<7} {issue.path}: {issue.reason}"
-            for issue in result.issues
-        )
         return "\n".join(lines)
     count = result.changed_count
     if count == 0:
@@ -2557,9 +2554,16 @@ def _format_transfer(
 
 
 def _report_transfer_operation(
-    operation: TransferOperation,
+    operation: TransferOperation | TransferIssue,
     progress: TextIO,
 ) -> None:
+    if isinstance(operation, TransferIssue):
+        line = f"{operation.status:<7} {operation.path}: {operation.reason}"
+        if _use_color(progress):
+            color = "\033[31m" if operation.status == "failed" else "\033[33m"
+            line = f"{color}{line}{_RESET}"
+        print(f"  {line}", file=progress, flush=True)
+        return
     marker = _TRANSFER_MARKERS[operation.action]
     print(
         _format_path_line(

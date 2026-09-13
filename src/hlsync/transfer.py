@@ -31,7 +31,17 @@ class TransferOperation:
     kind: EntryKind
 
 
-TransferProgress = Callable[[TransferOperation], None]
+TransferProgress = Callable[[TransferOperation | TransferIssue], None]
+
+
+def _record_issue(
+    issues: list[TransferIssue],
+    issue: TransferIssue,
+    progress: TransferProgress | None,
+) -> None:
+    issues.append(issue)
+    if progress is not None:
+        progress(issue)
 
 
 @dataclass(frozen=True)
@@ -202,23 +212,27 @@ def _push_files(
         if blocked_by is not None:
             unavailable_directories.add(directory)
             if directory in planned_creations:
-                issues.append(
+                _record_issue(
+                    issues,
                     TransferIssue(
                         directory,
                         "skipped",
                         f"parent directory '{blocked_by}' could not be created",
-                    )
+                    ),
+                    progress,
                 )
             continue
         try:
-            if progress is not None:
-                progress(operation)
             if not dry_run:
                 transport.make_directory(directory)
         except PathOperationError as error:
             unavailable_directories.add(directory)
-            issues.append(TransferIssue(directory, "failed", str(error)))
+            _record_issue(
+                issues, TransferIssue(directory, "failed", str(error)), progress
+            )
             continue
+        if progress is not None:
+            progress(operation)
         if directory in planned_creations:
             completed.add(directory)
     for operation in (
@@ -226,12 +240,14 @@ def _push_files(
     ):
         blocked_by = unavailable_parent(operation.path)
         if blocked_by is not None:
-            issues.append(
+            _record_issue(
+                issues,
                 TransferIssue(
                     operation.path,
                     "skipped",
                     f"parent directory '{blocked_by}' is unavailable",
-                )
+                ),
+                progress,
             )
             continue
         metadata = local_entries[operation.path]
@@ -241,8 +257,6 @@ def _push_files(
             )
         path = local_root / Path(*PurePosixPath(operation.path).parts)
         try:
-            if progress is not None:
-                progress(operation)
             if not dry_run:
                 with path.open("rb") as source:
                     transport.upload_file(
@@ -253,18 +267,24 @@ def _push_files(
                         replace=operation.action == "update",
                     )
         except PathOperationError as error:
-            issues.append(TransferIssue(operation.path, "failed", str(error)))
+            _record_issue(
+                issues, TransferIssue(operation.path, "failed", str(error)), progress
+            )
             continue
         except OSError as error:
-            issues.append(
+            _record_issue(
+                issues,
                 TransferIssue(
                     operation.path,
                     "failed",
                     f"could not read local file '{path}': {error}",
-                )
+                ),
+                progress,
             )
             continue
         completed.add(operation.path)
+        if progress is not None:
+            progress(operation)
     return completed, issues
 
 
@@ -336,8 +356,6 @@ def _pull_files(
     remote_entries = _entry_map(remote)
     entries = {entry.path: entry for entry in plan.entries}
     for operation in operations:
-        if progress is not None:
-            progress(operation)
         entry = entries[operation.path]
         _replace_local_file(
             local_root,
@@ -347,6 +365,8 @@ def _pull_files(
             transport,
         )
         completed.add(operation.path)
+        if progress is not None:
+            progress(operation)
     return completed
 
 
@@ -360,17 +380,19 @@ def _delete_remote(
     issues: list[TransferIssue] = []
     for operation in (item for item in operations if item.action == "delete"):
         try:
-            if progress is not None:
-                progress(operation)
             if not dry_run:
                 transport.delete_path(
                     operation.path,
                     is_directory=operation.kind == "directory",
                 )
         except PathOperationError as error:
-            issues.append(TransferIssue(operation.path, "failed", str(error)))
+            _record_issue(
+                issues, TransferIssue(operation.path, "failed", str(error)), progress
+            )
             continue
         completed.add(operation.path)
+        if progress is not None:
+            progress(operation)
     return completed, issues
 
 
@@ -410,15 +432,17 @@ def execute_transfer(
         )
         issues = []
     if issues:
-        issues.extend(
-            TransferIssue(
-                entry.path,
-                "skipped",
-                "remote pruning was suppressed after another transfer failed",
-            )
-            for entry in plan.entries
-            if entry.action == "delete-remote"
-        )
+        for entry in plan.entries:
+            if entry.action == "delete-remote":
+                _record_issue(
+                    issues,
+                    TransferIssue(
+                        entry.path,
+                        "skipped",
+                        "remote pruning was suppressed after another transfer failed",
+                    ),
+                    progress,
+                )
     else:
         deleted, deletion_issues = _delete_remote(
             transport,

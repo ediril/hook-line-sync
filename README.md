@@ -377,8 +377,10 @@ parent is fully classified before HLSync enters eligible children, and excluded
 directories are never entered. Dry-run plans use diff's compact colored `+`,
 `~`, and `-` action markers under an explicit dry-push heading.
 
-Transfers print the colored `+`, `~`, or `-` action and path immediately before
-each operation begins, then finish with a compact count.
+Live transfers print the colored `+`, `~`, or `-` action and path after each
+operation succeeds. Failures and skips appear immediately; the final summary
+contains counts without repeating errors. Dry runs use the same feedback to
+show planned operations without performing them.
 When no operation is needed, HLSync prints `Nothing to push` or `Nothing to
 pull` without announcing an empty transfer phase. An empty push also reports
 how many included files are up to date in the selected scope. A push that

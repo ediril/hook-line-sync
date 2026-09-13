@@ -15,7 +15,7 @@ from hlsync.config import ProfileConfiguration
 from hlsync.rules import RuleSet, SyncRule
 from hlsync.selection import FileSelector, FileSelectorSet
 from hlsync.snapshot import TreeEntry, TreeSnapshot, snapshot_local
-from hlsync.transfer import TransferOperation, execute_transfer
+from hlsync.transfer import TransferIssue, TransferOperation, execute_transfer
 from hlsync.transport import (
     ExplicitFTPSTransport,
     PathOperationError,
@@ -586,6 +586,12 @@ def test_push_skips_an_unwritable_subtree_and_continues_independent_files(
     plan = build_comparison(local, remote, prune_remote=True)
     uploads = []
     deletions = []
+    events = []
+
+    def report(event):
+        if isinstance(event, TransferOperation):
+            assert (event.path, b"good") in uploads
+        events.append(event)
 
     class PartiallyWritableTransport:
         def make_directory(self, path):
@@ -601,6 +607,9 @@ def test_push_skips_an_unwritable_subtree_and_continues_independent_files(
             modified_ns,
             replace,
         ):
+            assert [(event.status, event.path) for event in events] == [
+                ("failed", "blocked"), ("skipped", "blocked/child.txt")
+            ]
             uploads.append((path, source.read()))
 
         def delete_path(self, path, *, is_directory):
@@ -612,11 +621,14 @@ def test_push_skips_an_unwritable_subtree_and_continues_independent_files(
         local=local,
         remote=remote,
         transport=PartiallyWritableTransport(),
+        progress=report,
     )
 
     assert uploads == [("good.txt", b"good")]
     assert deletions == []
     assert result.changed_count == 1
+    assert isinstance(events[-1], TransferIssue)
+    assert events[-1].path == "orphan.txt"
     assert [(issue.status, issue.path) for issue in result.issues] == [
         ("failed", "blocked"),
         ("skipped", "blocked/child.txt"),
