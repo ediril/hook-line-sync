@@ -35,6 +35,7 @@ from hlsync.pattern_operands import (
     add_pattern_operands,
     normalize_pattern_operands,
 )
+from hlsync.progress import DirectoryReadProgress
 from hlsync.rules import (
     RuleError,
     RuleSet,
@@ -2130,24 +2131,19 @@ def _build_plan(
     )
     print("Reading remote files over FTPS...", file=progress, flush=True)
 
-    def report_recovery(message: str) -> None:
-        print(f"  {message}", file=progress, flush=True)
-
-    def report_remote_directory(directory: PurePosixPath) -> None:
-        print(f"  Reading {directory.as_posix()}", file=progress, flush=True)
-
-    artifact_options: dict[str, Callable[[str], None]] = {}
-    if direction == "push":
-        option = "artifact_recovery" if recover_artifacts else "artifact_preview"
-        artifact_options[option] = report_recovery
-    remote = transport.snapshot(
-        rules,
-        remote_selector,
-        include_excluded=include_excluded,
-        traverse_excluded=False,
-        directory_progress=report_remote_directory,
-        **artifact_options,
-    )
+    with DirectoryReadProgress(progress) as reading:
+        artifact_options: dict[str, Callable[[str], None]] = {}
+        if direction == "push":
+            option = "artifact_recovery" if recover_artifacts else "artifact_preview"
+            artifact_options[option] = reading.message
+        remote = transport.snapshot(
+            rules,
+            remote_selector,
+            include_excluded=include_excluded,
+            traverse_excluded=False,
+            directory_progress=reading.reading,
+            **artifact_options,
+        )
     print("Comparing local and remote files...", file=progress, flush=True)
     plan = build_comparison(
         local,

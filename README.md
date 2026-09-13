@@ -388,6 +388,8 @@ uses `--keep-remote` confirms retention without
 repeating the paths already available through `diff`.
 
 After scanning, push shows the planned upload count and total size. Interactive
+terminals animate remote reads with the current directory and directories read;
+the total is not known until traversal finishes. During uploads, interactive
 terminals display a progress bar with bytes sent and files installed. File
 counts advance only after timestamp verification and installation; failures
 remain visible immediately. Redirected output keeps ordinary per-file logs.

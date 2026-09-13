@@ -1088,6 +1088,8 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     assert "\033[38;5;82m+ src/main.py\033[0m\n" in colored_push[2]
     assert "Uploading: 2 files · 23 B." in colored_push[2]
+    assert "directories read" in colored_push[2]
+    assert "Read 1 directories." in colored_push[2]
     assert "0/2 installed" in colored_push[2]
     assert "2/2 installed · 23 B/23 B sent" in colored_push[2]
     assert "\r" not in push_result[2]

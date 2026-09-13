@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.13.8 — 2026-09-13
+
+### Added
+
+- Animate progress while reading remote directories, including during blocked
+  network calls, for live and dry transfers. Show current directory and count
+  without implying that the unknown total is a percentage.
+
 ## 0.9.13.7 — 2026-09-13
 
 ### Added
