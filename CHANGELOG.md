@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.13.1 — 2026-09-13
+
+### Added
+
+- Select MLSD or Unix-style LIST from server capabilities. LIST uses SIZE and
+  MDTM and feeds the same tree, exclusion, comparison, and transfer pipeline.
+
 ## 0.9.2.3 — 2026-09-02
 
 ### Fixed

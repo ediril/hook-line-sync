@@ -31,7 +31,9 @@ pip install hook-line-sync
 ```
 
 The FTPS server must support explicit TLS with protected data connections
-(`AUTH TLS` and `PROT P`) plus MLSD directory listings. Push additionally
+(`AUTH TLS` and `PROT P`). HLSync prefers MLSD listings; servers without MLSD
+use Unix-style LIST listings with SIZE and MDTM for exact file metadata.
+LIST mode includes dotfiles and requires two extra requests per file. Push additionally
 requires MFMT and MDTM to apply and verify uploaded-file timestamps.
 
 ## Quick start

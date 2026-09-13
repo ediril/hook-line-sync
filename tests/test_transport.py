@@ -147,6 +147,9 @@ def test_connects_with_verified_explicit_tls_and_protected_data_channel(
         # The fixture refuses unprotected data connections, so recursive MLSD
         # success proves that PROT P was negotiated rather than merely called.
         snapshot = transport.snapshot(rules)
+        transport._use_mlsd = False
+        assert transport.snapshot(rules) == snapshot
+        transport._use_mlsd = True
         assert [(entry.path, entry.kind) for entry in snapshot.entries] == [
             ("assets", "directory"),
             ("assets/logo.svg", "file"),

@@ -149,6 +149,7 @@ class ExplicitFTPSTransport:
 
     def __post_init__(self) -> None:
         self._client: ftplib.FTP_TLS | None = None
+        self._use_mlsd = True
 
     def connect(self) -> None:
         username = os.environ.get(self.configuration.username_env)
@@ -176,6 +177,11 @@ class ExplicitFTPSTransport:
             client.login(username, password)
             client.prot_p()
             client.cwd(self.configuration.remote_root)
+            features = client.sendcmd("FEAT")
+            self._use_mlsd = any(
+                line.strip().upper().split(" ", 1)[0] in {"MLST", "MLSD"}
+                for line in features.splitlines()
+            )
         except (OSError, ftplib.Error, ssl.SSLError) as error:
             try:
                 client.close()
@@ -271,7 +277,7 @@ class ExplicitFTPSTransport:
         relative_directory: PurePosixPath,
         rules: RuleSet,
     ) -> TreeSnapshot:
-        """Read one remote directory using one structured MLSD listing."""
+        """Normalize the negotiated listing format into shared tree metadata."""
         client = self._connected_client()
         remote_directory = relative_directory.as_posix()
         if remote_directory == ".":
@@ -281,7 +287,7 @@ class ExplicitFTPSTransport:
                 client.mlsd(
                     remote_directory,
                     facts=["type", "size", "modify"],
-                ),
+                ) if self._use_mlsd else self._list_facts(relative_directory),
                 key=lambda item: item[0],
             )
         except ftplib.error_perm as error:
@@ -367,6 +373,55 @@ class ExplicitFTPSTransport:
                     f"invalid remote file metadata for '{relative_path}': {error}"
                 ) from error
         return TreeSnapshot(tuple(entries))
+
+    def _list_facts(
+        self, directory: PurePosixPath,
+    ) -> list[tuple[str, dict[str, str]]]:
+        client = self._connected_client()
+        lines: list[str] = []
+        # Keep options separate from paths; servers disagree on LIST -a PATH.
+        previous = client.pwd()
+        client.cwd(f"./{directory.as_posix()}")
+        try:
+            client.retrlines("LIST -a", lines.append)
+        finally:
+            try:
+                client.cwd(previous)
+            except (OSError, ftplib.Error) as error:
+                client.close()
+                self._client = None
+                raise TransportError(
+                    "could not restore remote working directory"
+                ) from error
+        children: list[tuple[str, dict[str, str]]] = []
+        client.voidcmd("TYPE I")
+        for line in lines:
+            if re.fullmatch(r"total \d+", line):
+                continue
+            fields = line.split(maxsplit=8)
+            if len(fields) != 9 or not re.fullmatch(
+                r"[-dl][rwxStTs-]{9}[+@.]?", fields[0]
+            ):
+                raise TransportError(f"unsupported LIST entry: {line!r}")
+            name = fields[8]
+            kind = fields[0][0]
+            if kind == "l":
+                name = name.split(" -> ", 1)[0]
+            if name in {".", ".."}:
+                continue
+            if not name or "/" in name or "\r" in name or "\n" in name:
+                raise TransportError(f"invalid name in remote listing: {name!r}")
+            facts = {"type": {"d": "dir", "-": "file", "l": "OS.unix=slink"}[kind]}
+            if kind == "-":
+                remote_path = f"./{(directory / name).as_posix()}"
+                size = client.size(remote_path)
+                if size is None:
+                    raise TransportError(f"missing remote size for '{name}'")
+                response = client.sendcmd(f"MDTM {remote_path}")
+                _parse_mdtm_response(response, remote_path)
+                facts.update(size=str(size), modify=response.partition(" ")[2].strip())
+            children.append((name, facts))
+        return children
 
     def _connected_client(self) -> ftplib.FTP_TLS:
         if self._client is None:
