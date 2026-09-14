@@ -1,4 +1,4 @@
-# Releasing HLS
+# Releasing HLSync
 
 HLSync publishes the `hook-line-sync` distribution to PyPI. The installed
 command and import package are both `hlsync`.
@@ -6,8 +6,8 @@ command and import package are both `hlsync`.
 ## PyPI requirements
 
 Use an existing PyPI account with two-factor authentication and an API token.
-Twine prompts for credentials during publication; do not store the token in the
-repository.
+Twine uses credentials from `~/.pypirc` or `TWINE_USERNAME`/`TWINE_PASSWORD`,
+and prompts if needed. Do not store the token in the repository.
 
 ## Release procedure
 
@@ -18,23 +18,23 @@ repository.
    dependencies installed, run:
 
    ```console
-   python scripts/prepare_release.py
+   ./scripts/publish.sh
    ```
 
-   The script runs the release identity check, lint, tests, isolated package
-   build, Twine metadata check, and a clean wheel installation. It places the
-   validated wheel and source archive in `dist/<version>/` and prints the exact
-   upload command.
-4. Review the output, then run the printed command. For example:
+   The script uses the repository's `.venv/bin/python` when available, otherwise
+   `python3`; set `PYTHON` to select another interpreter. It builds through
+   `prepare_release.py`, which runs identity checks, lint, tests, isolated builds,
+   metadata checks, and a clean wheel installation, then uploads both artifacts.
+   If `dist/<version>/` already exists, it reuses those prepared artifacts after
+   checking their metadata. Bump the version when releasing new source changes;
+   existing artifacts are not rebuilt automatically.
 
-   ```console
-   python -m twine upload dist/0.8.22.15/*
-   ```
+   To prepare artifacts without publishing, run `python scripts/prepare_release.py`.
 
-5. A Git tag is not required by PyPI. It is strongly recommended for source
+4. A Git tag is not required by PyPI. It is strongly recommended for source
    provenance: tag the release commit as `v<version>`, push that tag, and create
    a corresponding GitHub Release.
-6. Install the published version in a clean environment and run `hlsync --version`
+5. Install the published version in a clean environment and run `hlsync --version`
    before announcing it.
 
 PyPI does not allow a published version to be replaced. If publication fails
