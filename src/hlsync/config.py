@@ -26,6 +26,7 @@ DEFAULT_GLOBAL_RULES = (
     SyncRule(6, "exclude", "**/desktop.ini"),
     SyncRule(7, "exclude", "**/.gitignore"),
     SyncRule(8, "exclude", "**/.gitmodules"),
+    SyncRule(9, "exclude", "**/error_log"),
 )
 
 

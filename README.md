@@ -147,7 +147,7 @@ already deployed can be pruned. Use `-k` to retain them, or remote exclusion
 rules to protect remote paths.
 
 Global rules live in `~/.hlsync/rules.json`, apply to every profile, and are
-created with a conservative metadata-only policy:
+created with default exclusions for version-control metadata and common logs:
 
 ```text
 **/.git/**
@@ -158,6 +158,7 @@ created with a conservative metadata-only policy:
 **/desktop.ini
 **/.gitignore
 **/.gitmodules
+**/error_log
 ```
 
 Manage global exclusions and inclusions from any directory with `-g` /

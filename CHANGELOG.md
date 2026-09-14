@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.14.3 — 2026-09-14
+
+### Changed
+
+- Include `**/error_log` in the global local-exclusion defaults for new rules files.
+  Existing global rules files remain user-managed.
+
 ## 0.9.14.2 — 2026-09-14
 
 ### Added
