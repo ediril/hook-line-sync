@@ -116,6 +116,54 @@ def test_gitignore_baseline_and_persisted_profile_overrides(tmp_path, monkeypatc
     assert "keep.php" in output and "other.php" not in output
 
 
+def test_anywhere_rules_share_scoping_storage_and_overrides(tmp_path, monkeypatch):
+    store = ConfigurationStore(tmp_path / "configs.json")
+    root = tmp_path / "site"
+    sub = root / "sub"
+    sub.mkdir(parents=True)
+    assert invoke([
+        "create", "prod", "--host", "ftp.example.com", "--remote-root", "/site",
+        "--local-root", str(root),
+    ], store)[0] == 0
+    monkeypatch.chdir(sub)
+    assert invoke([
+        "rules", "-e", "--anywhere", "one.txt,two.txt", "*.log",
+    ], store)[0] == 0
+    profile = store.load().profiles["prod"]
+    assert [r.pattern for r in profile.rules] == [
+        "sub/**/one.txt", "sub/**/two.txt", "sub/**/*.log",
+    ]
+    rules = _effective_rules(store, profile)
+    assert rules.excludes("sub/one.txt")
+    assert rules.excludes("sub/future/deep/one.txt")
+    assert not rules.excludes("elsewhere/one.txt")
+    assert invoke(["rules", "-i", "--any", "one.txt"], store)[0] == 0
+    assert not _effective_rules(store, store.load().profiles["prod"]).excludes(
+        "sub/future/deep/one.txt"
+    )
+    assert invoke(["rules", "-e", "-g", "--any", "cache/"], store)[0] == 0
+    assert GlobalRuleStore(tmp_path / "rules.json").load().rules[-1].pattern == (
+        "**/cache/**"
+    )
+    assert invoke([
+        "rules", "-e", "--remote", "--any", "protected",
+    ], store)[0] == 0
+    remote_rule = store.load().profiles["prod"].rules[-1]
+    assert remote_rule.target == "remote"
+    assert remote_rule.pattern == "sub/**/protected"
+    before = (tmp_path / "configs.json").read_text()
+    with pytest.raises(SystemExit) as error:
+        invoke(["rules", "-e", "--any", "--pattern", "one.txt"], store)
+    assert error.value.code == 2
+    for arguments in (
+        ["rules", "--any"],
+        ["rules", "-e", "--any", "/absolute"],
+        ["rules", "-e", "--any", "../outside"],
+    ):
+        assert invoke(arguments, store)[0] != 0
+    assert (tmp_path / "configs.json").read_text() == before
+
+
 def test_profile_lifecycle_uses_production_credentials_and_version(
     tmp_path, monkeypatch
 ) -> None:

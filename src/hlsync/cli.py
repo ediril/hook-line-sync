@@ -390,7 +390,7 @@ def build_parser() -> argparse.ArgumentParser:
         usage=(
             "hlsync [PROFILE] rules\n"
             "       hlsync [PROFILE] rules (-e | -i) [--remote] "
-            "[--pattern] PATH ...\n"
+            "[--pattern | --anywhere] PATH ...\n"
             "       hlsync [PROFILE] rules --remove RULE_ID\n"
             "       hlsync rules -g [(-e | -i) PATH ... | "
             "--remove GLOBAL_RULE_ID]"
@@ -434,10 +434,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="apply new rules to protected remote paths",
     )
-    rules_parser.add_argument(
+    rule_matching = rules_parser.add_mutually_exclusive_group()
+    rule_matching.add_argument(
         "--pattern",
         action="store_true",
         help="record operands as reusable wildcard patterns",
+    )
+    rule_matching.add_argument(
+        "--anywhere",
+        action="store_true",
+        help="match names at any depth below the current directory; -g: every profile",
     )
     rules_parser.add_argument(
         "-g",
@@ -1014,6 +1020,14 @@ def _change_rules(
     if not patterns:
         flag = "-i/--include" if include else "-e/--exclude"
         raise ConfigurationError(f"{flag} requires at least one path")
+    if arguments.anywhere:
+        for pattern in patterns:
+            path = PurePosixPath(pattern)
+            if path.is_absolute() or ".." in path.parts or not path.parts:
+                raise ConfigurationError(
+                    "--anywhere requires relative names or patterns"
+                )
+        patterns = tuple(f"**/{pattern}" for pattern in patterns)
     if arguments.global_rules:
         global_store = _global_rule_store(store)
         configuration = global_store.load()
@@ -1039,7 +1053,7 @@ def _change_rules(
     current_directory = _effective_current_directory(arguments, root)
     operands = (
         patterns
-        if arguments.pattern or arguments.remote
+        if arguments.pattern or arguments.anywhere or arguments.remote
         else expand_path_operands(
             patterns,
             profile_root=root,
@@ -1153,8 +1167,8 @@ def _manage_rules(
     patterns = normalize_pattern_operands(arguments)
     if patterns:
         raise ConfigurationError("rule paths require -e/--exclude or -i/--include")
-    if arguments.remote or arguments.pattern:
-        raise ConfigurationError("--remote and --pattern require -e or -i")
+    if arguments.remote or arguments.pattern or arguments.anywhere:
+        raise ConfigurationError("--remote, --pattern, and --anywhere require -e or -i")
     if arguments.global_rules or (
         arguments.rule_id is not None and arguments.rule_id.startswith("g")
     ):

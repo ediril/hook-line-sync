@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.14.2 — 2026-09-14
+
+### Added
+
+- `rules -e/-i --anywhere NAME` records reusable matches at every depth beneath
+  the current directory, or throughout every profile with `-g`. `--any` works too.
+
 ## 0.9.14.1 — 2026-09-14
 
 ### Added

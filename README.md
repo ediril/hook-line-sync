@@ -198,6 +198,15 @@ hlsync rules -e --pattern '**/*.log'   # every directory below this point
 hlsync rules -i --pattern 'vendor/**'  # re-include a subtree
 ```
 
+Use `--anywhere` (or `--any`) to match a name at every depth, including future
+files. It works with both `-e` and `-i`, and replaces `--pattern`:
+
+```console
+hlsync rules -e --anywhere filename.ext  # current directory and descendants
+hlsync rules -e --any '*.log'            # quote wildcards to preserve the pattern
+hlsync rules -e -g --anywhere cache/     # matching directory trees in every profile
+```
+
 `*` matches within one path segment; a complete `**` segment crosses directory
 levels. Patterns are rooted where the command runs. HLSync rules are not
 Gitignore syntax: `!`, `?`, bracket patterns, absolute paths, parent traversal,
