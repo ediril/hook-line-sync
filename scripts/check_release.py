@@ -11,16 +11,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "src" / "hlsync" / "__init__.py"
 CHANGELOG_FILE = ROOT / "CHANGELOG.md"
-WEBSITE_FILE = ROOT / "website" / "index.php"
 PYPROJECT_FILE = ROOT / "pyproject.toml"
 
 VERSION_PATTERN = re.compile(
     r'^__version__ = "(?P<version>0\.(?P<month>[1-9]|1[0-2])\.'
     r'(?P<day>[1-9]|[12][0-9]|3[01])\.(?P<increment>[1-9][0-9]*))"$',
-    re.MULTILINE,
-)
-WEBSITE_VERSION_PATTERN = re.compile(
-    r"^\$version = '(?P<version>[^']+)';$",
     re.MULTILINE,
 )
 CONSOLE_SCRIPTS_PATTERN = re.compile(
@@ -55,16 +50,6 @@ def validate_release(tag: str | None = None) -> str:
         raise SystemExit(
             "release check failed: pyproject.toml must expose only the "
             "hlsync = hlsync.cli:main console script"
-        )
-
-    website_versions = tuple(
-        match["version"]
-        for match in WEBSITE_VERSION_PATTERN.finditer(WEBSITE_FILE.read_text())
-    )
-    if website_versions != (version,):
-        raise SystemExit(
-            "release check failed: website/index.php must contain exactly one "
-            f"$version assignment matching {version}"
         )
 
     heading_pattern = re.compile(

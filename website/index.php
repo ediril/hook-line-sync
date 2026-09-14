@@ -1,7 +1,6 @@
 <?php
 declare(strict_types=1);
 
-$version = '0.9.13.9';
 $repository = 'https://github.com/ediril/hook-line-sync';
 $year = (int) date('Y');
 $title = 'Hook Line Sync — a better way to "just FTP it"';
@@ -32,7 +31,6 @@ $structuredData = [
     'description' => $description,
     'applicationCategory' => 'DeveloperApplication',
     'operatingSystem' => 'Any operating system with Python 3.10+',
-    'softwareVersion' => $version,
     'url' => $canonicalUrl ?? $repository,
     'downloadUrl' => 'https://pypi.org/project/hook-line-sync/',
     'sameAs' => $repository,
@@ -134,7 +132,7 @@ function h(string $value): string
     <main id="main">
         <section class="hero" id="top">
             <div class="hero-copy">
-                <p class="eyebrow"><span class="signal"></span> PRE-ALPHA // v<?= h($version) ?></p>
+                <p class="eyebrow"><span class="signal"></span> PRE-ALPHA</p>
                 <h1>A better way to<br><span>“just FTP it.”</span></h1>
                 <p class="hero-lede">
                     Map your local project once. Preview the diff. Push exactly what
@@ -300,7 +298,7 @@ function h(string $value): string
     <footer class="site-footer">
         <a class="brand footer-brand" href="#top">hook<span>/</span>line<span>/</span>sync</a>
         <p>Built for the narrow gap between “just FTP it” and deployment infrastructure.</p>
-        <p>© <?= h((string) $year) ?> HLS contributors // MIT</p>
+        <p>© <?= h((string) $year) ?> HLS contributors // MIT // <a href="https://pypi.org/project/hook-line-sync/">Latest release on PyPI ↗</a></p>
     </footer>
 </body>
 </html>
