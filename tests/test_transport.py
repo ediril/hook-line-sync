@@ -12,6 +12,7 @@ from pyftpdlib.servers import FTPServer
 
 from hlsync.comparison import build_comparison
 from hlsync.config import ProfileConfiguration
+from hlsync.gitignore import GitIgnores
 from hlsync.rules import RuleSet, SyncRule
 from hlsync.selection import FileSelector, FileSelectorSet
 from hlsync.snapshot import TreeEntry, TreeSnapshot, snapshot_local
@@ -583,6 +584,42 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             TransferOperation("delete", "orphan-dir/child.txt", "file"),
             TransferOperation("delete", "orphan-dir", "directory"),
         ]
+
+
+def test_gitignore_pruning_and_override_over_ftps(
+    tls_ftp_server, tmp_path, monkeypatch
+):
+    port, certificate, remote_root = tls_ftp_server
+    local_root = tmp_path / "local"
+    local_root.mkdir()
+    (local_root / ".gitignore").write_text("*.txt\n")
+    for name in ("ignored.txt", "deploy.txt"):
+        (local_root / name).write_text("local")
+        (remote_root / name).write_text("old")
+    rules = RuleSet(
+        (SyncRule(1, "exclude", ".gitignore"), SyncRule(2, "include", "deploy.txt")),
+        gitignores=GitIgnores(local_root),
+    )
+    monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
+    monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
+    with ExplicitFTPSTransport(
+        ProfileConfiguration(host="localhost", remote_root="/", port=port),
+        ssl_context=ssl.create_default_context(cafile=os.fspath(certificate)),
+    ) as transport:
+        local = snapshot_local(local_root, rules, include_excluded=True)
+        remote = transport.snapshot(rules, include_excluded=True)
+        plan = build_comparison(local, remote, prune_remote=True)
+        for dry in (True, False):
+            execute_transfer(
+                plan, local_root=local_root, local=local, remote=remote,
+                transport=transport, dry_run=dry,
+            )
+            if dry:
+                assert (remote_root / "ignored.txt").read_text() == "old"
+                assert (remote_root / "deploy.txt").read_text() == "old"
+        assert not (remote_root / "ignored.txt").exists()
+        assert (remote_root / "deploy.txt").read_text() == "local"
+        assert not (remote_root / ".gitignore").exists()
 
 
 def test_push_skips_an_unwritable_subtree_and_continues_independent_files(

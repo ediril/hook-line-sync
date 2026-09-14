@@ -135,6 +135,17 @@ No profile selection is persisted between commands.
 
 ## Synchronization rules
 
+HLSync automatically honors `.gitignore` files inside the mapped local root,
+including nested files, as local exclusions. No Git installation is needed.
+Explicit HLSync rules override this baseline; profile rules override global rules.
+To deploy a Git-ignored path, use `hlsync rules -i vendor/` (or a specific file).
+Ignore files outside the profile, Git's global excludes, and the Git index are
+not consulted; matching tracked files are excluded too.
+
+**Review `hlsync push --dry` after changing ignores:** locally excluded files
+already deployed can be pruned. Use `-k` to retain them, or remote exclusion
+rules to protect remote paths.
+
 Global rules live in `~/.hlsync/rules.json`, apply to every profile, and are
 created with a conservative metadata-only policy:
 

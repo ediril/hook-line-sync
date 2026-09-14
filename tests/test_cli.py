@@ -4,7 +4,7 @@ from pathlib import PurePosixPath
 import pytest
 
 from hlsync import __version__
-from hlsync.cli import run
+from hlsync.cli import _effective_rules, run
 from hlsync.config import DEFAULT_GLOBAL_RULES, ConfigurationStore, GlobalRuleStore
 from hlsync.rules import RuleSet, SyncRule
 from hlsync.snapshot import TreeEntry, TreeSnapshot, snapshot_local
@@ -40,6 +40,80 @@ def invoke(
         stderr=stderr,
     )
     return status, stdout.getvalue(), stderr.getvalue()
+
+
+def test_gitignore_baseline_and_persisted_profile_overrides(tmp_path, monkeypatch):
+    root = tmp_path / "site"
+    root.mkdir()
+    (tmp_path / ".gitignore").write_text("visible.php\n")
+    (root / ".gitignore").write_text(
+        "*.log\n/root-only.php\nvendor/\n!vendor/keep.php\n"
+    )
+    (root / "vendor").mkdir()
+    (root / "sub").mkdir()
+    (root / "sub/.gitignore").write_text("!keep.log\n")
+    for name in (
+        "visible.php",
+        "root-only.php",
+        "error.log",
+        "sub/root-only.php",
+        "sub/keep.log",
+        "sub/error.log",
+        "vendor/keep.php",
+        "vendor/other.php",
+    ):
+        (root / name).write_text("content")
+    store = ConfigurationStore(tmp_path / "configs.json")
+    assert (
+        invoke(
+            [
+                "create",
+                "prod",
+                "--host",
+                "ftp.example.com",
+                "--remote-root",
+                "/site",
+                "--local-root",
+                str(root),
+            ],
+            store,
+        )[0]
+        == 0
+    )
+    monkeypatch.chdir(root)
+
+    def effective():
+        return _effective_rules(store, store.load().profiles["prod"])
+
+    rules = effective()
+    snapshot = {
+        e.path: e for e in snapshot_local(root, rules, include_excluded=True).entries
+    }
+    assert snapshot["error.log"].excluded
+    assert snapshot["root-only.php"].excluded
+    assert snapshot["sub/error.log"].excluded
+    assert not snapshot["sub/keep.log"].excluded
+    assert not snapshot["sub/root-only.php"].excluded
+    assert not snapshot["visible.php"].excluded
+    assert "vendor/keep.php" not in snapshot
+    assert rules.excludes("vendor/keep.php")
+    assert not rules.excludes("vendor", target="remote", is_directory=True)
+
+    # Reversing a prior exclusion must not tidy away the required inclusion.
+    for flag in ("-e", "-i"):
+        assert invoke(["rules", flag, "error.log"], store)[0] == 0
+    assert not effective().excludes("error.log")
+    assert any(r.action == "include" for r in store.load().profiles["prod"].rules)
+    assert invoke(["rules", "-i", "vendor/keep.php"], store)[0] == 0
+    snapshot = {
+        e.path: e
+        for e in snapshot_local(root, effective(), include_excluded=True).entries
+    }
+    assert not snapshot["vendor/keep.php"].excluded
+    assert snapshot["vendor/other.php"].excluded
+    status, output, error = invoke(["list", "-r", "-i"], store)
+    assert status == 0, error
+    assert "keep.php" in output and "other.php" not in output
 
 
 def test_profile_lifecycle_uses_production_credentials_and_version(

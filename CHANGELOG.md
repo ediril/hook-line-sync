@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.14.1 — 2026-09-14
+
+### Added
+
+- Apply profile-root and nested `.gitignore` files as default local exclusions.
+  Explicit HLSync rules override them, including `rules -i` reinclusions.
+
 ## 0.9.13.9 — 2026-09-13
 
 ### Changed

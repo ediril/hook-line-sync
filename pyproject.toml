@@ -10,6 +10,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
+dependencies = ["pathspec>=0.12.1,<2"]
 authors = [{ name = "Hook Line Sync contributors" }]
 keywords = ["deployment", "ftp", "ftps", "synchronization"]
 classifiers = [

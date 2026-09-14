@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from hlsync.gitignore import GitIgnores
 from hlsync.rules import RuleAction, RuleError, RuleSet, RuleTarget, SyncRule
 from hlsync.storage import write_json_atomic
 
@@ -109,6 +110,7 @@ def _rule_action_already_applies(
     action: RuleAction,
     pattern: str,
     target: RuleTarget,
+    gitignores: GitIgnores | None = None,
 ) -> bool:
     if "*" in pattern:
         return False
@@ -120,7 +122,11 @@ def _rule_action_already_applies(
         ),
         None,
     )
-    excluded = winner is not None and winner.action == "exclude"
+    excluded = (
+        winner.action == "exclude"
+        if winner is not None
+        else bool(target == "local" and gitignores and gitignores.excludes(pattern))
+    )
     return excluded if action == "exclude" else not excluded
 
 
@@ -131,6 +137,7 @@ def _append_rules(
     *,
     target: RuleTarget = "local",
     base_rules: tuple[SyncRule, ...] = (),
+    gitignores: GitIgnores | None = None,
 ) -> tuple[tuple[SyncRule, ...], RuleUpdate]:
     ordered = list(rules)
     added: list[SyncRule] = []
@@ -146,12 +153,10 @@ def _append_rules(
             if rule.pattern == pattern and rule.target == target
         )
         ordered = [
-            rule
-            for rule in ordered
-            if rule.pattern != pattern or rule.target != target
+            rule for rule in ordered if rule.pattern != pattern or rule.target != target
         ]
         if replaced and _rule_action_already_applies(
-            (*base_rules, *ordered), action, pattern, target
+            (*base_rules, *ordered), action, pattern, target, gitignores
         ):
             removed.extend(replaced)
             continue
@@ -393,6 +398,9 @@ class ApplicationConfiguration:
             patterns,
             target=target,
             base_rules=base_rules,
+            gitignores=GitIgnores(Path(profile.local_root))
+            if profile.local_root
+            else None,
         )
         self.profiles[profile_name] = profile.with_rules(rules)
         return update

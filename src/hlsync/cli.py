@@ -30,6 +30,7 @@ from hlsync.config import (
     canonical_local_root,
     validate_profile_name,
 )
+from hlsync.gitignore import GitIgnores
 from hlsync.pattern_operands import (
     PatternOperandError,
     add_pattern_operands,
@@ -761,7 +762,11 @@ def _effective_rules(
     profile: ProfileConfiguration,
 ) -> RuleSet:
     global_rules = _global_rule_store(store).load().rules
-    return RuleSet.layered(global_rules, profile.rules)
+    return RuleSet.layered(
+        global_rules,
+        profile.rules,
+        gitignores=GitIgnores(Path(profile.local_root)) if profile.local_root else None,
+    )
 
 
 def _resolve_profile(

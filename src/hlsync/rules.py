@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
+from hlsync.gitignore import GitIgnores
 from hlsync.selection import FileSelector, SelectionError
 
 RuleAction = Literal["include", "exclude"]
@@ -79,9 +80,7 @@ def patterns_from_operands(
         rooted = base / supplied
         local_path = profile_root.joinpath(*rooted.parts)
         is_directory = pattern.endswith("/") or (
-            "*" not in pattern
-            and local_path.is_dir()
-            and not local_path.is_symlink()
+            "*" not in pattern and local_path.is_dir() and not local_path.is_symlink()
         )
         if is_directory:
             rooted = rooted / "**"
@@ -209,6 +208,7 @@ class SyncRule:
 @dataclass(frozen=True)
 class RuleSet:
     rules: tuple[SyncRule, ...] = ()
+    gitignores: GitIgnores | None = None
 
     def __post_init__(self) -> None:
         if any(not isinstance(rule, SyncRule) for rule in self.rules):
@@ -220,7 +220,9 @@ class RuleSet:
             raise RuleError("rules must be ordered by increasing id")
 
     @classmethod
-    def layered(cls, *layers: tuple[SyncRule, ...]) -> RuleSet:
+    def layered(
+        cls, *layers: tuple[SyncRule, ...], gitignores: GitIgnores | None = None
+    ) -> RuleSet:
         return cls(
             tuple(
                 SyncRule(index, rule.action, rule.pattern, rule.target)
@@ -228,7 +230,8 @@ class RuleSet:
                     (rule for layer in layers for rule in layer),
                     start=1,
                 )
-            )
+            ),
+            gitignores=gitignores,
         )
 
     def excludes(
@@ -238,7 +241,6 @@ class RuleSet:
         target: RuleTarget = "local",
         is_directory: bool = False,
     ) -> bool:
-        del is_directory
         profile_relative_path = relative_path
         path = PurePosixPath(profile_relative_path)
         if path.is_absolute() or not path.parts or ".." in path.parts:
@@ -252,7 +254,13 @@ class RuleSet:
             ),
             None,
         )
-        return winner is not None and winner.action == "exclude"
+        if winner is not None:
+            return winner.action == "exclude"
+        return bool(
+            target == "local"
+            and self.gitignores is not None
+            and self.gitignores.excludes(candidate, is_directory=is_directory)
+        )
 
     def may_include_descendant(
         self,
