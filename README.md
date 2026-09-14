@@ -24,10 +24,10 @@ command-line tool with uv:
 uv tool install hook-line-sync
 ```
 
-Or install it with pip:
+Upgrade later with:
 
 ```console
-pip install hook-line-sync
+uv tool upgrade hook-line-sync
 ```
 
 The FTPS server must support explicit TLS with protected data connections
