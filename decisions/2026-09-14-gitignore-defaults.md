@@ -4,7 +4,8 @@
 
 Read profile-root and nested `.gitignore` files lazily, using pathspec's
 GitIgnoreSpec matcher. Respect directory scope and ignored parent boundaries.
-Do not follow symlinked ignore files or consult ancestors outside the profile.
+Do not follow symlinked ignore files. The original profile-only ancestor limit
+is superseded by [repository-scoped ignores](2026-09-30-repository-ignore-scope.md).
 Cache parsed files for one command; never copy patterns into configuration.
 
 Explicit HLSync rules override Git ignores: global rules first, profile rules

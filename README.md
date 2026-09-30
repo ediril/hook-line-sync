@@ -135,12 +135,15 @@ No profile selection is persisted between commands.
 
 ## Synchronization rules
 
-HLSync automatically honors `.gitignore` files inside the mapped local root,
-including nested files, as local exclusions. No Git installation is needed.
+HLSync automatically honors `.gitignore` files as local exclusions. When the
+mapped local root is inside a Git repository, this includes all ancestor
+`.gitignore` files up to the nearest repository root, plus files inside the
+mapped tree. Without an enclosing repository, ignore scope starts at the mapped
+root. Git worktrees are supported; no Git installation is needed.
 Explicit HLSync rules override this baseline; profile rules override global rules.
 To deploy a Git-ignored path, use `hlsync rules -i vendor/` (or a specific file).
-Ignore files outside the profile, Git's global excludes, and the Git index are
-not consulted; matching tracked files are excluded too.
+Ignore files above the repository root, Git's global excludes, and the Git index
+are not consulted; matching tracked files are excluded too.
 
 **Review `hlsync push --dry` after changing ignores:** locally excluded files
 already deployed can be pruned. Use `-k` to retain them, or remote exclusion
@@ -323,6 +326,11 @@ one-sided paths, conflicts, and local or remote exclusion boundaries. Use
 unchanged and untraversed entries for the complete exploratory view.
 Recursive diff keeps file-browser order in both views: directories and their
 indented contents appear before files at the parent level.
+Rows without status markers retain blank status columns so names stay aligned.
+The `▸` marker means contents were not inspected, including excluded folders.
+Diff announces each remote directory on stderr before reading it, including
+directories whose unchanged contents produce no diff output. Paths in these
+announcements are relative to the profile root.
 
 For push authority, a locally excluded file is treated as absent. If it exists
 remotely, default diff marks its deletion as `r -`; `diff -k --all` marks the

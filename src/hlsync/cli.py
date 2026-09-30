@@ -1541,30 +1541,15 @@ def _format_path_line(
     marker_color: str | None,
     excluded: bool,
     collapsed: bool = False,
-    omit_empty_directory_marker: bool = False,
     path_color: str | None = None,
 ) -> str:
     indent = "  " * depth
     label = f"{path}/" if directory else path
     traversal = " ▸" if collapsed else ""
-    omit_marker = omit_empty_directory_marker and directory and not marker.strip()
-    body = (
-        f"{label}{traversal}"
-        if omit_marker
-        else f"{marker} {label}{traversal}"
-    )
+    body = f"{marker} {label}{traversal}"
     line = f"{indent}{body}"
     if not color:
         return line
-    if omit_marker:
-        directory_color = (
-            _COLLAPSED_DIRECTORY_COLOR
-            if collapsed
-            else path_color
-            or (_EXCLUDED_DIRECTORY_COLOR if excluded else _DIRECTORY_COLOR)
-        )
-        suffix = " ▸" if collapsed else ""
-        return f"{indent}{directory_color}{path}/{suffix}{_RESET}"
     if len(marker) == 3:
         side, action = marker[0], marker[2]
         side_color = _DIFF_MARKER_COLORS.get(side)
@@ -1578,8 +1563,11 @@ def _format_path_line(
         )
         rendered_status = f"{rendered_side} {rendered_action}"
         if directory:
-            directory_color = path_color or (
-                _EXCLUDED_DIRECTORY_COLOR if excluded else _DIRECTORY_COLOR
+            directory_color = (
+                _COLLAPSED_DIRECTORY_COLOR
+                if collapsed and not marker.strip()
+                else path_color
+                or (_EXCLUDED_DIRECTORY_COLOR if excluded else _DIRECTORY_COLOR)
             )
             suffix = " ▸" if collapsed else ""
             return (
@@ -1595,8 +1583,6 @@ def _format_path_line(
         return f"{indent}{rendered_status} {rendered_path}"
     if directory:
         if collapsed:
-            if omit_marker:
-                return f"{indent}{_COLLAPSED_DIRECTORY_COLOR}{path}/ ▸{_RESET}"
             colored_marker = (
                 f"{marker_color}{marker}{_RESET}" if marker_color else marker
             )
@@ -1607,8 +1593,6 @@ def _format_path_line(
         directory_color = path_color or (
             _EXCLUDED_DIRECTORY_COLOR if excluded else _DIRECTORY_COLOR
         )
-        if omit_marker:
-            return f"{indent}{directory_color}{path}/{_RESET}"
         colored_marker = (
             f"{marker_color}{marker}{_RESET}" if marker_color else marker
         )
@@ -1697,7 +1681,6 @@ def _format_comparison_entries(
                 marker_color=_comparison_marker_color(marker),
                 excluded=entry.action == "excluded",
                 collapsed=collapsed,
-                omit_empty_directory_marker=True,
                 path_color=remote_exclusion_color,
             )
         )
@@ -1765,14 +1748,13 @@ def _format_compact_comparison_entry(
         )
         lines.append(
             _format_path_line(
-                " ",
+                "   ",
                 directory=True,
                 path=label,
                 depth=depth,
                 color=color,
                 marker_color=None,
                 excluded=False,
-                omit_empty_directory_marker=True,
             )
         )
         emitted_directories.add(ancestor_path)
@@ -1805,13 +1787,12 @@ def _scope_header_lines(
         return ()
     return (
         _format_path_line(
-            " ",
+            "   ",
             directory=True,
             path=display_root.as_posix(),
             color=color,
             marker_color=None,
             excluded=False,
-            omit_empty_directory_marker=True,
         ),
     )
 
@@ -2262,6 +2243,12 @@ def _diff(
                 else TreeSnapshot()
             )
             remote_directory_exists = current.has_remote
+            if current.has_remote:
+                print(
+                    f"Reading remote directory: {display_directory}/",
+                    file=progress,
+                    flush=True,
+                )
             try:
                 remote_listing = (
                     transport.list_directory(directory, rules)
@@ -2380,7 +2367,6 @@ def _diff(
                 if _comparison_entry_kind(entry, direction) == "directory"
                 and entry.path not in descended_paths
                 and entry.path != directory.as_posix()
-                and entry.action != "excluded"
             )
             projected_recursive_deletions = frozenset(
                 entry.path

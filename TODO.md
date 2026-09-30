@@ -1,5 +1,12 @@
 # Work Queue
 
+- [x] Show the uninspected-contents marker on excluded diff directories too.
+- [x] Align unmarked diff directories with marked siblings by retaining blank
+  status columns, including ancestor headings and collapsed directories.
+- [x] Inherit `.gitignore` rules from all ancestors within the nearest Git
+  repository, preserving explicit HLSync inclusion overrides.
+- [x] Announce remote directories before diff reads them so a slow scan cannot
+  appear to be stuck on the preceding excluded-directory result.
 - [x] Add `-v` as an alias for `--version` and document the existing `version`
   command and its `v` abbreviation.
 - [x] Honor local exclusions when recursive diff encounters a remote-only

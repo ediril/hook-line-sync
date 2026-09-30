@@ -4,11 +4,17 @@
 
 ### Added
 
+- Announce each remote directory before diff reads it, so slow or unchanged
+  directories remain visible while scanning.
 - Accept `-v` as an alias for `--version`, alongside `version` and its unique
   prefixes such as `v`.
 
 ### Fixed
 
+- Keep blank status columns on unmarked diff directories so sibling names align.
+- Show `▸` on excluded directories whose contents were not inspected.
+- Honor ancestor `.gitignore` files up to the enclosing Git repository root
+  when a profile maps a subdirectory, including Git worktrees.
 - Make recursive diff skip remote-only directories covered by local exclusions,
   including `.gitignore`, while preserving explicit descendant inclusions.
 

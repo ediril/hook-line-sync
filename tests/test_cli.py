@@ -1016,11 +1016,12 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     push_progress = (
         "Checking differences for profile 'prod'...\n"
         "Connecting securely over FTPS...\n"
+        "Reading remote directory: src/\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
-    assert push_comparison[1].startswith("src/\n")
+    assert push_comparison[1].startswith("    src/\n")
     assert "l + main.py\n" in push_comparison[1]
-    assert "  nested/ ▸\n" in push_comparison[1]
+    assert "      nested/ ▸" in push_comparison[1].splitlines()
     serve_nested_directory = False
     local_only_directory = invoke(["diff", "."], store)
     assert "  l   nested/ ▸\n" in local_only_directory[1]
@@ -1058,7 +1059,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "\033[31m-\033[0m" in pruned_comparison[1]
     assert "l\033[0m \033[90mx\033[0m" in pruned_comparison[1]
     assert "node_modules/" in pruned_comparison[1]
-    assert "src/ ▸" in pruned_comparison[1]
+    assert "    \033[3;38;5;24msrc/ ▸\033[0m" in pruned_comparison[1].splitlines()
     assert "same.txt" not in pruned_comparison[1]
     kept_comparison = invoke(["diff", "-k"], store, terminal_output=True)
     assert "Options: keep remote-only paths (-k).\n" in kept_comparison[2]
@@ -1080,13 +1081,13 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     monkeypatch.chdir(workspace)
     directory_comparison = invoke(["diff", "src"], store)
     assert "= src/\n" not in directory_comparison[1]
-    assert directory_comparison[1].startswith("src/\n")
-    assert "  nested/ ▸\n" in directory_comparison[1]
+    assert directory_comparison[1].startswith("    src/\n")
+    assert "      nested/ ▸" in directory_comparison[1].splitlines()
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
     assert "    l + child.py\n" in recursive_directory_comparison[1]
     nested_directory_comparison = invoke(["diff", "src/nested"], store)
-    assert nested_directory_comparison[1].startswith("src/nested/\n")
+    assert nested_directory_comparison[1].startswith("    src/nested/\n")
     assert "  l + child.py\n" in nested_directory_comparison[1]
     expanded_comparison = invoke(
         ["diff", "README.md,src/main.py", "src"], store
@@ -1101,7 +1102,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     assert "Options: all entries (-a).\n" in colored_comparison[2]
     assert "\033[38;5;75msrc/\033[0m" in colored_comparison[1]
-    assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
+    assert "\033[90mx\033[0m \033[38;5;24mnode_modules/ ▸\033[0m" in (
         colored_comparison[1]
     )
     assert "\033[38;5;30mr\033[0m \033[31m-\033[0m" in colored_comparison[1]
@@ -1289,7 +1290,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "secret.txt" not in prefixed_list[1]
     prefixed_diff = invoke(["prod", "diff", "src"], store)
     assert prefixed_diff[0] == 0
-    assert prefixed_diff[1].startswith("src/\n")
+    assert prefixed_diff[1].startswith("    src/\n")
     assert "  l + main.py\n" in prefixed_diff[1]
     prefixed_page = invoke(["prod", "diff", ".", "-r", "--paged"], store)
     assert (
@@ -1298,7 +1299,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
 
 
-@pytest.mark.parametrize("exclusion_source", ["rule", "gitignore"])
+@pytest.mark.parametrize("exclusion_source", ["rule", "gitignore", "parent-gitignore"])
 def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
     tmp_path, monkeypatch, exclusion_source
 ) -> None:
@@ -1315,10 +1316,23 @@ def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
     monkeypatch.chdir(workspace)
     if exclusion_source == "rule":
         assert invoke(["rules", "-e", "--pattern", "cache/**"], store)[0] == 0
-    else:
+    elif exclusion_source == "gitignore":
         (workspace / ".gitignore").write_text("cache/\n")
+    else:
+        (tmp_path / ".git").mkdir()
+        (tmp_path / ".gitignore").write_text("/workspace/cache/\n")
 
     listed = []
+    progress = io.StringIO()
+
+    def diff():
+        output = io.StringIO()
+        progress.seek(0)
+        progress.truncate()
+        status = run(
+            ["diff", "-r"], store=store, stdout=output, stderr=progress,
+        )
+        return status, output.getvalue(), progress.getvalue()
 
     class RemoteOnlyTransport:
         def __init__(self, profile):
@@ -1332,6 +1346,10 @@ def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
 
         def list_directory(self, relative_directory, rules):
             directory = relative_directory.as_posix()
+            # The path must be visible before a potentially slow network read.
+            assert progress.getvalue().endswith(
+                f"Reading remote directory: {directory}/\n"
+            )
             listed.append(directory)
             if directory == ".":
                 return TreeSnapshot((TreeEntry(
@@ -1347,18 +1365,20 @@ def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
 
     monkeypatch.setattr("hlsync.cli.ExplicitFTPSTransport", RemoteOnlyTransport)
 
-    status, output, error = invoke(["diff", "-r"], store)
+    status, output, error = diff()
     assert status == 0, error
     assert listed == ["."]
-    assert "r ! cache/\n" in output
+    assert "Reading remote directory: cache/" not in error
+    assert "r ! cache/ ▸\n" in output
     assert "keep.txt" not in output
 
     # An explicit descendant inclusion must still allow traversal.
     assert invoke(["rules", "-i", "--pattern", "cache/keep.txt"], store)[0] == 0
     listed.clear()
-    status, output, error = invoke(["diff", "-r"], store)
+    status, output, error = diff()
     assert status == 0, error
     assert listed == [".", "cache"]
+    assert "r ! cache/\n" in output
     assert "r - keep.txt\n" in output
 
 
@@ -1450,7 +1470,7 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
 
     comparison = invoke(["diff", "-r"], store)
     assert comparison[0] == 0
-    assert comparison[1] == "r x future-dir/\n"
+    assert comparison[1] == "r x future-dir/ ▸\n"
     assert listed == ["."]
 
     remote_listing = invoke(["lsr"], store)
@@ -1458,7 +1478,7 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
     assert "r x future-dir/\n" in remote_listing[1]
     colored_boundary = invoke(["diff", "-r"], store, terminal_output=True)[1]
     assert "\033[38;5;30mr\033[0m \033[90mx\033[0m" in colored_boundary
-    assert "\033[38;5;24mfuture-dir/\033[0m" in colored_boundary
+    assert "\033[38;5;24mfuture-dir/ ▸\033[0m" in colored_boundary
     colored_remote_listing = invoke(["lsr"], store, terminal_output=True)[1]
     assert "\033[38;5;24mfuture-dir/\033[0m" in colored_remote_listing
 

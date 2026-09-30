@@ -1,4 +1,4 @@
-"""Profile-scoped Git ignores, loaded lazily without walking unrelated trees."""
+"""Repository-scoped Git ignores, loaded lazily for profile-relative paths."""
 
 from pathlib import Path, PurePosixPath
 
@@ -7,7 +7,15 @@ from pathspec import GitIgnoreSpec
 
 class GitIgnores:
     def __init__(self, root: Path) -> None:
-        self.root = root
+        self.root = next(
+            (
+                directory
+                for directory in (root, *root.parents)
+                if (directory / ".git").is_dir() or (directory / ".git").is_file()
+            ),
+            root,
+        )
+        self._profile_prefix = root.relative_to(self.root)
         self._specs: dict[PurePosixPath, GitIgnoreSpec] = {}
 
     def _spec(self, directory: PurePosixPath) -> GitIgnoreSpec:
@@ -27,7 +35,7 @@ class GitIgnores:
         return self._specs[directory]
 
     def excludes(self, path: str, *, is_directory: bool = False) -> bool:
-        parts = PurePosixPath(path).parts
+        parts = (PurePosixPath(self._profile_prefix) / path).parts
         scopes: list[PurePosixPath] = []
         for depth in range(len(parts)):
             parent = PurePosixPath(*parts[:depth])
