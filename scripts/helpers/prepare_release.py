@@ -11,9 +11,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from check_release import validate_release
-
-ROOT = Path(__file__).resolve().parents[1]
+from check_release import ROOT, validate_release
 
 
 def run(*arguments: str) -> None:

@@ -2,13 +2,17 @@
 set -euo pipefail
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    echo "Usage: scripts/publish.sh"
+    echo "Usage: scripts/publish.sh [--prepare]"
     echo "Build and validate the current release if needed, then publish it to PyPI."
     echo "Uses dist/<version>/ if already prepared. Set PYTHON to select an interpreter."
+    echo "Use --prepare to build and validate artifacts without publishing."
     exit 0
 fi
-if [[ $# -ne 0 ]]; then
-    echo "Usage: scripts/publish.sh" >&2
+prepare_only=false
+if [[ $# -eq 1 && "$1" == "--prepare" ]]; then
+    prepare_only=true
+elif [[ $# -ne 0 ]]; then
+    echo "Usage: scripts/publish.sh [--prepare]" >&2
     exit 2
 fi
 
@@ -24,13 +28,13 @@ if [[ -z "$release_python" ]]; then
     fi
 fi
 
-"$release_python" scripts/check_release.py
+"$release_python" scripts/helpers/check_release.py
 release_version="$("$release_python" -c \
-    'import sys; sys.path.insert(0, "scripts"); from check_release import release_version; print(release_version()[0])')"
+    'import sys; sys.path.insert(0, "scripts/helpers"); from check_release import release_version; print(release_version()[0])')"
 release_directory="dist/$release_version"
 
 if [[ ! -d "$release_directory" ]]; then
-    "$release_python" scripts/prepare_release.py
+    "$release_python" scripts/helpers/prepare_release.py
 else
     echo "Using prepared release: $release_directory/"
 fi
@@ -43,6 +47,10 @@ if [[ ! -f "$release_wheel" || ! -f "$release_source" ]]; then
 fi
 
 "$release_python" -m twine check "$release_wheel" "$release_source"
+if [[ "$prepare_only" == true ]]; then
+    echo "Release $release_version is ready in $release_directory/"
+    exit 0
+fi
 echo "Publishing hook-line-sync $release_version to PyPI..."
 "$release_python" -m twine upload --repository pypi \
     "$release_wheel" "$release_source"

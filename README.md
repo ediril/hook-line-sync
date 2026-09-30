@@ -534,13 +534,13 @@ and prompts if needed. Do not store the token in the repository.
 
    The script uses the repository's `.venv/bin/python` when available, otherwise
    `python3`; set `PYTHON` to select another interpreter. It builds through
-   `prepare_release.py`, which runs identity checks, lint, tests, isolated builds,
+   helpers in `scripts/helpers/`, which run identity checks, lint, tests, isolated builds,
    metadata checks, and a clean wheel installation, then uploads both artifacts.
    If `dist/<version>/` already exists, it reuses those prepared artifacts after
    checking their metadata. Bump the version when releasing new source changes;
    existing artifacts are not rebuilt automatically.
 
-   To prepare artifacts without publishing, run `python scripts/prepare_release.py`.
+   To prepare artifacts without publishing, run `./scripts/publish.sh --prepare`.
 
 4. A Git tag is not required by PyPI. It is strongly recommended for source
    provenance: tag the release commit as `v<version>`, push that tag, and create
