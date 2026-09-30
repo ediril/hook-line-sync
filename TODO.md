@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Consolidate maintainer release instructions into README's development
+  and maintenance section.
 - [x] Suggest `--keep-remote` when a dry push plans remote deletions, omitting
   the tip when the option is already selected or no deletions are planned.
 - [x] Remove the redundant retained-path reminder from push summaries, including
