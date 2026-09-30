@@ -524,7 +524,8 @@ Twine uses credentials from `~/.pypirc` or `TWINE_USERNAME`/`TWINE_PASSWORD`,
 and prompts if needed. Do not store the token in the repository.
 
 1. Set [`src/hlsync/__init__.py`](src/hlsync/__init__.py) to the next version.
-2. Add a matching dated section to [`CHANGELOG.md`](CHANGELOG.md).
+2. Update [`CHANGELOG.md`](CHANGELOG.md) when useful. Release notes and dated
+   headings are optional and do not block publishing.
 3. Commit the release changes. From that clean checkout, with development
    dependencies installed, run:
 

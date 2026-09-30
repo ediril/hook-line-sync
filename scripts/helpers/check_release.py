@@ -5,12 +5,10 @@ from __future__ import annotations
 
 import argparse
 import re
-from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION_FILE = ROOT / "src" / "hlsync" / "__init__.py"
-CHANGELOG_FILE = ROOT / "CHANGELOG.md"
 PYPROJECT_FILE = ROOT / "pyproject.toml"
 
 VERSION_PATTERN = re.compile(
@@ -24,19 +22,18 @@ CONSOLE_SCRIPTS_PATTERN = re.compile(
 )
 
 
-def release_version() -> tuple[str, int, int]:
+def release_version() -> str:
     matches = tuple(VERSION_PATTERN.finditer(VERSION_FILE.read_text()))
     if len(matches) != 1:
         raise SystemExit(
             "release check failed: src/hlsync/__init__.py must contain exactly one "
             'valid __version__ = "0.<month>.<day>.<increment>" assignment'
         )
-    match = matches[0]
-    return match["version"], int(match["month"]), int(match["day"])
+    return matches[0]["version"]
 
 
 def validate_release(tag: str | None = None) -> str:
-    version, month, day = release_version()
+    version = release_version()
     if tag is not None and tag != f"v{version}":
         raise SystemExit(
             f"release check failed: tag {tag!r} does not match v{version}"
@@ -52,19 +49,7 @@ def validate_release(tag: str | None = None) -> str:
             "hlsync = hlsync.cli:main console script"
         )
 
-    heading_pattern = re.compile(
-        rf"^## {re.escape(version)} — (?P<year>[0-9]{{4}})-"
-        rf"{month:02d}-{day:02d}$",
-        re.MULTILINE,
-    )
-    heading = heading_pattern.search(CHANGELOG_FILE.read_text())
-    if heading is None:
-        raise SystemExit(
-            f"release check failed: CHANGELOG.md has no dated {version} heading"
-        )
-
-    release_date = date(int(heading["year"]), month, day)
-    print(f"Release identity valid: {version} ({release_date.isoformat()})")
+    print(f"Release identity valid: {version}")
     return version
 
 

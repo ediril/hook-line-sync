@@ -30,7 +30,7 @@ fi
 
 "$release_python" scripts/helpers/check_release.py
 release_version="$("$release_python" -c \
-    'import sys; sys.path.insert(0, "scripts/helpers"); from check_release import release_version; print(release_version()[0])')"
+    'import sys; sys.path.insert(0, "scripts/helpers"); from check_release import release_version; print(release_version())')"
 release_directory="dist/$release_version"
 
 if [[ ! -d "$release_directory" ]]; then

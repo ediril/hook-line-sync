@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Remove the dated-changelog requirement from release validation; publishing
+  does not depend on release-note formatting.
 - [x] Move release helpers under `scripts/helpers/` and expose preparation
   through `scripts/publish.sh --prepare`.
 - [x] Consolidate maintainer release instructions into README's development
