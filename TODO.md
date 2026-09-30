@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Honor local exclusions when recursive diff encounters a remote-only
+  directory, preserving explicit descendant inclusions.
 - [x] Make push and its default diff projection delete selected remote-only
   paths, replacing opt-in pruning with `-k` / `--keep-remote` retention.
 - [x] Remove persisted rule-ID allocation counters and derive disposable IDs

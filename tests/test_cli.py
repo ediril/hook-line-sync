@@ -1298,6 +1298,70 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
 
 
+@pytest.mark.parametrize("exclusion_source", ["rule", "gitignore"])
+def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
+    tmp_path, monkeypatch, exclusion_source
+) -> None:
+    store = ConfigurationStore(tmp_path / "configs.json")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    assert invoke(
+        [
+            "create", "prod", "--host", "unreachable.example",
+            "--remote-root", "/public_html", "--local-root", str(workspace),
+        ],
+        store,
+    )[0] == 0
+    monkeypatch.chdir(workspace)
+    if exclusion_source == "rule":
+        assert invoke(["rules", "-e", "--pattern", "cache/**"], store)[0] == 0
+    else:
+        (workspace / ".gitignore").write_text("cache/\n")
+
+    listed = []
+
+    class RemoteOnlyTransport:
+        def __init__(self, profile):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            pass
+
+        def list_directory(self, relative_directory, rules):
+            directory = relative_directory.as_posix()
+            listed.append(directory)
+            if directory == ".":
+                return TreeSnapshot((TreeEntry(
+                    "cache", "directory",
+                    excluded=rules.excludes("cache", is_directory=True),
+                ),))
+            assert directory == "cache"
+            return TreeSnapshot((TreeEntry(
+                "cache/keep.txt", "file", size=1, modified_ns=0,
+                timestamp_precision_ns=1,
+                excluded=rules.excludes("cache/keep.txt"),
+            ),))
+
+    monkeypatch.setattr("hlsync.cli.ExplicitFTPSTransport", RemoteOnlyTransport)
+
+    status, output, error = invoke(["diff", "-r"], store)
+    assert status == 0, error
+    assert listed == ["."]
+    assert "r ! cache/\n" in output
+    assert "keep.txt" not in output
+
+    # An explicit descendant inclusion must still allow traversal.
+    assert invoke(["rules", "-i", "--pattern", "cache/keep.txt"], store)[0] == 0
+    listed.clear()
+    status, output, error = invoke(["diff", "-r"], store)
+    assert status == 0, error
+    assert listed == [".", "cache"]
+    assert "r - keep.txt\n" in output
+
+
 def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("NO_COLOR", raising=False)
     store = ConfigurationStore(tmp_path / "configs.json")

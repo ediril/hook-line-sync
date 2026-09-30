@@ -1995,8 +1995,10 @@ def _descendant_directories(
         if selector is not None and not selector.may_match_descendant(path):
             continue
         if (
-            local_entry is not None
-            and local_entry.excluded
+            any(
+                entry is not None and entry.excluded
+                for entry in (local_entry, remote_entry)
+            )
             and not rules.may_include_descendant(path, target="local")
         ):
             continue

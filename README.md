@@ -327,8 +327,9 @@ indented contents appear before files at the parent level.
 For push authority, a locally excluded file is treated as absent. If it exists
 remotely, default diff marks its deletion as `r -`; `diff -k --all` marks the
 retained remote copy as `r !`. An excluded directory is instead a hard
-traversal boundary and is retained remotely as `r !`. `-i` never hides an
-actionable deletion.
+traversal boundary and is retained remotely as `r !`, even when it exists only
+remotely. An explicit local inclusion for a descendant permits traversal;
+remote exclusions remain hard boundaries. `-i` never hides an actionable deletion.
 
 Bare diff keeps traversal shallow but projects the recursive scope of bare
 push: an immediate remote-only directory appears as `r - folder/ ▸`, warning that

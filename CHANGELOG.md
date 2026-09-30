@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Make recursive diff skip remote-only directories covered by local exclusions,
+  including `.gitignore`, while preserving explicit descendant inclusions.
+
 ## 0.9.14.3 — 2026-09-14
 
 ### Changed
