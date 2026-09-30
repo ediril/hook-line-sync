@@ -4,6 +4,13 @@ Date: 2026-09-02
 
 ## Decision
 
+Push summaries report the result without a trailing reminder about retained
+remote paths, including when `--keep-remote` was explicitly selected. This
+reflects the user's September 30 preference to omit redundant option reminders.
+When a dry push plans remote deletions without `--keep-remote`, show a tip
+explaining that `-k` would retain those paths. Exclusions alone do not trigger
+the tip, and real pushes and dry pushes with `-k` do not show it.
+
 Push, pull, and dry push consume one deterministic ordered operation stream.
 The transfer executor performs preflight, emits each operation immediately
 before its mutation boundary, and preserves create-before-upload and

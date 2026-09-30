@@ -1164,6 +1164,14 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "Dry push...\n" in dry_push[2]
     assert "  + src/nested/child.py\n" in dry_push[2]
     assert "planned changes.\n" in dry_push[1]
+    retention_tip = "Tip: use --keep-remote (-k) to retain these remote paths.\n"
+    assert retention_tip in dry_push[1]
+    dry_kept_push = invoke(["push", "--dry", "-k"], store)
+    assert dry_kept_push[0] == 0
+    assert retention_tip not in dry_kept_push[1]
+    dry_upload_only = invoke(["push", "main.py", "--dry"], store)
+    assert dry_upload_only[0] == 0
+    assert retention_tip not in dry_upload_only[1]
     colored_dry_push = invoke(
         ["push", "--dry"],
         store,
@@ -1178,6 +1186,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
 
     recursive_push = invoke(["push"], store)
     assert recursive_push[0] == 0
+    assert retention_tip not in recursive_push[1]
     assert ("upload", "src/nested/child.py", b"child", 5, False) in operations
     operations.clear()
 
@@ -1199,10 +1208,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         "  + src/.env.example\n"
         "  + src/main.py\n"
     )
-    assert push_result[1] == (
-        "Push complete: 3 changes.\n"
-        "Remote-only paths retained by --keep-remote.\n"
-    )
+    assert push_result[1] == "Push complete: 3 changes.\n"
     assert operations == [
         ("mkdir", "src"),
         ("upload", "src/.env.example", b"KEY=value", 9, False),
@@ -1258,10 +1264,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     operations.clear()
     retained_push = invoke(["push", "deployed.html", "-k"], store)
     assert "Pushing changes..." not in retained_push[2]
-    assert retained_push[1] == (
-        "  Nothing to push.\n"
-        "Remote-only paths retained by --keep-remote.\n"
-    )
+    assert retained_push[1] == "  Nothing to push.\n"
     pull_result = invoke(["pull", "deployed.html"], store)
     assert pull_result[0] == 0
     assert pull_result[2].startswith("Preparing pull for profile 'prod'...\n")
@@ -1488,6 +1491,14 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
     assert pushed[0] == 0
     assert operations == []
     assert "Nothing to push" in pushed[1]
+    assert "retained by --keep-remote" not in pushed[1]
+
+    protected_with_keep = invoke(["push", "-k"], store)
+    assert protected_with_keep[0] == 0
+    assert "retained by --keep-remote" not in protected_with_keep[1]
+    protected_dry = invoke(["push", "--dry"], store)
+    assert protected_dry[0] == 0
+    assert "Tip: use --keep-remote" not in protected_dry[1]
 
     included = invoke(["rules", "-i", "--remote", "future-dir/"], store)
     assert included[0] == 0

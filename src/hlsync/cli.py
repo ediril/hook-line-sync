@@ -2516,16 +2516,15 @@ def _format_transfer(
             if dry_run
             else [f"{direction} complete: {changes}."]
         )
-    skipped = [entry for entry in result.plan.entries if entry.action == "skip"]
-    if result.plan.direction == "push":
-        retained_remote = any(
-            entry.action == "skip"
-            or (entry.action == "excluded" and entry.remote_kind is not None)
-            for entry in result.plan.entries
-        )
-        if retained_remote:
-            lines.append("Remote-only paths retained by --keep-remote.")
-    else:
+    if (
+        dry_run
+        and result.plan.direction == "push"
+        and result.plan.prune_remote
+        and any(entry.action == "delete-remote" for entry in result.plan.entries)
+    ):
+        lines.append("Tip: use --keep-remote (-k) to retain these remote paths.")
+    if result.plan.direction == "pull":
+        skipped = [entry for entry in result.plan.entries if entry.action == "skip"]
         if skipped:
             lines.append("Remote-only paths not restored:")
             lines.extend(f"  {entry.path}" for entry in skipped)

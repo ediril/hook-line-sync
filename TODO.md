@@ -1,5 +1,9 @@
 # Work Queue
 
+- [x] Suggest `--keep-remote` when a dry push plans remote deletions, omitting
+  the tip when the option is already selected or no deletions are planned.
+- [x] Remove the redundant retained-path reminder from push summaries, including
+  when `--keep-remote` is explicitly selected.
 - [x] Separate actual path presence from diff actions and exclusion source;
   reserve blank for both sides and distinguish local `x` from remote `#`.
 - [x] Show the uninspected-contents marker on excluded diff directories too.

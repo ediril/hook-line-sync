@@ -4,12 +4,15 @@
 
 ### Changed
 
+- Remove the trailing `--keep-remote` reminder from push summaries.
 - Make diff's presence column independent of action and exclusion: `l` means
   local only, `r` remote only, and blank both sides. Use `x` for local exclusions
   and `#` for remote exclusions, replacing `!`.
 
 ### Added
 
+- Suggest `--keep-remote` only when a dry push plans remote deletions and the
+  option was not supplied.
 - Announce each remote directory before diff reads it, so slow or unchanged
   directories remain visible while scanning.
 - Accept `-v` as an alias for `--version`, alongside `version` and its unique

@@ -417,9 +417,11 @@ contains counts without repeating errors. Dry runs use the same feedback to
 show planned operations without performing them.
 When no operation is needed, HLSync prints `Nothing to push` or `Nothing to
 pull` without announcing an empty transfer phase. An empty push also reports
-how many included files are up to date in the selected scope. A push that
-uses `--keep-remote` confirms retention without
-repeating the paths already available through `diff`.
+how many included files are up to date in the selected scope. Push summaries
+report the outcome without a retained-path reminder, including with `--keep-remote`.
+A dry push that plans remote deletions suggests `--keep-remote` (`-k`) as a way
+to retain those paths. The tip is omitted when `-k` was supplied or no remote
+deletions are planned.
 
 After scanning, push shows the planned upload count and total size. Interactive
 terminals show remote reads as completed/discovered directories (such as 2/12)
