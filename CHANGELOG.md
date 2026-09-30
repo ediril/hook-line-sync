@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- Make diff's presence column independent of action and exclusion: `l` means
+  local only, `r` remote only, and blank both sides. Use `x` for local exclusions
+  and `#` for remote exclusions, replacing `!`.
+
 ### Added
 
 - Announce each remote directory before diff reads it, so slow or unchanged

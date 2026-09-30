@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Separate actual path presence from diff actions and exclusion source;
+  reserve blank for both sides and distinguish local `x` from remote `#`.
 - [x] Show the uninspected-contents marker on excluded diff directories too.
 - [x] Align unmarked diff directories with marked siblings by retaining blank
   status columns, including ancestor headings and collapsed directories.

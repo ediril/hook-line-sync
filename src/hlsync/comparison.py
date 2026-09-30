@@ -153,7 +153,7 @@ def build_comparison(
                         path=path,
                         state="remote-only",
                         action="delete-remote",
-                        local_kind=None,
+                        local_kind=local_entry.kind if local_entry else None,
                         remote_kind=remote_entry.kind,
                     )
                 )

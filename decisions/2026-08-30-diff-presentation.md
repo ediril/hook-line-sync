@@ -2,6 +2,9 @@
 
 Date: 2026-08-30
 
+The side/exclusion symbols and ancestor-heading alignment below are superseded
+by [independent presence and status columns](2026-09-30-diff-presence-and-exclusions.md).
+
 ## Decision
 
 Diff uses separate side and action columns. `l +` is a local-only upload, `r -`

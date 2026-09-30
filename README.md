@@ -289,11 +289,12 @@ hlsync list --remote templates -r
 hlsync lsr
 ```
 
-Remote listing connects read-only. Remote-excluded paths use `r x` and their
+Remote listing connects read-only. Remote-excluded paths use `#` and their
 directories are shown as boundaries without being entered.
 
 Directories appear before files at each level, with each group sorted by name.
-Directories end in `/`; excluded paths use `x`. `-i`, `--inc`, and
+Directories end in `/`; local exclusions use `x`, remote exclusions use `#`.
+Single-side listings do not report whether the other side has a copy. `-i`, `--inc`, and
 `--included-only` hide excluded paths. `hlsync ls` remains an unadvertised
 compatibility spelling.
 
@@ -333,10 +334,11 @@ directories whose unchanged contents produce no diff output. Paths in these
 announcements are relative to the profile root.
 
 For push authority, a locally excluded file is treated as absent. If it exists
-remotely, default diff marks its deletion as `r -`; `diff -k --all` marks the
-retained remote copy as `r !`. An excluded directory is instead a hard
-traversal boundary and is retained remotely as `r !`, even when it exists only
-remotely. An explicit local inclusion for a descendant permits traversal;
+remotely, default diff marks its deletion as `-`; `diff -k --all` marks the
+retained path as `x`. The presence column still reports the actual copies:
+blank when both exist, `r` when only the remote copy exists. An excluded
+directory is a traversal boundary and is retained with `x`. An explicit local
+inclusion for a descendant permits traversal;
 remote exclusions remain hard boundaries. `-i` never hides an actionable deletion.
 
 Bare diff keeps traversal shallow but projects the recursive scope of bare
@@ -357,10 +359,12 @@ Diff prints each directory as it is compared. For a shell-driven review,
 
 Colors are automatic on terminals, disabled for pipes and redirection, and
 suppressed when `NO_COLOR` is set. Text markers retain the core meaning without
-color. The left status column uses `l` and `r` for the relevant side; the right
-column shows the action. Notably, `r x` is a remote-excluded path left
-untouched, while `l x` and `r !` describe locally excluded paths that are
-respectively absent or present remotely.
+color. The left status column reports presence: `l` means local only, `r` means
+remote only, and a blank means both sides. The right column reports action or
+status: `x` means locally excluded and `#` means remotely excluded. For example,
+`  x notes/ ▸` exists on both sides but is locally excluded, while
+`r # millionminds/ ▸` exists only remotely and is remotely excluded. Exclusion
+source never changes the presence column.
 
 ## Push and pull
 

@@ -291,11 +291,13 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
         "    ~  present on both sides; update\n"
         "  r -  remote-only; delete\n"
         "  r    remote-only; retain\n"
-        "  r x  remote-excluded; leave untouched\n"
+        "  l  local only\n"
+        "  r  remote only\n"
+        "     blank side column: present on both sides\n"
         "  ?  conflict\n"
         "  =  unchanged file\n"
-        "  l x  local-excluded, absent remotely\n"
-        "  r !  local-excluded, present remotely\n"
+        "  x  locally excluded\n"
+        "  #  remotely excluded; leave untouched\n"
         "  /  directory\n"
         "  ▸  contents not inspected\n",
         "",
@@ -1033,9 +1035,9 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
-    assert "  r - debug.log\n" in push_comparison[1]
+    assert "    - debug.log\n" in push_comparison[1]
     hidden_exclusions = invoke(["diff", "-i"], store)
-    assert "  r - debug.log\n" in hidden_exclusions[1]
+    assert "    - debug.log\n" in hidden_exclusions[1]
     assert invoke(["prod", "diff", "same.txt"], store)[1] == (
         "  no differences\n"
     )
@@ -1119,7 +1121,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     all_included = invoke(["diff", "**", "--all", "-i"], store)
     assert "  = same.txt" in all_included[1]
-    assert "  r - debug.log\n" in all_included[1]
+    assert "    - debug.log\n" in all_included[1]
     assert "node_modules" not in all_included[1]
     with monkeypatch.context() as no_color:
         no_color.setenv("NO_COLOR", "1")
@@ -1369,7 +1371,7 @@ def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
     assert status == 0, error
     assert listed == ["."]
     assert "Reading remote directory: cache/" not in error
-    assert "r ! cache/ ▸\n" in output
+    assert "r x cache/ ▸\n" in output
     assert "keep.txt" not in output
 
     # An explicit descendant inclusion must still allow traversal.
@@ -1378,7 +1380,7 @@ def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
     status, output, error = diff()
     assert status == 0, error
     assert listed == [".", "cache"]
-    assert "r ! cache/\n" in output
+    assert "r x cache/\n" in output
     assert "r - keep.txt\n" in output
 
 
@@ -1470,14 +1472,14 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
 
     comparison = invoke(["diff", "-r"], store)
     assert comparison[0] == 0
-    assert comparison[1] == "r x future-dir/ ▸\n"
+    assert comparison[1] == "  # future-dir/ ▸\n"
     assert listed == ["."]
 
     remote_listing = invoke(["lsr"], store)
     assert remote_listing[0] == 0
-    assert "r x future-dir/\n" in remote_listing[1]
+    assert "# future-dir/\n" in remote_listing[1]
     colored_boundary = invoke(["diff", "-r"], store, terminal_output=True)[1]
-    assert "\033[38;5;30mr\033[0m \033[90mx\033[0m" in colored_boundary
+    assert "  \033[90m#\033[0m" in colored_boundary
     assert "\033[38;5;24mfuture-dir/ ▸\033[0m" in colored_boundary
     colored_remote_listing = invoke(["lsr"], store, terminal_output=True)[1]
     assert "\033[38;5;24mfuture-dir/\033[0m" in colored_remote_listing

@@ -75,14 +75,13 @@ _RESET = "\033[0m"
 _DIRECTORY_COLOR = "\033[38;5;75m"
 _EXCLUDED_DIRECTORY_COLOR = "\033[38;5;24m"
 _COLLAPSED_DIRECTORY_COLOR = "\033[3;38;5;24m"
-_EXCLUDED_REMOTE_COLOR = "\033[38;5;166m"
 _DIFF_MARKER_COLORS = {
     "+": "\033[38;5;82m",
     "~": "\033[33m",
     "-": "\033[31m",
     "?": "\033[35m",
     "x": "\033[90m",
-    "!": _EXCLUDED_REMOTE_COLOR,
+    "#": "\033[90m",
     "r": "\033[38;5;30m",
     "l": "\033[38;5;51m",
 }
@@ -1431,19 +1430,9 @@ def _list_remote(
     def remote_status(
         entry: TreeEntry,
     ) -> tuple[str, str | None, bool, str | None]:
-        if entry.remote_excluded:
-            return (
-                "r x",
-                _DIFF_MARKER_COLORS["x"],
-                True,
-                (
-                    _EXCLUDED_DIRECTORY_COLOR
-                    if entry.kind == "directory"
-                    else _DIFF_MARKER_COLORS["x"]
-                ),
-            )
-        if entry.excluded:
-            return "r !", _EXCLUDED_REMOTE_COLOR, True, _EXCLUDED_REMOTE_COLOR
+        if entry.remote_excluded or entry.excluded:
+            marker = "#" if entry.remote_excluded else "x"
+            return marker, _DIFF_MARKER_COLORS[marker], True, None
         return " ", None, False, None
 
     return _format_tree_listing(
@@ -1467,33 +1456,29 @@ def _comparison_kind(entry: ComparisonEntry) -> str:
     return entry.local_kind or entry.remote_kind or "unknown"
 
 
-def _comparison_marker(entry: ComparisonEntry, direction: str) -> str:
-    if entry.state == "remote-excluded":
-        return "r x"
-    if entry.action == "excluded":
-        return "r !" if entry.remote_kind is not None else "l x"
-    if entry.action == "conflict":
-        return "  ?"
-    if entry.action == "unchanged":
-        return "  ="
-    if entry.action == "untraversed":
-        return {
-            "remote-only": "r  ",
-            "local-only": "l  ",
-        }.get(entry.state, "   ")
-    if entry.action == "skip":
-        return "r  " if entry.state == "remote-only" else "l  "
-    if entry.state == "changed":
-        return "  ~"
-    if direction == "push":
-        return "l +" if entry.state == "local-only" else "r -"
-    return "r +" if entry.state == "remote-only" else "l -"
+def _comparison_marker(entry: ComparisonEntry) -> str:
+    side = (
+        "r" if entry.local_kind is None
+        else "l" if entry.remote_kind is None
+        else " "
+    )
+    action = {
+        "excluded": "#" if entry.state == "remote-excluded" else "x",
+        "conflict": "?",
+        "unchanged": "=",
+        "untraversed": " ",
+        "skip": " ",
+        "create-remote": "+",
+        "upload": "+",
+        "replace-remote": "~",
+        "replace-local": "~",
+        "delete-remote": "-",
+    }[entry.action]
+    return f"{side} {action}"
 
 
 def _comparison_marker_color(marker: str) -> str | None:
     action = marker[-1]
-    if marker == "r x":
-        return _DIFF_MARKER_COLORS["x"]
     return _DIFF_MARKER_COLORS.get(action) or _DIFF_MARKER_COLORS.get(marker.strip())
 
 
@@ -1516,11 +1501,13 @@ def _format_legend(output: TextIO) -> str:
         ("  ~", "present on both sides; update", _DIFF_MARKER_COLORS["~"]),
         ("r -", "remote-only; delete", _DIFF_MARKER_COLORS["-"]),
         ("r  ", "remote-only; retain", _DIFF_MARKER_COLORS["r"]),
-        ("r x", "remote-excluded; leave untouched", _EXCLUDED_REMOTE_COLOR),
+        ("l", "local only", _DIFF_MARKER_COLORS["l"]),
+        ("r", "remote only", _DIFF_MARKER_COLORS["r"]),
+        (" ", "blank side column: present on both sides", None),
         ("?", "conflict", _DIFF_MARKER_COLORS["?"]),
         ("=", "unchanged file", None),
-        ("l x", "local-excluded, absent remotely", _DIFF_MARKER_COLORS["x"]),
-        ("r !", "local-excluded, present remotely", _DIFF_MARKER_COLORS["!"]),
+        ("x", "locally excluded", _DIFF_MARKER_COLORS["x"]),
+        ("#", "remotely excluded; leave untouched", _DIFF_MARKER_COLORS["#"]),
         ("/", "directory", _DIRECTORY_COLOR),
         ("▸", "contents not inspected", _COLLAPSED_DIRECTORY_COLOR),
     )
@@ -1655,20 +1642,7 @@ def _format_comparison_entries(
         marker = (
             "   "
             if directory and entry.action == "unchanged"
-            else _comparison_marker(entry, direction)
-        )
-        remote_exclusion_color = (
-            (
-                (
-                    _EXCLUDED_DIRECTORY_COLOR
-                    if directory
-                    else _DIFF_MARKER_COLORS["x"]
-                )
-                if entry.state == "remote-excluded"
-                else _EXCLUDED_REMOTE_COLOR
-            )
-            if entry.action == "excluded" and entry.remote_kind is not None
-            else None
+            else _comparison_marker(entry)
         )
         depth, path = display_path(entry.path) if display_path else (0, entry.path)
         lines.append(
@@ -1681,7 +1655,6 @@ def _format_comparison_entries(
                 marker_color=_comparison_marker_color(marker),
                 excluded=entry.action == "excluded",
                 collapsed=collapsed,
-                path_color=remote_exclusion_color,
             )
         )
     return tuple(lines)
