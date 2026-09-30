@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Accept `-v` as an alias for `--version`, alongside `version` and its unique
+  prefixes such as `v`.
+
 ### Fixed
 
 - Make recursive diff skip remote-only directories covered by local exclusions,

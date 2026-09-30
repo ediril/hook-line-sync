@@ -475,8 +475,9 @@ Commands accept the shortest unique prefix. Exact names win. An ambiguous
 prefix prompts for a numbered choice on an interactive terminal and fails with
 the candidate list in noninteractive use.
 
-Use `hlsync help [command]`, `hlsync --version`, and `hlsync --legend` for
-built-in reference.
+Use `hlsync help [command]`, `hlsync version`, and `hlsync --legend` for
+built-in reference. `hlsync v`, `hlsync -v`, and `hlsync --version` also print
+the installed version.
 
 ## License
 

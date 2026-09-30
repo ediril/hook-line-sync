@@ -298,7 +298,7 @@ def build_parser() -> argparse.ArgumentParser:
             "prefix."
         ),
     )
-    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument("-v", "--version", action="version", version=__version__)
     parser.add_argument(
         "--legend",
         action="store_true",

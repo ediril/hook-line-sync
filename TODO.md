@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Add `-v` as an alias for `--version` and document the existing `version`
+  command and its `v` abbreviation.
 - [x] Honor local exclusions when recursive diff encounters a remote-only
   directory, preserving explicit descendant inclusions.
 - [x] Make push and its default diff projection delete selected remote-only
