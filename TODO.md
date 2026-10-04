@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Review decision notes, retain substantial architectural rationale, and
+  consolidate related choices while keeping usage conventions in README.
 - [x] Keep status columns fixed while indenting nested path names in tree output.
 - [x] Remove per-directory read announcements from diff while preserving
   streamed folder grouping.

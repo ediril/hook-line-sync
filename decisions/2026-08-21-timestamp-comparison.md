@@ -5,8 +5,10 @@ Date: 2026-08-21
 ## Decision
 
 File snapshots carry size, UTC modification time in integer nanoseconds, and
-the source timestamp's declared precision. Remote file snapshots require valid
-MLSD `size` and `modify` facts.
+the source timestamp's declared precision. Remote snapshots require valid size
+and UTC timestamp facts normalized by the transport, whether read through MLSD
+or through LIST with SIZE and MDTM. Listing-method selection belongs to the
+[remote metadata decision](2026-09-13-remote-listings.md).
 
 Files compare as unchanged when their sizes match and their timestamps match
 after both are truncated to the coarser declared precision. Directories compare
@@ -25,4 +27,4 @@ prevents equal timestamps from hiding an obvious content change.
 - Comparing unrepresentable subsecond precision.
 - A content-hash requirement, because standard FTP provides no portable remote
   hash operation.
-- Parsing server-specific `LIST` output when structured MLSD facts are absent.
+- Using human-readable LIST dates or sizes as comparison metadata.

@@ -34,6 +34,11 @@ shallow operand does not project implicit recursion. A directory outside
 selected traversal depth remains visible with a collapsed marker, but is
 diagnostic only and is not authorization to create or delete its contents.
 
+Recursive comparison streams deterministic directory subtrees. Paged comparison
+uses an explicit resume path and reconstructs traversal from a fresh read;
+there is no persisted session or cached comparison cursor. Presentation details
+and command spellings are documented in README.
+
 ## Rationale
 
 Filtering before descent makes exclusions useful as scalability and safety
@@ -41,6 +46,8 @@ boundaries, while preserving recursive push for the included tree. Retaining a
 locally excluded directory avoids pretending HLSync can prune it without doing
 the very traversal the exclusion forbids. File-level pruning remains useful for
 ordinary generated or unwanted files.
+
+Stateless paging avoids retaining stale remote state between invocations.
 
 ## Intentionally excluded
 

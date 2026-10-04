@@ -60,10 +60,14 @@
   it; the user owns clearing completed items. Update it when a new next step is
   inserted or when the direction changes enough that the queue needs rethinking.
 - Reserve `decisions/` for substantial architectural decisions and their
-  current rationale. Put smaller conventions, such as version formats, in
-  README and explain the change in the commit message.
+  current rationale: model boundaries, safety guarantees, dependencies, or
+  consequential tradeoffs. Do not create or update decision files for version
+  formats, CLI spelling, symbols, column order, indentation, progress wording,
+  or other small behavior changes. Document current usage in README and explain
+  those changes in commit messages. Consolidate related architectural rationale
+  into existing notes; Git preserves obsolete decisions and minor change history.
 - Use `plans/` only for future work/roadmaps, not decisions already made.
 - Use `social/` for public-facing post drafts or demo narration.
 - Keep `README.md` current and avoid stale claims.
-- If a user gives a durable directive, capture it here or in a dated decision
-  note as appropriate.
+- Capture durable working and documentation directives here. Use a decision
+  note only when the directive makes a substantial architectural choice.

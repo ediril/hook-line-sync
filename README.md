@@ -522,6 +522,9 @@ run `hlsync diff` from a mapped project to preview its differences.
 The PyPI distribution is `hook-line-sync`; the installed command and Python
 package are both `hlsync`. See [`TODO.md`](TODO.md) for the
 ordered work queue and [`CHANGELOG.md`](CHANGELOG.md) for completed changes.
+[`decisions/`](decisions/) holds substantial architectural choices and their
+rationale. CLI conventions and current usage are documented here; smaller
+changes are explained in commit messages.
 
 The self-contained PHP 8.3 project site is in [`website/`](website/README.md).
 

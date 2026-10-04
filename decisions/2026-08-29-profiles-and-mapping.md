@@ -11,21 +11,17 @@ a host, but their local roots may not equal, contain, or be contained by one
 another. Every descendant keeps the same profile-relative path beneath the
 remote root.
 
-Configuration stores these entries under the `profiles` key. The model and
-public APIs use profile terminology consistently; there is no parallel project
-representation.
+Configuration stores these entries under the `profiles` key in
+`~/.hlsync/configs.json`, using schema version 9. The model and public APIs use
+profile terminology consistently; there is no parallel project representation.
+Earlier runtime names and configuration schemas are not recognized or migrated.
 
-`hlsync create` always records a local root. It accepts `--local-root` directly
-or proposes the current directory with yes as the default; declining prompts
-for another directory. A profile without a local root cannot synchronize or
-own rules and must be completed through `map`.
+New profiles always record a local root. A profile without a local root cannot
+synchronize or own rules and must be completed through mapping.
 
-`hlsync map` is the single editor for the local-to-remote mapping. With no root
-options it proposes the real current directory as the local root. Explicit
-`--local-root` and `--remote-root` options may change either or both sides.
-HLSync validates the complete proposed mapping, displays each old → new value,
-and requires confirmation that defaults to no. Mapping changes preserve the
-profile's rules, endpoint, and credential settings.
+Mapping changes validate the complete proposed local-to-remote target and
+require explicit confirmation. They preserve the profile's rules, endpoint,
+and credential settings.
 
 A profile-aware command either names a profile explicitly or resolves the one
 mapped root containing the current directory. No profile selection persists
@@ -41,6 +37,10 @@ path translation and current-directory inference deterministic. Requiring the
 command or filesystem context to identify the profile prevents hidden state
 from redirecting a transfer.
 
+A clean schema break is preferable while the tool is pre-alpha because it
+avoids aliases and migration paths for representations that no longer match
+the model. Current runtime names and CLI usage are documented in README.
+
 ## Intentionally excluded
 
 - Treating a configured entry as a deduplicated server record.
@@ -50,4 +50,5 @@ from redirecting a transfer.
 - Guessing a profile or falling back to the first configured profile.
 - Silently changing a mapping or editing endpoint settings through `map`.
 - Storing credential values in profile configuration.
+- Reading or migrating legacy runtime configuration and project schemas.
 - Connecting to or deleting remote content when a profile is removed.

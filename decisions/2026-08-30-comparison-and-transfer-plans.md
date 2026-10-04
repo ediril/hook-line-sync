@@ -25,6 +25,12 @@ directory. An explicitly selected remote-only directory is inventoried fully
 so deletion can proceed deepest-first, unless a protected descendant makes the
 ancestor undeletable.
 
+Comparison entries preserve observed local and remote kinds separately from
+their planned action. A locally excluded file can exist physically while being
+absent from push authority. Presentation derives presence from the observed
+kinds and action from the plan; exclusion and diagnostic markers never become
+transfer policy.
+
 ## Rationale
 
 Diff supports quick, shallow exploration, while dry push answers the distinct
@@ -32,6 +38,9 @@ question “what will this exact push execute?” Sharing ordered operation
 derivation with execution prevents preview drift. Keeping dry artifact recovery
 projective preserves read-only behavior without comparing against a server
 state that real push would first repair.
+
+Keeping observed presence separate from authority prevents display concerns
+from erasing facts needed to explain a planned deletion.
 
 ## Intentionally excluded
 
