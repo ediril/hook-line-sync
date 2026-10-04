@@ -516,17 +516,39 @@ The self-contained PHP 8.3 project site is in [`website/`](website/README.md).
 
 ### Releasing to PyPI
 
-Releases use `0.<month>.<day>.<increment>` without leading zeroes; the increment
-starts at `1` each day.
+Releases use `<major>.<work-day>.<increment>` without leading zeroes. Versions
+come from Git history, not the build date or manually maintained counters:
+
+- [`version.json`](version.json) selects the major number and its baseline
+  commit. Version 1 starts at `b309f3e` ("done with mvp", August 22, 2026).
+- The baseline day is `0`. Each subsequent date with commits advances the
+  work-day number by one, regardless of how many idle days pass.
+- The increment counts commits on that date, starting at `1`. On the baseline
+  day, only the baseline commit and later commits count.
+- Dates use each commit's recorded committer date and timezone. Only the
+  first-parent history of the current checkout counts; a merge counts once.
+  All commits count, including documentation and maintenance changes.
+
+For example, two commits on the baseline day are `1.0.1` and `1.0.2`.
+The next day with a commit produces `1.1.1`, even after a week without changes.
+The September 30 commit `778ba7d` is `1.13.9` under this scheme.
+
+Builds require history back to the baseline and reject backwards-moving commit
+dates. Wheels and source archives preserve the computed version; installed
+commands do not access Git. Reinstall editable checkouts after committing to
+refresh their installed version. To start a new major, update `version.json`
+with the new major and an existing baseline commit on the same first-parent
+history. That baseline starts at `<major>.0.1`.
 
 Use an existing PyPI account with two-factor authentication and an API token.
 Twine uses credentials from `~/.pypirc` or `TWINE_USERNAME`/`TWINE_PASSWORD`,
 and prompts if needed. Do not store the token in the repository.
 
-1. Set [`src/hlsync/__init__.py`](src/hlsync/__init__.py) to the next version.
+1. Commit the changes to release. Use a checkout with history back to the
+   baseline in `version.json`. Do not edit the generated `_version.py`.
 2. Update [`CHANGELOG.md`](CHANGELOG.md) when useful. Release notes and dated
    headings are optional and do not block publishing.
-3. Commit the release changes. From that clean checkout, with development
+3. Commit any release-note changes. From that clean checkout, with development
    dependencies installed, run:
 
    ```console
@@ -538,7 +560,7 @@ and prompts if needed. Do not store the token in the repository.
    helpers in `scripts/helpers/`, which run identity checks, lint, tests, isolated builds,
    metadata checks, and a clean wheel installation, then uploads both artifacts.
    If `dist/<version>/` already exists, it reuses those prepared artifacts after
-   checking their metadata. Bump the version when releasing new source changes;
+   checking their metadata. New commits advance the version;
    existing artifacts are not rebuilt automatically.
 
    To prepare artifacts without publishing, run `./scripts/publish.sh --prepare`.
@@ -550,5 +572,7 @@ and prompts if needed. Do not store the token in the repository.
    before announcing it.
 
 PyPI does not allow a published version to be replaced. If publication fails
-after accepting either artifact, increment the version and create a new
-release; do not reuse the failed version.
+after accepting either artifact, create another commit (an empty release-retry
+commit is sufficient) and build a new release; do not reuse the failed version.
+Publish from one release history: separate branches can compute the same
+version and are not separate publication streams.

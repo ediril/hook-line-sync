@@ -59,7 +59,9 @@
   the next task. When an item is finished, mark it complete but do not remove
   it; the user owns clearing completed items. Update it when a new next step is
   inserted or when the direction changes enough that the queue needs rethinking.
-- Use `decisions/` for dated architectural decisions and current rationale.
+- Reserve `decisions/` for substantial architectural decisions and their
+  current rationale. Put smaller conventions, such as version formats, in
+  README and explain the change in the commit message.
 - Use `plans/` only for future work/roadmaps, not decisions already made.
 - Use `social/` for public-facing post drafts or demo narration.
 - Keep `README.md` current and avoid stale claims.

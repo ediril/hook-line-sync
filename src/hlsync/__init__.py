@@ -1,3 +1,5 @@
 """Hook Line Sync."""
 
-__version__ = "0.9.30.5"
+from ._version import __version__
+
+__all__ = ["__version__"]

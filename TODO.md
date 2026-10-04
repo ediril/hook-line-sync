@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Derive `<major>.<work-day>.<daily-commit>` versions from a pinned major
+  baseline and verify release artifacts preserve the version without Git.
 - [x] Remove the dated-changelog requirement from release validation; publishing
   does not depend on release-note formatting.
 - [x] Move release helpers under `scripts/helpers/` and expose preparation

@@ -1,6 +1,7 @@
 [build-system]
 requires = ["setuptools>=77"]
-build-backend = "setuptools.build_meta"
+build-backend = "hlsync_build"
+backend-path = ["build_backend"]
 
 [project]
 name = "hook-line-sync"
@@ -45,7 +46,7 @@ dev = [
 hlsync = "hlsync.cli:main"
 
 [tool.setuptools.dynamic]
-version = { attr = "hlsync.__version__" }
+version = { attr = "hlsync._version.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -12,6 +12,7 @@ import tempfile
 from pathlib import Path
 
 from check_release import ROOT, validate_release
+from versioning import write_version
 
 
 def run(*arguments: str) -> None:
@@ -33,6 +34,7 @@ def venv_python(venv: Path) -> Path:
 
 def main() -> None:
     version = validate_release()
+    write_version(ROOT)
     destination = ROOT / "dist" / version
     if destination.exists():
         raise SystemExit(
