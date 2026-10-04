@@ -169,10 +169,10 @@ function h(string $value): string
                         <p><span class="prompt">❯</span> <b>hlsync diff -r</b></p>
                         <p class="muted">Checking differences for profile 'discovery'...</p>
                         <p><span class="directory">&nbsp; assets/</span></p>
-                        <p><span class="added">l +</span> &nbsp; index.php</p>
-                        <p><span class="removed">r -</span> &nbsp; legacy.php</p>
-                        <p>&nbsp; <span class="changed">~</span> &nbsp; site.css</p>
-                        <p><span class="added">l +</span> <span class="directory">icons/</span></p>
+                        <p><span class="added">+ l</span> &nbsp; index.php</p>
+                        <p><span class="removed">- r</span> &nbsp; legacy.php</p>
+                        <p><span class="changed">~</span> &nbsp; &nbsp; site.css</p>
+                        <p><span class="added">+ l</span> <span class="directory">icons/</span></p>
                         <p class="terminal-gap"><span class="prompt">❯</span> <b>hlsync push</b></p>
                         <p class="muted">Pushing changes...</p>
                         <p>&nbsp; <span class="added">+</span> index.php</p>
@@ -252,9 +252,9 @@ function h(string $value): string
                         <p>The remote is treated as a deployment target. A file missing locally is reported instead of being copied back unexpectedly.</p>
                     </div>
                     <div class="mini-diff" aria-hidden="true">
-                        <span class="added">l +</span><i></i><b>local-only / added</b>
+                        <span class="added">+ l</span><i></i><b>local-only / added</b>
                         <span class="changed">~</span><i></i><b>changed</b>
-                        <span class="removed">r -</span><i></i><b>remote-only / deleted</b>
+                        <span class="removed">- r</span><i></i><b>remote-only / deleted</b>
                         <span class="remote-only">r</span><i></i><b>kept with -k</b>
                     </div>
                 </article>

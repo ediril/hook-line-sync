@@ -1474,11 +1474,11 @@ def _comparison_marker(entry: ComparisonEntry) -> str:
         "replace-local": "~",
         "delete-remote": "-",
     }[entry.action]
-    return f"{side} {action}"
+    return f"{action} {side}"
 
 
 def _comparison_marker_color(marker: str) -> str | None:
-    action = marker[-1]
+    action = marker[0]
     return _DIFF_MARKER_COLORS.get(action) or _DIFF_MARKER_COLORS.get(marker.strip())
 
 
@@ -1497,10 +1497,10 @@ def _use_color(output: TextIO) -> bool:
 def _format_legend(output: TextIO) -> str:
     color = _use_color(output)
     entries = (
-        ("l +", "local-only; upload", _DIFF_MARKER_COLORS["+"]),
-        ("  ~", "present on both sides; update", _DIFF_MARKER_COLORS["~"]),
-        ("r -", "remote-only; delete", _DIFF_MARKER_COLORS["-"]),
-        ("r  ", "remote-only; retain", _DIFF_MARKER_COLORS["r"]),
+        ("+ l", "local-only; upload", _DIFF_MARKER_COLORS["+"]),
+        ("~  ", "present on both sides; update", _DIFF_MARKER_COLORS["~"]),
+        ("- r", "remote-only; delete", _DIFF_MARKER_COLORS["-"]),
+        ("  r", "remote-only; retain", _DIFF_MARKER_COLORS["r"]),
         ("l", "local only", _DIFF_MARKER_COLORS["l"]),
         ("r", "remote only", _DIFF_MARKER_COLORS["r"]),
         (" ", "blank side column: present on both sides", None),
@@ -1538,7 +1538,7 @@ def _format_path_line(
     if not color:
         return line
     if len(marker) == 3:
-        side, action = marker[0], marker[2]
+        action, side = marker[0], marker[2]
         side_color = _DIFF_MARKER_COLORS.get(side)
         rendered_side = (
             f"{side_color}{side}{_RESET}" if side_color and side != " " else side
@@ -1548,7 +1548,7 @@ def _format_path_line(
             if marker_color and action != " "
             else action
         )
-        rendered_status = f"{rendered_side} {rendered_action}"
+        rendered_status = f"{rendered_action} {rendered_side}"
         if directory:
             directory_color = (
                 _COLLAPSED_DIRECTORY_COLOR

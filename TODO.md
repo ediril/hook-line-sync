@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Display action/exclusion before presence in diff status columns; update
+  colored output, legend, and examples consistently.
 - [x] Derive `<major>.<work-day>.<daily-commit>` versions from a pinned major
   baseline and verify release artifacts preserve the version without Git.
 - [x] Remove the dated-changelog requirement from release validation; publishing

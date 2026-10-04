@@ -4,12 +4,12 @@ Date: 2026-09-30
 
 ## Decision
 
-The first diff column describes actual presence only: `l` for local only, `r`
+The presence column describes actual presence only: `l` for local only, `r`
 for remote only, and blank when both copies exist. Keep its width fixed even
 when blank. Determine presence from the observed local and remote entry kinds,
 independently of transfer authority, planned action, or exclusion source.
 
-The second column describes action or status. Use `x` for a local exclusion
+The action/status column uses `x` for a local exclusion
 and `#` for a remote exclusion. The user requested that these remain visually
 distinct. Remove `!`, whose warning connotation obscured the meaning. Single-side
 listings use the same exclusion symbols without claiming presence on the other

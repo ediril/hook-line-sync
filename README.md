@@ -342,10 +342,10 @@ inclusion for a descendant permits traversal;
 remote exclusions remain hard boundaries. `-i` never hides an actionable deletion.
 
 Bare diff keeps traversal shallow but projects the recursive scope of bare
-push: an immediate remote-only directory appears as `r - folder/ ▸`, warning that
+push: an immediate remote-only directory appears as `- r folder/ ▸`, warning that
 push will delete the subtree while indicating that diff did not enumerate its
 contents. Use `diff -r` to inspect beneath it. An explicit shallow operand such
-as `diff .` retains an unentered child directory as `r   folder/ ▸`.
+as `diff .` retains an unentered child directory as `  r folder/ ▸`.
 
 Show the current status and directory notation without connecting:
 
@@ -359,11 +359,11 @@ Diff prints each directory as it is compared. For a shell-driven review,
 
 Colors are automatic on terminals, disabled for pipes and redirection, and
 suppressed when `NO_COLOR` is set. Text markers retain the core meaning without
-color. The left status column reports presence: `l` means local only, `r` means
-remote only, and a blank means both sides. The right column reports action or
-status: `x` means locally excluded and `#` means remotely excluded. For example,
-`  x notes/ ▸` exists on both sides but is locally excluded, while
-`r # millionminds/ ▸` exists only remotely and is remotely excluded. Exclusion
+color. The left column reports action or status: `x` means locally excluded
+and `#` means remotely excluded. The right column reports presence: `l` means
+local only, `r` means remote only, and a blank means both sides. For example,
+`x   notes/ ▸` exists on both sides but is locally excluded, while
+`# r millionminds/ ▸` exists only remotely and is remotely excluded. Exclusion
 source never changes the presence column.
 
 ## Push and pull
