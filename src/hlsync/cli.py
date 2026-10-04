@@ -112,7 +112,9 @@ class _PendingDiffDirectory:
 
 @dataclass(frozen=True)
 class _PendingDiffOutput:
-    lines: tuple[str, ...]
+    entry: ComparisonEntry
+    collapsed_paths: frozenset[str]
+    display_root: PurePosixPath | None
 
 
 @dataclass(frozen=True)
@@ -177,6 +179,8 @@ def _active_options(arguments: argparse.Namespace) -> str | None:
         options.append("pull perspective (--pull)")
     if getattr(arguments, "recursive", False):
         options.append("recursive (-r)")
+    if getattr(arguments, "shallow", False):
+        options.append("shallow (-s)")
     if getattr(arguments, "show_all", False):
         options.append("all entries (-a)")
     if getattr(arguments, "included_only", False):
@@ -192,6 +196,18 @@ def _active_options(arguments: argparse.Namespace) -> str | None:
     if not options:
         return None
     return f"Options: {'; '.join(options)}."
+
+
+def _add_recursive_depth_arguments(parser: argparse.ArgumentParser) -> None:
+    depth = parser.add_mutually_exclusive_group()
+    depth.add_argument(
+        "-r", "--recursive", action="store_true",
+        help="recurse into selected directories (default)",
+    )
+    depth.add_argument(
+        "-s", "--shallow", action="store_true",
+        help="process immediate contents without entering child directories",
+    )
 
 
 def _resolve_command_name(
@@ -551,12 +567,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="preview file changes without modifying anything",
         usage=(
             "hlsync [PROFILE] diff [PATH ...]\n"
-            "       [--pull | --keep-remote] [-r] [-a] [-i] [--paged]\n"
+            "       [--pull | --keep-remote] [-r | -s] [-a] [-i] [--paged]\n"
             "       [--resume DIRECTORY]"
         ),
         description=(
-            "With no PATH, preview the current directory one level. A directory "
-            "PATH is also shallow unless -r. Use --pull to reverse direction, "
+            "With no PATH, preview the current subtree recursively. Directory "
+            "PATHs are also recursive; use -s for immediate contents only. "
+            "Use --pull to reverse direction, "
             "-i to hide exclusions, and -a to show everything."
         ),
     )
@@ -574,12 +591,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="show changes from the remote perspective without remote deletion",
     )
-    diff_parser.add_argument(
-        "-r",
-        "--recursive",
-        action="store_true",
-        help="include descendants of selected directories",
-    )
+    _add_recursive_depth_arguments(diff_parser)
     _add_included_only_argument(diff_parser)
     diff_parser.add_argument(
         "-a",
@@ -611,8 +623,8 @@ def build_parser() -> argparse.ArgumentParser:
     transfer_description = {
         "push": (
             "Push local changes. With no PATH, push the current subtree "
-            "recursively. A directory PATH is shallow unless -r. Remote-only "
-            "directory PATHs are deleted recursively unless -k. Use --dry to "
+            "recursively. Directory PATHs are also recursive; use -s for "
+            "immediate contents only. Use --dry to "
             "preview the exact push without changing either side."
         ),
         "pull": (
@@ -629,7 +641,7 @@ def build_parser() -> argparse.ArgumentParser:
                 (
                     "hlsync [PROFILE] pull PATH [PATH ...] [-r]"
                     if command == "pull"
-                    else "hlsync [PROFILE] push [PATH ...] [-r]"
+                    else "hlsync [PROFILE] push [PATH ...] [-r | -s]"
                 )
                 + (" [-k] [--dry]" if command == "push" else "")
             ),
@@ -644,17 +656,8 @@ def build_parser() -> argparse.ArgumentParser:
                 else "relative paths or wildcards"
             ),
         )
-        transfer_parser.add_argument(
-            "-r",
-            "--recursive",
-            action="store_true",
-            help=(
-                "recurse into selected directories (implied with no PATH)"
-                if command == "push"
-                else "recurse into selected directories"
-            ),
-        )
         if command == "push":
+            _add_recursive_depth_arguments(transfer_parser)
             transfer_parser.add_argument(
                 "-k",
                 "--keep-remote",
@@ -665,6 +668,11 @@ def build_parser() -> argparse.ArgumentParser:
                 "--dry",
                 action="store_true",
                 help="show the exact push without changing either side",
+            )
+        else:
+            transfer_parser.add_argument(
+                "-r", "--recursive", action="store_true",
+                help="recurse into selected directories",
             )
 
     help_parser = subparsers.add_parser("help", help="show command help")
@@ -1772,8 +1780,10 @@ def _scope_header_lines(
 def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection:
     operands = list(normalize_pattern_operands(arguments))
     current_directory = _effective_current_directory(arguments, root)
+    recursive = arguments.recursive or (
+        arguments.command in {"diff", "push"} and not arguments.shallow
+    )
     if not operands:
-        recursive = arguments.recursive or arguments.command == "push"
         return _current_directory_selection(
             root,
             current_directory=current_directory,
@@ -1783,44 +1793,30 @@ def _file_selection(arguments: argparse.Namespace, root: Path) -> FileSelection:
         operands,
         root,
         current_directory=current_directory,
-        recursive=arguments.recursive,
+        recursive=recursive,
     )
 
 
-def _leaf_selectors(selection: FileSelection) -> tuple[FileSelector, ...]:
-    if isinstance(selection, FileSelector):
-        return (selection,)
-    if isinstance(selection, FileSelectorSet):
-        return selection.selectors
-    return _leaf_selectors(selection.traversal)
 
-
-def _remote_push_selection(
+def _push_comparison_selection(
     arguments: argparse.Namespace,
     root: Path,
     local: TreeSnapshot,
-    selection: FileSelection,
+    selection: DirectoryContentsSelection,
 ) -> FileSelection:
-    """Fully inspect explicit paths that are absent from local authority."""
-    current_directory = _effective_current_directory(arguments, root)
+    """Keep explicitly selected remote-only directories as deletion targets."""
     local_entries = {entry.path: entry for entry in local.entries}
-    recursive_roots: list[FileSelector] = []
     for operand in normalize_pattern_operands(arguments):
         if operand == "." or any(character in operand for character in "*?["):
             continue
-        selected = FileSelector.from_argument(
-            operand.rstrip("/"),
-            profile_root=root,
-            current_directory=current_directory,
-        )
-        local_entry = local_entries.get(selected.pattern)
-        if local_entry is None or (
-            local_entry.excluded and local_entry.kind == "directory"
-        ):
-            recursive_roots.append(FileSelector(f"{selected.pattern}/**"))
-    if not recursive_roots:
-        return selection
-    return FileSelectorSet((*_leaf_selectors(selection), *recursive_roots))
+        path = FileSelector.from_argument(
+            operand.rstrip("/"), profile_root=root,
+            current_directory=_effective_current_directory(arguments, root),
+        ).pattern
+        entry = local_entries.get(path)
+        if entry is None or (entry.excluded and entry.kind == "directory"):
+            return selection.traversal
+    return selection
 
 
 def _selection_from_values(
@@ -2061,6 +2057,8 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
         command.append("--keep-remote")
     if arguments.recursive:
         command.append("--recursive")
+    if arguments.shallow:
+        command.append("--shallow")
     if arguments.included_only:
         command.append("-i")
     if arguments.show_all:
@@ -2098,11 +2096,6 @@ def _build_plan(
         respect_remote_boundaries=True,
         directory_progress=report_local_directory,
     )
-    remote_selector = (
-        _remote_push_selection(arguments, root, local, selector)
-        if direction == "push" and prune_remote
-        else selector
-    )
     print("Reading remote files over FTPS...", file=progress, flush=True)
 
     with DirectoryReadProgress(progress) as reading:
@@ -2112,7 +2105,7 @@ def _build_plan(
             artifact_options[option] = reading.message
         remote = transport.snapshot(
             rules,
-            remote_selector,
+            selector,
             include_excluded=include_excluded,
             traverse_excluded=False,
             directory_progress=reading.reading,
@@ -2120,18 +2113,23 @@ def _build_plan(
             **artifact_options,
         )
     print("Comparing local and remote files...", file=progress, flush=True)
+    comparison_selection = (
+        _push_comparison_selection(arguments, root, local, selector)
+        if direction == "push" and prune_remote
+        else selector
+    )
     plan = build_comparison(
         local,
         remote,
         direction=direction,
         prune_remote=prune_remote,
-        selector=remote_selector if arguments.pattern_operands else None,
+        selector=comparison_selection if arguments.pattern_operands else None,
     )
     untraversed_directories = frozenset(
         entry.path
         for entry in plan.entries
         if _comparison_entry_kind(entry, direction) == "directory"
-        and not remote_selector.may_match_descendant(entry.path)
+        and not selector.may_match_descendant(entry.path)
         and entry.action != "excluded"
     )
     plan = mark_untraversed_directories(plan, untraversed_directories)
@@ -2191,6 +2189,35 @@ def _diff(
     selected_count = 0
     displayed_count = 0
     emitted_directories: set[str] = set()
+
+    def format_entries(
+        entries: Sequence[ComparisonEntry],
+        collapsed_paths: frozenset[str],
+        display_root: PurePosixPath | None,
+    ) -> tuple[str, ...]:
+        if not arguments.show_all:
+            return tuple(
+                line
+                for entry in entries
+                for line in _format_compact_comparison_entry(
+                    entry,
+                    direction,
+                    color=color,
+                    collapsed=entry.path in collapsed_paths,
+                    display_root=display_root,
+                    emitted_directories=emitted_directories,
+                )
+            )
+        return _format_comparison_entries(
+            entries,
+            direction,
+            color=color,
+            collapsed_paths=collapsed_paths,
+            display_path=lambda path: _scoped_display_path(
+                path, display_root=display_root,
+            ),
+        )
+
     with ExplicitFTPSTransport(profile) as transport:
         if pending and arguments.show_all:
             for line in _scope_header_lines(
@@ -2203,9 +2230,12 @@ def _diff(
         while pending:
             current = pending.pop()
             if isinstance(current, _PendingDiffOutput):
-                for line in current.lines:
+                lines = format_entries(
+                    (current.entry,), current.collapsed_paths, current.display_root,
+                )
+                for line in lines:
                     print(line, file=output, flush=True)
-                displayed_count += len(current.lines)
+                displayed_count += len(lines)
                 continue
             directory = current.path
             display_directory = directory.as_posix()
@@ -2334,19 +2364,7 @@ def _diff(
                 and entry.path not in descended_paths
                 and entry.path != directory.as_posix()
             )
-            projected_recursive_deletions = frozenset(
-                entry.path
-                for entry in plan.entries
-                if direction == "push"
-                and not arguments.pattern_operands
-                and not arguments.keep_remote
-                and entry.action == "delete-remote"
-                and entry.path in collapsed_paths
-            )
-            plan = mark_untraversed_directories(
-                plan,
-                collapsed_paths - projected_recursive_deletions,
-            )
+            plan = mark_untraversed_directories(plan, collapsed_paths)
             shown = tuple(
                 entry
                 for entry in plan.entries
@@ -2375,36 +2393,9 @@ def _diff(
                 )
             )
 
-            def format_entries(
-                entries: Sequence[ComparisonEntry],
-            ) -> tuple[str, ...]:
-                if not arguments.show_all:
-                    return tuple(
-                        line
-                        for entry in entries
-                        for line in _format_compact_comparison_entry(
-                            entry,
-                            direction,
-                            color=color,
-                            collapsed=entry.path in collapsed_paths,
-                            display_root=current.display_root,
-                            emitted_directories=emitted_directories,
-                        )
-                    )
-                return _format_comparison_entries(
-                    entries,
-                    direction,
-                    color=color,
-                    collapsed_paths=collapsed_paths,
-                    display_path=lambda path: _scoped_display_path(
-                        path,
-                        display_root=current.display_root,
-                    ),
-                )
-
             if arguments.paged:
                 pending.extend(reversed(pending_descendants))
-                lines = format_entries(shown)
+                lines = format_entries(shown, collapsed_paths, current.display_root)
                 for line in lines:
                     print(line, file=output, flush=True)
                 displayed_count += len(lines)
@@ -2447,17 +2438,15 @@ def _diff(
             )
             for entry in directory_entries:
                 if entry in shown:
-                    entry_lines = format_entries((entry,))
-                    if entry_lines:
-                        events.append(_PendingDiffOutput(entry_lines))
+                    events.append(_PendingDiffOutput(
+                        entry, collapsed_paths, current.display_root,
+                    ))
                 descendant = descendants_by_path.get(entry.path)
                 if descendant is not None:
                     events.append(descendant)
             events.extend(
-                _PendingDiffOutput(entry_lines)
+                _PendingDiffOutput(entry, collapsed_paths, current.display_root)
                 for entry in file_entries
-                for entry_lines in (format_entries((entry,)),)
-                if entry_lines
             )
             scheduled_paths = {
                 event.path.as_posix()

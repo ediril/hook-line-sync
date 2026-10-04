@@ -57,11 +57,20 @@ def mark_untraversed_directories(
     paths: frozenset[str],
 ) -> ComparisonPlan:
     """Make directory boundaries visible without making them executable."""
+    retained_ancestors = frozenset(
+        parent.as_posix()
+        for path in paths
+        for parent in PurePosixPath(path).parents
+    )
     return replace(
         plan,
         entries=tuple(
             replace(entry, action="untraversed")
             if entry.path in paths and entry.action != "excluded"
+            else replace(entry, action="skip")
+            if entry.action == "delete-remote"
+            and entry.remote_kind == "directory"
+            and entry.path in retained_ancestors
             else entry
             for entry in plan.entries
         ),

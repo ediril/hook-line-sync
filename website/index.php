@@ -166,7 +166,7 @@ function h(string $value): string
                         <span class="terminal-state">TLS:ON</span>
                     </div>
                     <div class="terminal-body">
-                        <p><span class="prompt">❯</span> <b>hlsync diff -r</b></p>
+                        <p><span class="prompt">❯</span> <b>hlsync diff</b></p>
                         <p class="muted">Checking differences for profile 'discovery'...</p>
                         <p><span class="directory">&nbsp; assets/</span></p>
                         <p><span class="added">+ l</span> &nbsp; index.php</p>
@@ -223,7 +223,7 @@ function h(string $value): string
                     <div class="step-icon" aria-hidden="true">∆</div>
                     <h3>Read the diff</h3>
                     <p>Compare local and remote files before changing either side. Routine output stays focused on paths that differ; <code>--all</code> reveals the complete comparison.</p>
-                    <code>hlsync diff -r</code>
+                    <code>hlsync diff</code>
                 </li>
                 <li>
                     <span class="step-number">04</span>

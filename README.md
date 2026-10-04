@@ -52,14 +52,14 @@ From the local project root:
 hlsync create prod --host ftp.example.com --remote-root /public_html/site
 hlsync connect
 hlsync rules -e .git node_modules
-hlsync diff -r
+hlsync diff
 hlsync push
 ```
 
 `create` proposes the current directory as the local root; pressing Enter accepts
 it. Declining prompts for another local folder. Use `--local-root PATH` to
-provide one directly. Bare `push` is recursive, so `diff -r` is its matching
-preview.
+provide one directly. Both `diff` and `push` recurse by default. Use `-s` /
+`--shallow` to process only the selected folder's immediate contents.
 
 ## Profiles and mapping
 
@@ -253,19 +253,23 @@ Paths are relative to the current directory inside the mapped root. Multiple
 paths and wildcard patterns form one deterministic selection. Absolute paths,
 parent traversal, and paths escaping the mapped root are rejected.
 
-| Command | No path | Explicit directory | With `-r` |
+| Command | No path | Explicit directory | Depth option |
 | --- | --- | --- | --- |
-| `list` / `list --remote` | Current directory, one level | Directory contents, one level | Include descendants |
-| `diff` | Current directory, one level | Directory contents, one level | Include descendants |
-| `push` | Complete current subtree | Directory contents, one level | Include descendants |
-| `pull` | Error: path required | Directory contents, one level | Include descendants |
+| `list` / `list --remote` | Current directory, one level | Directory contents, one level | `-r` includes descendants |
+| `diff` | Complete current subtree | Complete directory subtree | `-s` limits to immediate contents |
+| `push` | Complete current subtree | Complete directory subtree | `-s` limits to immediate contents |
+| `pull` | Error: path required | Directory contents, one level | `-r` includes descendants |
+
+Diff and push accept `-s` / `--shallow`; `-r` / `--recursive` remains available
+to explicitly select the default. The two flags cannot be combined.
 
 `.` explicitly selects the current directory. An immediate child directory
 outside the traversal depth appears with `▸` but is diagnostic-only: it is not
 created, replaced, deleted, or entered. The selected directory itself may be
 created when selected files require it as their parent. An explicitly selected
-remote-only directory is the deletion target itself, so push enumerates that
-remote subtree and removes its contents deepest-first.
+remote-only directory is the deletion target itself, so recursive push
+enumerates that subtree and removes its contents deepest-first. With `-s`,
+deeper folders and their deletion ancestors are retained.
 
 ## Local and remote listing
 
@@ -305,7 +309,8 @@ compatibility spelling.
 ```console
 hlsync diff
 hlsync diff templates
-hlsync diff templates -r
+hlsync diff -s
+hlsync diff templates --shallow
 hlsync diff index.html app.js styles.css
 hlsync diff '**/*.css'
 ```
@@ -341,11 +346,10 @@ directory is a traversal boundary and is retained with `x`. An explicit local
 inclusion for a descendant permits traversal;
 remote exclusions remain hard boundaries. `-i` never hides an actionable deletion.
 
-Bare diff keeps traversal shallow but projects the recursive scope of bare
-push: an immediate remote-only directory appears as `- r folder/ ▸`, warning that
-push will delete the subtree while indicating that diff did not enumerate its
-contents. Use `diff -r` to inspect beneath it. An explicit shallow operand such
-as `diff .` retains an unentered child directory as `  r folder/ ▸`.
+Diff enters eligible child folders by default. `diff -s` or
+`diff templates --shallow` reads only immediate contents. Unentered child
+folders retain the `▸` marker and are retained, matching `push -s`; an
+unentered remote-only folder appears as `  r folder/ ▸`.
 
 Show the current status and directory notation without connecting:
 
@@ -386,21 +390,22 @@ traversed or changed. Push deletes selected remote-only paths by default,
 including remote copies of locally excluded files. Excluded directories on
 either side are retained and never entered; an explicit local inclusion beneath
 an excluded local directory is the only reason to enter that local boundary.
-`-k` / `--keep-remote` retains remote-only paths. An included local directory
-remains shallow unless `-r` is supplied. An explicitly selected remote-only
-directory is fully enumerated because deleting that directory requires deleting
-its contents. Bare `push` remains recursive by definition.
+`-k` / `--keep-remote` retains remote-only paths. Push recurses into selected
+directories by default, including remote-only deletion targets. `-s` /
+`--shallow` processes immediate contents without entering child folders,
+creating them, or deleting them. A selected remote-only directory containing
+an unentered child folder is also retained.
 
 Preview the exact push scope and operation order without changing either side:
 
 ```console
 hlsync push --dry
 hlsync push templates --dry
-hlsync push templates -r --dry
+hlsync push templates -s --dry
 ```
 
-Unlike bare `diff`, bare `push --dry` inherits push's recursive default. It
-also honors `-k`, remote exclusions, and explicit directory depth exactly as a
+Both `diff` and `push --dry` inherit push's recursive default. Dry push
+honors `-s`, `-k`, remote exclusions, and explicit directory scope exactly as a
 real push would. Interrupted-upload recovery is projected and reported but not
 performed. After planning, dry push runs the live transfer executor and skips
 only its mutation calls, preserving preflight, operation order, feedback, and

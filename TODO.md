@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Make diff and push recursive by default; support `-s` / `--shallow` for
+  immediate contents and preserve that scope in dry push and paged diff.
 - [x] Review decision notes, retain substantial architectural rationale, and
   consolidate related choices while keeping usage conventions in README.
 - [x] Keep status columns fixed while indenting nested path names in tree output.

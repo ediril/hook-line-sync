@@ -246,20 +246,22 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     assert "With no PATH, push the current subtree recursively." in (
         compact_push_help
     )
-    assert "A directory PATH is shallow unless -r." in compact_push_help
-    assert "Remote-only directory PATHs are deleted recursively unless -k." in (
-        compact_push_help
-    )
+    assert "Directory PATHs are also recursive; use -s" in compact_push_help
+    assert "-s, --shallow" in push_help
     compact_list_help = " ".join(invoke(["help", "list"], store)[1].split())
     assert "With no PATH, list the current directory one level." in (
         compact_list_help
     )
     assert "A directory PATH is also shallow unless -r." in compact_list_help
     compact_diff_help = " ".join(diff_help.split())
-    assert "With no PATH, preview the current directory one level." in (
+    assert "With no PATH, preview the current subtree recursively." in (
         compact_diff_help
     )
-    assert "A directory PATH is also shallow unless -r." in compact_diff_help
+    assert "Directory PATHs are also recursive; use -s" in compact_diff_help
+    assert "-s, --shallow" in diff_help
+    for command in ("diff", "push"):
+        with pytest.raises(SystemExit):
+            run([command, "-r", "-s"], store=store)
     assert "--pull to reverse direction" in compact_diff_help
     compact_pull_help = " ".join(invoke(["help", "pull"], store)[1].split())
     assert "usage: hlsync [PROFILE] pull PATH" in compact_pull_help
@@ -1023,12 +1025,17 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert push_comparison[1].startswith("    src/\n")
     assert "+ l   main.py\n" in push_comparison[1]
-    assert "      nested/ ▸" in push_comparison[1].splitlines()
+    assert "      nested/" in push_comparison[1].splitlines()
+    assert "+ l     child.py" in push_comparison[1].splitlines()
     serve_nested_directory = False
-    local_only_directory = invoke(["diff", "."], store)
+    local_only_directory = invoke(["diff", ".", "-s"], store)
     assert "  l   nested/ ▸\n" in local_only_directory[1]
     assert "child.py" not in local_only_directory[1]
     serve_nested_directory = True
+    shallow_comparison = invoke(["diff", "-s"], store)
+    assert "Options: shallow (-s).\n" in shallow_comparison[2]
+    assert "      nested/ ▸" in shallow_comparison[1].splitlines()
+    assert "child.py" not in shallow_comparison[1]
     assert "src/nested/child.py" not in push_comparison[1]
     assert "README.md" not in push_comparison[1]
     assert "deployed.html" not in push_comparison[1]
@@ -1043,6 +1050,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
 
     recursive_comparison = invoke(["diff", "-r"], store)
+    assert recursive_comparison[1] == push_comparison[1]
     assert "Options: recursive (-r).\n" in recursive_comparison[2]
     assert "Reading remote" not in "".join(recursive_comparison[1:])
     assert "+ l     child.py" in recursive_comparison[1].splitlines()
@@ -1058,11 +1066,11 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "Options:" not in pruned_comparison[2]
     assert "\033[31m-\033[0m \033[38;5;30mr\033[0m" in pruned_comparison[1]
     assert "\033[31mdeployed.html\033[0m\n" in pruned_comparison[1]
-    assert "archive/ ▸" in pruned_comparison[1]
+    assert "archive/ ▸" not in pruned_comparison[1]
     assert "\033[31m-\033[0m" in pruned_comparison[1]
     assert "\033[90mx\033[0m \033[38;5;51ml\033[0m" in pruned_comparison[1]
     assert "node_modules/" in pruned_comparison[1]
-    assert "    \033[3;38;5;24msrc/ ▸\033[0m" in pruned_comparison[1].splitlines()
+    assert "\033[38;5;75msrc/\033[0m" in pruned_comparison[1]
     assert "same.txt" not in pruned_comparison[1]
     kept_comparison = invoke(["diff", "-k"], store, terminal_output=True)
     assert "Options: keep remote-only paths (-k).\n" in kept_comparison[2]
@@ -1071,7 +1079,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
         "\033[38;5;30mdeployed.html\033[0m\n"
     )
     assert retained_line in kept_comparison[1]
-    explicit_shallow = invoke(["diff", "."], store, terminal_output=True)
+    explicit_shallow = invoke(["diff", ".", "--shallow"], store, terminal_output=True)
     assert "archive/ ▸" in explicit_shallow[1]
     assert "\033[38;5;30mr\033[0m" in explicit_shallow[1]
     monkeypatch.chdir(source)
@@ -1085,9 +1093,11 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     directory_comparison = invoke(["diff", "src"], store)
     assert "= src/\n" not in directory_comparison[1]
     assert directory_comparison[1].startswith("    src/\n")
-    assert "      nested/ ▸" in directory_comparison[1].splitlines()
+    assert "      nested/" in directory_comparison[1].splitlines()
+    assert "+ l     child.py" in directory_comparison[1].splitlines()
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
+    assert recursive_directory_comparison[1] == directory_comparison[1]
     assert "+ l     child.py\n" in recursive_directory_comparison[1]
     nested_directory_comparison = invoke(["diff", "src/nested"], store)
     assert nested_directory_comparison[1].startswith("    src/nested/\n")
@@ -1145,6 +1155,9 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     assert "main.py" in resumed[1]
     assert "--resume src/nested" in resumed[1]
+    shallow_page = invoke(["diff", "src", "node_modules", "-s", "--paged"], store)
+    assert "--shallow --paged --resume src" in shallow_page[1]
+    assert "child.py" not in shallow_page[1]
     monkeypatch.chdir(workspace)
 
     pull_comparison = invoke(
@@ -1194,6 +1207,19 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert retention_tip not in recursive_push[1]
     assert ("upload", "src/nested/child.py", b"child", 5, False) in operations
     operations.clear()
+    explicit_recursive_push = invoke(["push", "."], store)
+    assert explicit_recursive_push[0] == 0
+    assert ("upload", "src/nested/child.py", b"child", 5, False) in operations
+    operations.clear()
+    shallow_push = invoke(["push", "-s", "-k"], store)
+    assert shallow_push[0] == 0
+    assert "Options: shallow (-s); keep remote-only paths (-k)." in shallow_push[2]
+    assert all("nested" not in operation[1] for operation in operations)
+    operations.clear()
+    shallow_dry = invoke(["push", "--shallow", "--dry"], store)
+    assert shallow_dry[0] == 0
+    assert "child.py" not in shallow_dry[2]
+    assert operations == []
 
     monkeypatch.chdir(workspace)
     remote_listing = invoke(["list", "--remote"], store)
@@ -1203,7 +1229,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "  deployed.html\n" in remote_listing[1]
     assert invoke(["lsr"], store)[1] == remote_listing[1]
 
-    push_result = invoke(["push", "src", "-k"], store)
+    push_result = invoke(["push", "src", "-s", "-k"], store)
     assert push_result[0] == 0
     assert push_result[2].startswith("Preparing push for profile 'prod'...\n")
     assert "Comparing local and remote files...\n" in push_result[2]
@@ -1221,7 +1247,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     ]
     operations.clear()
     colored_push = invoke(
-        ["push", "src", "-k"],
+        ["push", "src", "--shallow", "-k"],
         store,
         terminal_progress=True,
     )

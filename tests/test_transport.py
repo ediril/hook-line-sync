@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import ssl
 import subprocess
@@ -10,8 +11,13 @@ from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import TLS_FTPHandler
 from pyftpdlib.servers import FTPServer
 
+from hlsync.cli import run
 from hlsync.comparison import build_comparison
-from hlsync.config import ProfileConfiguration
+from hlsync.config import (
+    ApplicationConfiguration,
+    ConfigurationStore,
+    ProfileConfiguration,
+)
 from hlsync.gitignore import GitIgnores
 from hlsync.rules import RuleSet, SyncRule
 from hlsync.selection import FileSelector, FileSelectorSet
@@ -584,6 +590,75 @@ def test_selected_push_pull_and_remote_prune_use_the_shared_plan(
             TransferOperation("delete", "orphan-dir/child.txt", "file"),
             TransferOperation("delete", "orphan-dir", "directory"),
         ]
+
+
+def test_cli_shallow_scope_and_recursive_defaults_over_ftps(
+    tls_ftp_server, tmp_path, monkeypatch
+):
+    port, certificate, remote_root = tls_ftp_server
+    local_root = tmp_path / "local"
+    (local_root / "nested").mkdir(parents=True)
+    (local_root / "top.txt").write_text("local top")
+    (local_root / "nested/child.txt").write_text("local child")
+    (remote_root / "nested").mkdir()
+    (remote_root / "orphan/deep").mkdir(parents=True)
+    (remote_root / "orphan/direct.txt").write_text("direct")
+    (remote_root / "orphan/deep/keep.txt").write_text("keep")
+    monkeypatch.chdir(local_root)
+    monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
+    monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
+    store = ConfigurationStore(tmp_path / "configs.json")
+    store.save(ApplicationConfiguration(profiles={
+        "prod": ProfileConfiguration(
+            host="localhost", port=port, remote_root="/", local_root=str(local_root),
+        ),
+    }))
+    context = ssl.create_default_context(cafile=os.fspath(certificate))
+    monkeypatch.setattr(
+        "hlsync.cli.ExplicitFTPSTransport",
+        lambda profile: ExplicitFTPSTransport(profile, ssl_context=context),
+    )
+    visited = []
+    original_listing = ExplicitFTPSTransport.list_directory
+
+    def list_directory(transport, directory, rules):
+        visited.append(directory.as_posix())
+        return original_listing(transport, directory, rules)
+
+    monkeypatch.setattr(ExplicitFTPSTransport, "list_directory", list_directory)
+
+    def invoke(arguments):
+        visited.clear()
+        output, errors = io.StringIO(), io.StringIO()
+        status = run(arguments, store=store, stdout=output, stderr=errors)
+        assert status == 0, errors.getvalue()
+        return output.getvalue(), errors.getvalue()
+
+    output, _ = invoke(["diff"])
+    assert "child.txt" in output and "keep.txt" in output
+    assert visited == [".", "nested", "orphan", "orphan/deep"]
+    output, _ = invoke(["diff", "-s"])
+    assert "nested/ ▸" in output and "orphan/ ▸" in output
+    assert "child.txt" not in output and "keep.txt" not in output
+    assert visited == ["."]
+    _, progress = invoke(["push", "--shallow", "--dry"])
+    assert "  + top.txt" in progress
+    assert "child.txt" not in progress
+    assert visited == ["."]
+    assert not (remote_root / "top.txt").exists()
+    invoke(["push", "-s"])
+    assert visited == ["."]
+    assert (remote_root / "top.txt").read_text() == "local top"
+    assert not (remote_root / "nested/child.txt").exists()
+    assert (remote_root / "orphan/direct.txt").exists()
+    invoke(["push", "orphan", "-s"])
+    assert visited == [".", "orphan"]
+    assert not (remote_root / "orphan/direct.txt").exists()
+    assert (remote_root / "orphan/deep/keep.txt").read_text() == "keep"
+    invoke(["push", "nested"])
+    assert (remote_root / "nested/child.txt").read_text() == "local child"
+    invoke(["push"])
+    assert not (remote_root / "orphan").exists()
 
 
 def test_gitignore_pruning_and_override_over_ftps(
