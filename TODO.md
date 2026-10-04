@@ -1,5 +1,9 @@
 # Work Queue
 
+- [x] Keep status columns fixed while indenting nested path names in tree output.
+- [x] Remove per-directory read announcements from diff while preserving
+  streamed folder grouping.
+- [x] Document the uv command for reinstalling and trying local changes.
 - [x] Display action/exclusion before presence in diff status columns; update
   colored output, legend, and examples consistently.
 - [x] Derive `<major>.<work-day>.<daily-commit>` versions from a pinned major

@@ -23,5 +23,5 @@ continues to drive transfer execution; transfer and exclusion policies do not
 change.
 
 This supersedes the side/exclusion notation and column-zero ancestor headings
-in the August 30 diff-presentation decision. Tree depth still adds indentation
-before the fixed status columns.
+in the August 30 diff-presentation decision. Status columns stay fixed at the
+left; tree depth adds indentation to path names after those columns.

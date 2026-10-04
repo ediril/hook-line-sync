@@ -1533,10 +1533,9 @@ def _format_path_line(
     indent = "  " * depth
     label = f"{path}/" if directory else path
     traversal = " ▸" if collapsed else ""
-    body = f"{marker} {label}{traversal}"
-    line = f"{indent}{body}"
+    body = f"{marker} {indent}{label}{traversal}"
     if not color:
-        return line
+        return body
     if len(marker) == 3:
         action, side = marker[0], marker[2]
         side_color = _DIFF_MARKER_COLORS.get(side)
@@ -1558,7 +1557,7 @@ def _format_path_line(
             )
             suffix = " ▸" if collapsed else ""
             return (
-                f"{indent}{rendered_status} "
+                f"{rendered_status} {indent}"
                 f"{directory_color}{path}/{suffix}{_RESET}"
             )
         path_style = marker_color or side_color
@@ -1567,14 +1566,14 @@ def _format_path_line(
             if path_style
             else f"{label}{traversal}"
         )
-        return f"{indent}{rendered_status} {rendered_path}"
+        return f"{rendered_status} {indent}{rendered_path}"
     if directory:
         if collapsed:
             colored_marker = (
                 f"{marker_color}{marker}{_RESET}" if marker_color else marker
             )
             return (
-                f"{indent}{colored_marker} "
+                f"{colored_marker} {indent}"
                 f"{_COLLAPSED_DIRECTORY_COLOR}{path}/ ▸{_RESET}"
             )
         directory_color = path_color or (
@@ -1583,10 +1582,10 @@ def _format_path_line(
         colored_marker = (
             f"{marker_color}{marker}{_RESET}" if marker_color else marker
         )
-        return f"{indent}{colored_marker} {directory_color}{path}/{_RESET}"
+        return f"{colored_marker} {indent}{directory_color}{path}/{_RESET}"
     if marker_color:
-        return f"{indent}{marker_color}{body}{_RESET}"
-    return line
+        return f"{marker_color}{body}{_RESET}"
+    return body
 
 
 def _file_browser_order(
@@ -2216,12 +2215,6 @@ def _diff(
                 else TreeSnapshot()
             )
             remote_directory_exists = current.has_remote
-            if current.has_remote:
-                print(
-                    f"Reading remote directory: {display_directory}/",
-                    file=progress,
-                    flush=True,
-                )
             try:
                 remote_listing = (
                     transport.list_directory(directory, rules)
@@ -2544,11 +2537,10 @@ def _report_transfer_operation(
         return
     marker = _TRANSFER_MARKERS[operation.action]
     print(
-        _format_path_line(
+        "  " + _format_path_line(
             marker,
             directory=operation.kind == "directory",
             path=operation.path,
-            depth=1,
             color=_use_color(progress),
             marker_color=_DIFF_MARKER_COLORS[marker],
             excluded=False,

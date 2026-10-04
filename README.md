@@ -328,10 +328,10 @@ unchanged and untraversed entries for the complete exploratory view.
 Recursive diff keeps file-browser order in both views: directories and their
 indented contents appear before files at the parent level.
 Rows without status markers retain blank status columns so names stay aligned.
+Status columns stay fixed at the left; tree indentation applies to path names.
 The `▸` marker means contents were not inspected, including excluded folders.
-Diff announces each remote directory on stderr before reading it, including
-directories whose unchanged contents produce no diff output. Paths in these
-announcements are relative to the profile root.
+Diff reads directories as it traverses the tree and groups their entries under
+folder headings, without separate per-directory read announcements.
 
 For push authority, a locally excluded file is treated as absent. If it exists
 remotely, default diff marks its deletion as `-`; `diff -k --all` marks the
@@ -507,6 +507,17 @@ Install the development environment and run the test suite:
 python -m pip install -e '.[dev]'
 pytest
 ```
+
+To try local changes using your installed `hlsync` command, run this from the
+repository root:
+
+```console
+uv tool install --force --reinstall .
+```
+
+This replaces the installed tool with a build of your current checkout. Rerun
+it after making changes. Use `hlsync --legend` for a quick display check, or
+run `hlsync diff` from a mapped project to preview its differences.
 
 The PyPI distribution is `hook-line-sync`; the installed command and Python
 package are both `hlsync`. See [`TODO.md`](TODO.md) for the

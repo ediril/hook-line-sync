@@ -1,4 +1,5 @@
 import io
+import re
 from pathlib import PurePosixPath
 
 import pytest
@@ -701,10 +702,10 @@ def test_ordered_exclusion_commands_persist_reinclusion(
     assert local_view[0] == 0 and local_view[2] == ""
     assert "    keep.js\n" in local_view[1]
     assert "x composer.json\n" in local_view[1]
-    assert "  x note.txt\n" in local_view[1]
+    assert "x   note.txt\n" in local_view[1]
     directory_view = invoke(["list", "node_modules"], store)
     assert "  node_modules/\n" in directory_view[1]
-    assert "  x drop.js\n" in directory_view[1]
+    assert "x   drop.js\n" in directory_view[1]
     assert "    keep.js\n" in directory_view[1]
     assert "    package/\n" in directory_view[1]
     assert "nested.js" not in directory_view[1]
@@ -992,7 +993,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     monkeypatch.chdir(workspace)
     recursive_list = invoke(["list", "--recursive"], store)
-    assert "  x package.js\n" in recursive_list[1]
+    assert "x   package.js\n" in recursive_list[1]
     assert "    .env.example\n" in recursive_list[1]
     assert recursive_list[1].index("x node_modules/\n") < (
         recursive_list[1].index("  src/\n")
@@ -1008,7 +1009,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "package.js" not in included_only_list[1]
     assert "    .env.example\n" in included_only_list[1]
     colored_list = invoke(["list", "--recursive"], store, terminal_output=True)
-    assert "  \033[90mx debug.log\033[0m" in colored_list[1]
+    assert "\033[90mx   debug.log\033[0m" in colored_list[1]
     assert "  \033[38;5;75msrc/\033[0m" in colored_list[1]
     assert "\033[90mx\033[0m \033[38;5;24mnode_modules/\033[0m" in (
         colored_list[1]
@@ -1018,15 +1019,14 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     push_progress = (
         "Checking differences for profile 'prod'...\n"
         "Connecting securely over FTPS...\n"
-        "Reading remote directory: src/\n"
     )
     assert push_comparison[0] == 0 and push_comparison[2] == push_progress
     assert push_comparison[1].startswith("    src/\n")
-    assert "+ l main.py\n" in push_comparison[1]
+    assert "+ l   main.py\n" in push_comparison[1]
     assert "      nested/ ▸" in push_comparison[1].splitlines()
     serve_nested_directory = False
     local_only_directory = invoke(["diff", "."], store)
-    assert "    l nested/ ▸\n" in local_only_directory[1]
+    assert "  l   nested/ ▸\n" in local_only_directory[1]
     assert "child.py" not in local_only_directory[1]
     serve_nested_directory = True
     assert "src/nested/child.py" not in push_comparison[1]
@@ -1035,21 +1035,22 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
-    assert "  -   debug.log\n" in push_comparison[1]
+    assert "-     debug.log\n" in push_comparison[1]
     hidden_exclusions = invoke(["diff", "-i"], store)
-    assert "  -   debug.log\n" in hidden_exclusions[1]
+    assert "-     debug.log\n" in hidden_exclusions[1]
     assert invoke(["prod", "diff", "same.txt"], store)[1] == (
         "  no differences\n"
     )
 
     recursive_comparison = invoke(["diff", "-r"], store)
     assert "Options: recursive (-r).\n" in recursive_comparison[2]
-    assert "  + l child.py\n" in recursive_comparison[1]
+    assert "Reading remote" not in "".join(recursive_comparison[1:])
+    assert "+ l     child.py" in recursive_comparison[1].splitlines()
     assert recursive_comparison[1].index("nested/\n") < (
-        recursive_comparison[1].index("  + l child.py\n")
+        recursive_comparison[1].index("+ l     child.py\n")
     )
-    assert recursive_comparison[1].index("  + l child.py\n") < (
-        recursive_comparison[1].index("+ l .env.example\n")
+    assert recursive_comparison[1].index("+ l     child.py\n") < (
+        recursive_comparison[1].index("+ l   .env.example\n")
     )
 
     monkeypatch.chdir(workspace)
@@ -1087,16 +1088,16 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "      nested/ ▸" in directory_comparison[1].splitlines()
     assert "src/nested/child.py" not in directory_comparison[1]
     recursive_directory_comparison = invoke(["diff", "src", "-r"], store)
-    assert "    + l child.py\n" in recursive_directory_comparison[1]
+    assert "+ l     child.py\n" in recursive_directory_comparison[1]
     nested_directory_comparison = invoke(["diff", "src/nested"], store)
     assert nested_directory_comparison[1].startswith("    src/nested/\n")
-    assert "  + l child.py\n" in nested_directory_comparison[1]
+    assert "+ l   child.py\n" in nested_directory_comparison[1]
     expanded_comparison = invoke(
         ["diff", "README.md,src/main.py", "src"], store
     )
     assert expanded_comparison[0] == 0
     assert "+ l README.md\n" in expanded_comparison[1]
-    assert "  + l main.py\n" in expanded_comparison[1]
+    assert "+ l   main.py\n" in expanded_comparison[1]
     assert "src/ ▸\n" not in expanded_comparison[1]
 
     colored_comparison = invoke(
@@ -1122,7 +1123,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     )
     all_included = invoke(["diff", "**", "--all", "-i"], store)
     assert "=   same.txt" in all_included[1]
-    assert "  -   debug.log\n" in all_included[1]
+    assert "-     debug.log\n" in all_included[1]
     assert "node_modules" not in all_included[1]
     with monkeypatch.context() as no_color:
         no_color.setenv("NO_COLOR", "1")
@@ -1130,6 +1131,9 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
             ["diff", "**", "--all"], store, terminal_output=True
         )
     assert "\033[" not in uncolored_comparison[1]
+    assert re.sub(r"\x1b\[[0-9;]*m", "", colored_comparison[1]) == (
+        uncolored_comparison[1]
+    )
 
     paged = invoke(["diff", ".", "--recursive", "--paged"], store)
     assert (
@@ -1297,7 +1301,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     prefixed_diff = invoke(["prod", "diff", "src"], store)
     assert prefixed_diff[0] == 0
     assert prefixed_diff[1].startswith("    src/\n")
-    assert "  + l main.py\n" in prefixed_diff[1]
+    assert "+ l   main.py\n" in prefixed_diff[1]
     prefixed_page = invoke(["prod", "diff", ".", "-r", "--paged"], store)
     assert (
         "Resume: hlsync prod diff . --recursive --paged --resume archive\n"
@@ -1329,16 +1333,6 @@ def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
         (tmp_path / ".gitignore").write_text("/workspace/cache/\n")
 
     listed = []
-    progress = io.StringIO()
-
-    def diff():
-        output = io.StringIO()
-        progress.seek(0)
-        progress.truncate()
-        status = run(
-            ["diff", "-r"], store=store, stdout=output, stderr=progress,
-        )
-        return status, output.getvalue(), progress.getvalue()
 
     class RemoteOnlyTransport:
         def __init__(self, profile):
@@ -1352,10 +1346,6 @@ def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
 
         def list_directory(self, relative_directory, rules):
             directory = relative_directory.as_posix()
-            # The path must be visible before a potentially slow network read.
-            assert progress.getvalue().endswith(
-                f"Reading remote directory: {directory}/\n"
-            )
             listed.append(directory)
             if directory == ".":
                 return TreeSnapshot((TreeEntry(
@@ -1371,21 +1361,20 @@ def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
 
     monkeypatch.setattr("hlsync.cli.ExplicitFTPSTransport", RemoteOnlyTransport)
 
-    status, output, error = diff()
+    status, output, error = invoke(["diff", "-r"], store)
     assert status == 0, error
     assert listed == ["."]
-    assert "Reading remote directory: cache/" not in error
     assert "x r cache/ ▸\n" in output
     assert "keep.txt" not in output
 
     # An explicit descendant inclusion must still allow traversal.
     assert invoke(["rules", "-i", "--pattern", "cache/keep.txt"], store)[0] == 0
     listed.clear()
-    status, output, error = diff()
+    status, output, error = invoke(["diff", "-r"], store)
     assert status == 0, error
     assert listed == [".", "cache"]
     assert "x r cache/\n" in output
-    assert "- r keep.txt\n" in output
+    assert "- r   keep.txt\n" in output
 
 
 def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> None:
