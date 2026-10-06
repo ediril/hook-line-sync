@@ -216,7 +216,7 @@ function h(string $value): string
                     <div class="step-icon" aria-hidden="true">⌁</div>
                     <h3>Exclude what doesn’t belong</h3>
                     <p>Exclude files that should never leave your machine. Use an explicit pattern when future matching files should stay excluded too.</p>
-                    <code>hlsync rules -e --pattern '*.map'</code>
+                    <code>hlsync exclude --pattern '*.map'</code>
                 </li>
                 <li>
                     <span class="step-number">03</span>

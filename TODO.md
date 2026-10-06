@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Replace `rules -e` / `rules -i` with top-level `exclude` and `include`
+  commands, and `rules --remove ID` with `rules rm ID`.
 - [x] Make remote deletion opt-in: push and diff retain remote-only paths unless
   `-p` / `--prune` is given, replacing `-k` / `--keep-remote`.
 - [x] Replace a changed file only when the source is strictly newer; treat a

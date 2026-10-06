@@ -51,7 +51,7 @@ From the local project root:
 ```console
 hlsync create prod --host ftp.example.com --remote-root /public_html/site
 hlsync connect
-hlsync rules -e .git node_modules
+hlsync exclude .git node_modules
 hlsync diff
 hlsync push
 ```
@@ -141,7 +141,7 @@ mapped local root is inside a Git repository, this includes all ancestor
 mapped tree. Without an enclosing repository, ignore scope starts at the mapped
 root. Git worktrees are supported; no Git installation is needed.
 Explicit HLSync rules override this baseline; profile rules override global rules.
-To deploy a Git-ignored path, use `hlsync rules -i vendor/` (or a specific file).
+To deploy a Git-ignored path, use `hlsync include vendor/` (or a specific file).
 Ignore files above the repository root, Git's global excludes, and the Git index
 are not consulted; matching tracked files are excluded too.
 
@@ -169,10 +169,10 @@ Manage global exclusions and inclusions from any directory with `-g` /
 local root; append `/` to target a complete directory tree:
 
 ```console
-hlsync rules -e -g --pattern '*.tmp'
-hlsync rules -i -g --pattern 'public/*.tmp'
-hlsync rules -g                    # inspect global rules
-hlsync rules --remove g4           # g prefix selects global rules
+hlsync exclude -g --pattern '*.tmp'
+hlsync include -g --pattern 'public/*.tmp'
+hlsync rules -g      # inspect global rules
+hlsync rules rm g4   # g prefix selects global rules
 ```
 
 Global rules apply first and profile rules apply afterward, so an ordinary
@@ -186,8 +186,8 @@ rules file.
 Exclude current paths permanently:
 
 ```console
-hlsync rules -e .git node_modules composer.json composer.lock
-hlsync rules -e '*.md'
+hlsync exclude .git node_modules composer.json composer.lock
+hlsync exclude '*.md'
 ```
 
 Normal wildcard operands are expanded against the current local tree and
@@ -197,18 +197,18 @@ quoted and shell-expanded matches produce the same path rules.
 Use `--pattern` when future matching paths should also be covered:
 
 ```console
-hlsync rules -e --pattern '*.md'       # this directory only
-hlsync rules -e --pattern '**/*.log'   # every directory below this point
-hlsync rules -i --pattern 'vendor/**'  # re-include a subtree
+hlsync exclude --pattern '*.md'       # this directory only
+hlsync exclude --pattern '**/*.log'   # every directory below this point
+hlsync include --pattern 'vendor/**'  # re-include a subtree
 ```
 
 Use `--anywhere` (or `--any`) to match a name at every depth, including future
-files. It works with both `-e` and `-i`, and replaces `--pattern`:
+files. It works with both `exclude` and `include`, and replaces `--pattern`:
 
 ```console
-hlsync rules -e --anywhere filename.ext  # current directory and descendants
-hlsync rules -e --any '*.log'            # quote wildcards to preserve the pattern
-hlsync rules -e -g --anywhere cache/     # matching directory trees in every profile
+hlsync exclude --anywhere filename.ext  # current directory and descendants
+hlsync exclude --any '*.log'            # quote wildcards to preserve the pattern
+hlsync exclude -g --anywhere cache/     # matching directory trees in every profile
 ```
 
 `*` matches within one path segment; a complete `**` segment crosses directory
@@ -220,8 +220,8 @@ Local rules define the authoritative local set. Remote rules instead protect
 server-side paths from synchronization:
 
 ```console
-hlsync rules -e --remote subdomains
-hlsync rules -i --remote subdomains
+hlsync exclude --remote subdomains
+hlsync include --remote subdomains
 ```
 
 Remote operands are declarative and never require a connection when recorded.
@@ -241,7 +241,7 @@ redundant exact rules but preserves ambiguous wildcard overlaps.
 
 ```console
 hlsync rules
-hlsync rules --remove 3
+hlsync rules rm 3
 ```
 
 Multiple operands and comma-separated groups are accepted. A literal filename

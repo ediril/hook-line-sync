@@ -140,6 +140,8 @@ CANONICAL_COMMANDS = (
     "push",
     "pull",
     "rules",
+    "exclude",
+    "include",
     "help",
     "version",
 )
@@ -156,6 +158,8 @@ PROFILE_AWARE_COMMANDS = frozenset(
         "push",
         "pull",
         "rules",
+        "exclude",
+        "include",
     }
 )
 
@@ -401,67 +405,79 @@ def build_parser() -> argparse.ArgumentParser:
         help="new absolute remote root; omitted leaves it unchanged",
     )
 
+    rule_change_help = {
+        "exclude": "exclude paths from synchronization",
+        "include": "include paths, overriding broader exclusions",
+    }
+    for command in ("exclude", "include"):
+        rule_parser = subparsers.add_parser(
+            command,
+            help=rule_change_help[command],
+            usage=(
+                f"hlsync [PROFILE] {command} [--remote] "
+                "[--pattern | --anywhere] PATH ...\n"
+                f"       hlsync {command} -g [--remote] "
+                "[--pattern | --anywhere] PATH ..."
+            ),
+            description=(
+                f"Record {command} rules for the current profile, or for every "
+                "profile with -g. List rules with 'hlsync rules'."
+            ),
+        )
+        add_pattern_operands(
+            rule_parser,
+            required=True,
+            metavar="PATH",
+            help_text="paths, wildcards, or comma-separated groups",
+        )
+        rule_parser.add_argument(
+            "--remote",
+            action="store_true",
+            help="apply to protected remote paths",
+        )
+        rule_matching = rule_parser.add_mutually_exclusive_group()
+        rule_matching.add_argument(
+            "--pattern",
+            action="store_true",
+            help="record operands as reusable wildcard patterns",
+        )
+        rule_matching.add_argument(
+            "--anywhere",
+            action="store_true",
+            help=(
+                "match names at any depth below the current directory; "
+                "-g: every profile"
+            ),
+        )
+        rule_parser.add_argument(
+            "-g",
+            "--global",
+            dest="global_rules",
+            action="store_true",
+            help="record a rule shared by every profile",
+        )
+
     rules_parser = subparsers.add_parser(
         "rules",
-        help="list or change synchronization rules",
+        help="list or remove synchronization rules",
         usage=(
             "hlsync [PROFILE] rules\n"
-            "       hlsync [PROFILE] rules (-e | -i) [--remote] "
-            "[--pattern | --anywhere] PATH ...\n"
-            "       hlsync [PROFILE] rules --remove RULE_ID\n"
-            "       hlsync rules -g [(-e | -i) PATH ... | "
-            "--remove GLOBAL_RULE_ID]"
+            "       hlsync [PROFILE] rules rm RULE_ID\n"
+            "       hlsync rules -g [rm GLOBAL_RULE_ID]"
         ),
         description=(
-            "List rules, add exclusions or inclusions with -e/-i, or remove "
-            "one with --remove. Use -g for global rules."
+            "List rules, or remove one by its displayed ID with rm. Use -g for "
+            "global rules. Add rules with 'hlsync exclude' and 'hlsync include'."
         ),
     )
-    rule_action = rules_parser.add_mutually_exclusive_group()
-    rule_action.add_argument(
-        "-e",
-        "--exclude",
-        dest="rule_action",
-        action="store_const",
-        const="exclude",
-        help="exclude paths",
-    )
-    rule_action.add_argument(
-        "-i",
-        "--include",
-        dest="rule_action",
-        action="store_const",
-        const="include",
-        help="include paths",
-    )
-    rule_action.add_argument(
-        "--remove",
-        dest="rule_id",
-        metavar="RULE_ID",
-        help="remove the displayed rule ID",
-    )
-    add_pattern_operands(
-        rules_parser,
-        required=False,
-        metavar="PATH",
-        help_text="paths, wildcards, or comma-separated groups",
-    )
     rules_parser.add_argument(
-        "--remote",
-        action="store_true",
-        help="apply new rules to protected remote paths",
+        "operation",
+        nargs="?",
+        choices=("rm",),
+        metavar="rm",
+        help="remove the rule with the displayed RULE_ID",
     )
-    rule_matching = rules_parser.add_mutually_exclusive_group()
-    rule_matching.add_argument(
-        "--pattern",
-        action="store_true",
-        help="record operands as reusable wildcard patterns",
-    )
-    rule_matching.add_argument(
-        "--anywhere",
-        action="store_true",
-        help="match names at any depth below the current directory; -g: every profile",
-    )
+    rules_parser.add_argument("rule_id", nargs="?", metavar="RULE_ID")
     rules_parser.add_argument(
         "-g",
         "--global",
@@ -1035,8 +1051,7 @@ def _change_rules(
     patterns = normalize_pattern_operands(arguments)
     target = "remote" if arguments.remote else "local"
     if not patterns:
-        flag = "-i/--include" if include else "-e/--exclude"
-        raise ConfigurationError(f"{flag} requires at least one path")
+        raise ConfigurationError(f"{arguments.command} requires at least one path")
     if arguments.anywhere:
         for pattern in patterns:
             path = PurePosixPath(pattern)
@@ -1175,17 +1190,8 @@ def _manage_rules(
     arguments: argparse.Namespace,
     store: ConfigurationStore,
 ) -> str:
-    if arguments.rule_action is not None:
-        return _change_rules(
-            arguments,
-            store,
-            include=arguments.rule_action == "include",
-        )
-    patterns = normalize_pattern_operands(arguments)
-    if patterns:
-        raise ConfigurationError("rule paths require -e/--exclude or -i/--include")
-    if arguments.remote or arguments.pattern or arguments.anywhere:
-        raise ConfigurationError("--remote, --pattern, and --anywhere require -e or -i")
+    if arguments.operation == "rm" and arguments.rule_id is None:
+        raise ConfigurationError("rules rm requires a RULE_ID")
     if arguments.global_rules or (
         arguments.rule_id is not None and arguments.rule_id.startswith("g")
     ):
@@ -2774,6 +2780,12 @@ def run(
             message = _map(arguments, configuration_store, stdin, stdout)
         elif arguments.command == "rules":
             message = _manage_rules(arguments, configuration_store)
+        elif arguments.command in {"exclude", "include"}:
+            message = _change_rules(
+                arguments,
+                configuration_store,
+                include=arguments.command == "include",
+            )
         elif arguments.command == "remove":
             message = _remove(arguments, configuration_store)
         elif arguments.command == "root":
