@@ -166,14 +166,14 @@ function h(string $value): string
                         <span class="terminal-state">TLS:ON</span>
                     </div>
                     <div class="terminal-body">
-                        <p><span class="prompt">❯</span> <b>hlsync diff</b></p>
+                        <p><span class="prompt">❯</span> <b>hlsync diff -p</b></p>
                         <p class="muted">Checking differences for profile 'discovery'...</p>
                         <p><span class="directory">&nbsp; assets/</span></p>
-                        <p><span class="added">+ l</span> &nbsp; index.php</p>
-                        <p><span class="removed">- r</span> &nbsp; legacy.php</p>
-                        <p><span class="changed">~</span> &nbsp; &nbsp; site.css</p>
-                        <p><span class="added">+ l</span> <span class="directory">icons/</span></p>
-                        <p class="terminal-gap"><span class="prompt">❯</span> <b>hlsync push</b></p>
+                        <p><span class="added">+&nbsp; l</span> &nbsp; index.php</p>
+                        <p><span class="removed">-&nbsp; r</span> &nbsp; legacy.php</p>
+                        <p><span class="changed">~</span> &nbsp; &nbsp; &nbsp;site.css</p>
+                        <p><span class="added">+&nbsp; l</span> <span class="directory">icons/</span></p>
+                        <p class="terminal-gap"><span class="prompt">❯</span> <b>hlsync push -p</b></p>
                         <p class="muted">Pushing changes...</p>
                         <p>&nbsp; <span class="added">+</span> index.php</p>
                         <p>&nbsp; <span class="changed">~</span> site.css</p>
@@ -229,7 +229,7 @@ function h(string $value): string
                     <span class="step-number">04</span>
                     <div class="step-icon" aria-hidden="true">↥</div>
                     <h3>Push the changes</h3>
-                    <p>Upload new and modified files, then remove remote-only files in the selected scope. Use <code>-k</code> when remote-only files should stay.</p>
+                    <p>Upload new and modified files. Nothing is deleted unless you add <code>-p</code> to remove remote-only files in the selected scope.</p>
                     <code>hlsync push</code>
                 </li>
             </ol>
@@ -252,16 +252,16 @@ function h(string $value): string
                         <p>The remote is treated as a deployment target. A file missing locally is reported instead of being copied back unexpectedly.</p>
                     </div>
                     <div class="mini-diff" aria-hidden="true">
-                        <span class="added">+ l</span><i></i><b>local-only / added</b>
+                        <span class="added">+&nbsp; l</span><i></i><b>local-only / added</b>
                         <span class="changed">~</span><i></i><b>changed</b>
-                        <span class="removed">- r</span><i></i><b>remote-only / deleted</b>
-                        <span class="remote-only">r</span><i></i><b>kept with -k</b>
+                        <span class="remote-only">r</span><i></i><b>remote-only / kept</b>
+                        <span class="removed">-&nbsp; r</span><i></i><b>deleted with -p</b>
                     </div>
                 </article>
                 <article class="principle">
                     <span class="principle-index">B</span>
-                    <h3>Push matches local state</h3>
-                    <p>Remote-only paths in the selected scope are deleted after uploads succeed. Use <code>-k</code> when they should be retained.</p>
+                    <h3>Deletion is explicit</h3>
+                    <p>Push never deletes by default. With <code>-p</code>, remote-only paths in the selected scope are deleted after uploads succeed.</p>
                 </article>
                 <article class="principle">
                     <span class="principle-index">C</span>

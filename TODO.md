@@ -1,5 +1,9 @@
 # Work Queue
 
+- [x] Make remote deletion opt-in: push and diff retain remote-only paths unless
+  `-p` / `--prune` is given, replacing `-k` / `--keep-remote`.
+- [x] Give diff status a dedicated exclusion slot (action, exclusion, presence)
+  so a pruned excluded path shows both `-` and `x`.
 - [x] Make diff and push recursive by default; support `-s` / `--shallow` for
   immediate contents and preserve that scope in dry push and paged diff.
 - [x] Review decision notes, retain substantial architectural rationale, and

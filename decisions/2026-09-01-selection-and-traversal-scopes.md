@@ -22,8 +22,9 @@ may match a descendant permits the local walk needed to honor that inclusion;
 remote boundaries cannot be pierced.
 
 Locally excluded files remain file-level absences and may be deleted remotely
-by ordinary push pruning. Included remote-only directories may be inventoried
-and deleted recursively when they are inside recursive push scope. An explicitly
+by an explicitly pruning push (`-p`). Without pruning, remote-only directories
+are retained and not entered. With it, included remote-only directories may be
+inventoried and deleted recursively when they are inside recursive push scope. An explicitly
 selected remote-only directory is likewise inventoried fully so FTP can delete
 its contents deepest-first. A protected descendant retains its deletion
 ancestors.
@@ -58,4 +59,4 @@ Stateless paging avoids retaining stale remote state between invocations.
 - Walking ancestor directories merely to reach an exact selected directory.
 - Persisting selection or traversal state between commands.
 - Treating a visible untraversed directory as authorization to mutate it.
-- Using `--keep-remote` to change traversal depth.
+- Using `--prune` to change traversal depth.

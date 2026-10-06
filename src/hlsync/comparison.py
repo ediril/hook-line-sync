@@ -160,7 +160,7 @@ def build_comparison(
                 comparison.append(
                     ComparisonEntry(
                         path=path,
-                        state="remote-only",
+                        state="excluded",
                         action="delete-remote",
                         local_kind=local_entry.kind if local_entry else None,
                         remote_kind=remote_entry.kind,

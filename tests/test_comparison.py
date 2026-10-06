@@ -115,9 +115,9 @@ def test_comparison_profiles_push_pull_prune_and_timestamp_precision() -> None:
     assert (
         pruned_push["excluded.txt"].state,
         pruned_push["excluded.txt"].action,
-    ) == ("remote-only", "delete-remote")
+    ) == ("excluded", "delete-remote")
     # Push authority can treat a local exclusion as absent without erasing
-    # its actual presence from the comparison used by diff.
+    # its actual presence or exclusion from the comparison used by diff.
     assert pruned_push["excluded.txt"].local_kind == "file"
     assert pruned_push["excluded-dir"].action == "excluded"
     assert pull["remote.txt"].action == "delete-remote"

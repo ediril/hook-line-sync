@@ -145,9 +145,9 @@ To deploy a Git-ignored path, use `hlsync rules -i vendor/` (or a specific file)
 Ignore files above the repository root, Git's global excludes, and the Git index
 are not consulted; matching tracked files are excluded too.
 
-**Review `hlsync push --dry` after changing ignores:** locally excluded files
-already deployed can be pruned. Use `-k` to retain them, or remote exclusion
-rules to protect remote paths.
+**Review `hlsync push --dry -p` before pruning:** with `-p`, locally excluded
+files that are already deployed are deleted remotely. Without `-p`, their remote
+copies are left alone; remote exclusion rules protect paths even when pruning.
 
 Global rules live in `~/.hlsync/rules.json`, apply to every profile, and are
 created with default exclusions for version-control metadata and common logs:
@@ -315,14 +315,13 @@ hlsync diff index.html app.js styles.css
 hlsync diff '**/*.css'
 ```
 
-Local path existence is authoritative except at explicit remote-exclusion
-boundaries. In the default push view, remote-only
-paths are shown as deletions because push will make the selected remote scope
-match local state. Preview retention instead with:
+Local path existence decides what is uploaded or replaced. In the default
+push view, remote-only paths are retained because push never deletes without
+`-p`. Preview a pruning push with:
 
 ```console
-hlsync diff --keep-remote
-hlsync diff -k
+hlsync diff --prune
+hlsync diff -p
 ```
 
 `--pull` changes the perspective for changed existing files and retains
@@ -334,13 +333,16 @@ Recursive diff keeps file-browser order in both views: directories and their
 indented contents appear before files at the parent level.
 Rows without status markers retain blank status columns so names stay aligned.
 Status columns stay fixed at the left; tree indentation applies to path names.
+The status has three slots: action (`+`, `~`, `-`, `?`, `=`), exclusion
+(`x` local, `#` remote), and presence (`l`, `r`, or blank for both sides), so
+`-x` marks an excluded path that `--prune` would delete.
 The `▸` marker means contents were not inspected, including excluded folders.
 Diff reads directories as it traverses the tree and groups their entries under
 folder headings, without separate per-directory read announcements.
 
-For push authority, a locally excluded file is treated as absent. If it exists
-remotely, default diff marks its deletion as `-`; `diff -k --all` marks the
-retained path as `x`. The presence column still reports the actual copies:
+For pruning, a locally excluded file is treated as absent. If it exists
+remotely, default diff marks it ` x` and retains it; `diff -p` marks its
+deletion as `-x`. The presence column still reports the actual copies:
 blank when both exist, `r` when only the remote copy exists. An excluded
 directory is a traversal boundary and is retained with `x`. An explicit local
 inclusion for a descendant permits traversal;
@@ -349,7 +351,9 @@ remote exclusions remain hard boundaries. `-i` never hides an actionable deletio
 Diff enters eligible child folders by default. `diff -s` or
 `diff templates --shallow` reads only immediate contents. Unentered child
 folders retain the `▸` marker and are retained, matching `push -s`; an
-unentered remote-only folder appears as `  r folder/ ▸`.
+unentered remote-only folder appears as `   r folder/ ▸`. Without `-p`, diff
+does not enter remote-only folders, since push would neither change nor
+delete their contents.
 
 Show the current status and directory notation without connecting:
 
@@ -386,12 +390,13 @@ hlsync pull templates -r
 Push uploads local-only files and replaces changed remote files. Pull replaces
 changed existing local files but never restores a missing local path. Locally
 excluded paths are never uploaded or pulled; remote-excluded paths are not
-traversed or changed. Push deletes selected remote-only paths by default,
-including remote copies of locally excluded files. Excluded directories on
+traversed or changed. Push never deletes unless `-p` / `--prune` is given;
+then it deletes selected remote-only paths, including remote copies of locally
+excluded files. Excluded directories on
 either side are retained and never entered; an explicit local inclusion beneath
 an excluded local directory is the only reason to enter that local boundary.
-`-k` / `--keep-remote` retains remote-only paths. Push recurses into selected
-directories by default, including remote-only deletion targets. `-s` /
+Push recurses into selected directories by default, including remote-only
+deletion targets when pruning. `-s` /
 `--shallow` processes immediate contents without entering child folders,
 creating them, or deleting them. A selected remote-only directory containing
 an unentered child folder is also retained.
@@ -405,7 +410,7 @@ hlsync push templates -s --dry
 ```
 
 Both `diff` and `push --dry` inherit push's recursive default. Dry push
-honors `-s`, `-k`, remote exclusions, and explicit directory scope exactly as a
+honors `-s`, `-p`, remote exclusions, and explicit directory scope exactly as a
 real push would. Interrupted-upload recovery is projected and reported but not
 performed. After planning, dry push runs the live transfer executor and skips
 only its mutation calls, preserving preflight, operation order, feedback, and
@@ -423,10 +428,7 @@ show planned operations without performing them.
 When no operation is needed, HLSync prints `Nothing to push` or `Nothing to
 pull` without announcing an empty transfer phase. An empty push also reports
 how many included files are up to date in the selected scope. Push summaries
-report the outcome without a retained-path reminder, including with `--keep-remote`.
-A dry push that plans remote deletions suggests `--keep-remote` (`-k`) as a way
-to retain those paths. The tip is omitted when `-k` was supplied or no remote
-deletions are planned.
+report the outcome without a retained-path reminder.
 
 After scanning, push shows the planned upload count and total size. Interactive
 terminals show remote reads as completed/discovered directories (such as 2/12)
@@ -437,11 +439,11 @@ counts advance only after timestamp verification and installation; failures
 remain visible immediately. Redirected output keeps ordinary per-file logs.
 Dry runs show planned totals without simulating byte progress.
 
-Retain remote-only paths for an exceptional push with:
+Delete selected remote-only paths explicitly with:
 
 ```console
-hlsync push --keep-remote
-hlsync push -k 'generated/*.html'
+hlsync push --prune
+hlsync push -p 'generated/*.html'
 ```
 
 Deletion is limited to the selected scope, runs only after every upload

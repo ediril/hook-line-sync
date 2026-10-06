@@ -635,6 +635,10 @@ def test_cli_shallow_scope_and_recursive_defaults_over_ftps(
         return output.getvalue(), errors.getvalue()
 
     output, _ = invoke(["diff"])
+    assert "child.txt" in output and "keep.txt" not in output
+    assert "   r orphan/ ▸" in output
+    assert visited == [".", "nested"]
+    output, _ = invoke(["diff", "-p"])
     assert "child.txt" in output and "keep.txt" in output
     assert visited == [".", "nested", "orphan", "orphan/deep"]
     output, _ = invoke(["diff", "-s"])
@@ -652,12 +656,16 @@ def test_cli_shallow_scope_and_recursive_defaults_over_ftps(
     assert not (remote_root / "nested/child.txt").exists()
     assert (remote_root / "orphan/direct.txt").exists()
     invoke(["push", "orphan", "-s"])
+    assert (remote_root / "orphan/direct.txt").exists()
+    invoke(["push", "orphan", "-s", "-p"])
     assert visited == [".", "orphan"]
     assert not (remote_root / "orphan/direct.txt").exists()
     assert (remote_root / "orphan/deep/keep.txt").read_text() == "keep"
     invoke(["push", "nested"])
     assert (remote_root / "nested/child.txt").read_text() == "local child"
     invoke(["push"])
+    assert (remote_root / "orphan/deep/keep.txt").exists()
+    invoke(["push", "-p"])
     assert not (remote_root / "orphan").exists()
 
 

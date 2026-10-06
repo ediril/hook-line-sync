@@ -185,8 +185,8 @@ def _active_options(arguments: argparse.Namespace) -> str | None:
         options.append("all entries (-a)")
     if getattr(arguments, "included_only", False):
         options.append("included paths only (-i)")
-    if getattr(arguments, "keep_remote", False):
-        options.append("keep remote-only paths (-k)")
+    if getattr(arguments, "prune", False):
+        options.append("prune remote-only paths (-p)")
     if getattr(arguments, "dry", False):
         options.append("dry run (--dry)")
     if getattr(arguments, "paged", False):
@@ -567,7 +567,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="preview file changes without modifying anything",
         usage=(
             "hlsync [PROFILE] diff [PATH ...]\n"
-            "       [--pull | --keep-remote] [-r | -s] [-a] [-i] [--paged]\n"
+            "       [--pull | --prune] [-r | -s] [-a] [-i] [--paged]\n"
             "       [--resume DIRECTORY]"
         ),
         description=(
@@ -611,10 +611,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="resume a paged diff at a profile-relative directory",
     )
     diff_direction.add_argument(
-        "-k",
-        "--keep-remote",
+        "-p",
+        "--prune",
         action="store_true",
-        help="show remote-only paths as retained instead of deleted",
+        help="show remote-only paths as deleted, as push --prune would",
     )
     transfer_help = {
         "push": "upload local changes to the remote profile",
@@ -624,7 +624,8 @@ def build_parser() -> argparse.ArgumentParser:
         "push": (
             "Push local changes. With no PATH, push the current subtree "
             "recursively. Directory PATHs are also recursive; use -s for "
-            "immediate contents only. Use --dry to "
+            "immediate contents only. Remote-only paths are kept unless "
+            "-p is given. Use --dry to "
             "preview the exact push without changing either side."
         ),
         "pull": (
@@ -643,7 +644,7 @@ def build_parser() -> argparse.ArgumentParser:
                     if command == "pull"
                     else "hlsync [PROFILE] push [PATH ...] [-r | -s]"
                 )
-                + (" [-k] [--dry]" if command == "push" else "")
+                + (" [-p] [--dry]" if command == "push" else "")
             ),
         )
         add_pattern_operands(
@@ -659,10 +660,10 @@ def build_parser() -> argparse.ArgumentParser:
         if command == "push":
             _add_recursive_depth_arguments(transfer_parser)
             transfer_parser.add_argument(
-                "-k",
-                "--keep-remote",
+                "-p",
+                "--prune",
                 action="store_true",
-                help="retain selected remote-only paths",
+                help="delete selected remote-only paths",
             )
             transfer_parser.add_argument(
                 "--dry",
@@ -1470,8 +1471,13 @@ def _comparison_marker(entry: ComparisonEntry) -> str:
         else "l" if entry.remote_kind is None
         else " "
     )
+    exclusion = (
+        "#" if entry.state == "remote-excluded"
+        else "x" if entry.state == "excluded"
+        else " "
+    )
     action = {
-        "excluded": "#" if entry.state == "remote-excluded" else "x",
+        "excluded": " ",
         "conflict": "?",
         "unchanged": "=",
         "untraversed": " ",
@@ -1482,12 +1488,16 @@ def _comparison_marker(entry: ComparisonEntry) -> str:
         "replace-local": "~",
         "delete-remote": "-",
     }[entry.action]
-    return f"{action} {side}"
+    return f"{action}{exclusion} {side}"
 
 
 def _comparison_marker_color(marker: str) -> str | None:
-    action = marker[0]
-    return _DIFF_MARKER_COLORS.get(action) or _DIFF_MARKER_COLORS.get(marker.strip())
+    action, exclusion, side = marker[0], marker[1], marker[3]
+    return (
+        _DIFF_MARKER_COLORS.get(action)
+        or _DIFF_MARKER_COLORS.get(exclusion)
+        or _DIFF_MARKER_COLORS.get(side)
+    )
 
 
 def _comparison_entry_kind(entry: ComparisonEntry, direction: str) -> str:
@@ -1505,10 +1515,11 @@ def _use_color(output: TextIO) -> bool:
 def _format_legend(output: TextIO) -> str:
     color = _use_color(output)
     entries = (
-        ("+ l", "local-only; upload", _DIFF_MARKER_COLORS["+"]),
-        ("~  ", "present on both sides; update", _DIFF_MARKER_COLORS["~"]),
-        ("- r", "remote-only; delete", _DIFF_MARKER_COLORS["-"]),
-        ("  r", "remote-only; retain", _DIFF_MARKER_COLORS["r"]),
+        ("+  l", "local-only; upload", _DIFF_MARKER_COLORS["+"]),
+        ("~   ", "present on both sides; update", _DIFF_MARKER_COLORS["~"]),
+        ("   r", "remote-only; retain", _DIFF_MARKER_COLORS["r"]),
+        ("-  r", "remote-only; delete with --prune", _DIFF_MARKER_COLORS["-"]),
+        ("-x  ", "locally excluded; delete with --prune", _DIFF_MARKER_COLORS["-"]),
         ("l", "local only", _DIFF_MARKER_COLORS["l"]),
         ("r", "remote only", _DIFF_MARKER_COLORS["r"]),
         (" ", "blank side column: present on both sides", None),
@@ -1544,18 +1555,24 @@ def _format_path_line(
     body = f"{marker} {indent}{label}{traversal}"
     if not color:
         return body
-    if len(marker) == 3:
-        action, side = marker[0], marker[2]
+    if len(marker) == 4:
+        action, exclusion, side = marker[0], marker[1], marker[3]
         side_color = _DIFF_MARKER_COLORS.get(side)
+        exclusion_color = _DIFF_MARKER_COLORS.get(exclusion)
         rendered_side = (
             f"{side_color}{side}{_RESET}" if side_color and side != " " else side
+        )
+        rendered_exclusion = (
+            f"{exclusion_color}{exclusion}{_RESET}"
+            if exclusion_color and exclusion != " "
+            else exclusion
         )
         rendered_action = (
             f"{marker_color}{action}{_RESET}"
             if marker_color and action != " "
             else action
         )
-        rendered_status = f"{rendered_action} {rendered_side}"
+        rendered_status = f"{rendered_action}{rendered_exclusion} {rendered_side}"
         if directory:
             directory_color = (
                 _COLLAPSED_DIRECTORY_COLOR
@@ -1647,7 +1664,7 @@ def _format_comparison_entries(
         collapsed = entry.path in collapsed_paths
         directory = _comparison_entry_kind(entry, direction) == "directory"
         marker = (
-            "   "
+            "    "
             if directory and entry.action == "unchanged"
             else _comparison_marker(entry)
         )
@@ -1728,7 +1745,7 @@ def _format_compact_comparison_entry(
         )
         lines.append(
             _format_path_line(
-                "   ",
+                "    ",
                 directory=True,
                 path=label,
                 depth=depth,
@@ -1767,7 +1784,7 @@ def _scope_header_lines(
         return ()
     return (
         _format_path_line(
-            "   ",
+            "    ",
             directory=True,
             path=display_root.as_posix(),
             color=color,
@@ -2053,8 +2070,8 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
     command.extend(("diff", *arguments.pattern_operands))
     if arguments.pull:
         command.append("--pull")
-    if arguments.keep_remote:
-        command.append("--keep-remote")
+    if arguments.prune:
+        command.append("--prune")
     if arguments.recursive:
         command.append("--recursive")
     if arguments.shallow:
@@ -2079,9 +2096,7 @@ def _build_plan(
     recover_artifacts: bool = True,
 ) -> tuple[TreeSnapshot, TreeSnapshot, ComparisonPlan]:
     selector = _file_selection(arguments, root)
-    prune_remote = direction == "push" and not getattr(
-        arguments, "keep_remote", False
-    )
+    prune_remote = direction == "push" and getattr(arguments, "prune", False)
     print("Scanning local files...", file=progress, flush=True)
 
     def report_local_directory(directory: PurePosixPath) -> None:
@@ -2150,7 +2165,7 @@ def _diff(
     selector = _file_selection(arguments, root)
     rules = _effective_rules(store, profile)
     direction = "pull" if arguments.pull else "push"
-    prune_remote = direction == "push" and not arguments.keep_remote
+    prune_remote = direction == "push" and arguments.prune
     color = _use_color(output)
     print(f"Checking differences for profile '{name}'...", file=progress, flush=True)
     options = _active_options(arguments)
@@ -2498,13 +2513,6 @@ def _format_transfer(
             if dry_run
             else [f"{direction} complete: {changes}."]
         )
-    if (
-        dry_run
-        and result.plan.direction == "push"
-        and result.plan.prune_remote
-        and any(entry.action == "delete-remote" for entry in result.plan.entries)
-    ):
-        lines.append("Tip: use --keep-remote (-k) to retain these remote paths.")
     if result.plan.direction == "pull":
         skipped = [entry for entry in result.plan.entries if entry.action == "skip"]
         if skipped:
