@@ -7,7 +7,8 @@ Date: 2026-08-30
 `hlsync diff` is a read-only exploratory comparison over its selected scope.
 Its default push perspective treats local existence as authoritative for
 creation and replacement: local-only paths are created remotely and changed
-files are replaced, while remote-only paths are retained. Deletion is opt-in:
+files are replaced when the source is newer, while remote-only paths are
+retained. Deletion is opt-in:
 `-p` / `--prune` on push, and on diff to preview it, deletes selected
 remote-only paths, including remote copies of locally excluded files. `--pull` reverses replacement direction but never
 restores missing local paths or deletes remote paths.

@@ -238,7 +238,8 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
     push_help = invoke(["help", "push"], store)[1]
     compact_push_help = " ".join(push_help.split())
     assert "-p, --prune" in push_help
-    assert "Remote-only paths are kept unless -p is given." in compact_push_help
+    assert "Remote-only paths are kept unless -p is given" in compact_push_help
+    assert "--force" in push_help
     assert "--dry" in push_help
     assert "preview the exact push without changing either side" in (
         compact_push_help
@@ -299,7 +300,7 @@ def test_profile_lifecycle_uses_production_credentials_and_version(
         "  l  local only\n"
         "  r  remote only\n"
         "     blank side column: present on both sides\n"
-        "  ?  conflict\n"
+        "  ?  conflict; destination not older, or type mismatch\n"
         "  =  unchanged file\n"
         "  x  locally excluded\n"
         "  #  remotely excluded; leave untouched\n"

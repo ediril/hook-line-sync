@@ -13,6 +13,7 @@ ComparisonState = Literal[
     "local-only",
     "remote-only",
     "changed",
+    "destination-newer",
     "excluded",
     "remote-excluded",
     "type-conflict",
@@ -77,24 +78,41 @@ def mark_untraversed_directories(
     )
 
 
-def _files_identical(local: TreeEntry, remote: TreeEntry) -> bool:
-    if local.size != remote.size:
-        return False
+def _comparable_timestamps(
+    local: TreeEntry, remote: TreeEntry
+) -> tuple[int, int] | None:
     if (
         local.modified_ns is None
         or remote.modified_ns is None
         or local.timestamp_precision_ns is None
         or remote.timestamp_precision_ns is None
     ):
-        return False
+        return None
     precision_ns = max(
         local.timestamp_precision_ns,
         remote.timestamp_precision_ns,
     )
     return (
-        local.modified_ns // precision_ns
-        == remote.modified_ns // precision_ns
+        local.modified_ns // precision_ns,
+        remote.modified_ns // precision_ns,
     )
+
+
+def _files_identical(local: TreeEntry, remote: TreeEntry) -> bool:
+    if local.size != remote.size:
+        return False
+    timestamps = _comparable_timestamps(local, remote)
+    return timestamps is not None and timestamps[0] == timestamps[1]
+
+
+def _source_is_newer(
+    local: TreeEntry, remote: TreeEntry, direction: Direction
+) -> bool:
+    timestamps = _comparable_timestamps(local, remote)
+    if timestamps is None:
+        return False
+    local_time, remote_time = timestamps
+    return local_time > remote_time if direction == "push" else remote_time > local_time
 
 
 def build_comparison(
@@ -103,6 +121,7 @@ def build_comparison(
     *,
     direction: Direction = "push",
     prune_remote: bool = False,
+    force: bool = False,
     selector: FileSelection | None = None,
 ) -> ComparisonPlan:
     local_entries = {entry.path: entry for entry in local.entries}
@@ -218,9 +237,12 @@ def build_comparison(
         ):
             state = "identical"
             action = "unchanged"
-        else:
+        elif force or _source_is_newer(local_entry, remote_entry, direction):
             state = "changed"
             action = "replace-remote" if direction == "push" else "replace-local"
+        else:
+            state = "destination-newer"
+            action = "conflict"
         comparison.append(
             ComparisonEntry(
                 path=path,

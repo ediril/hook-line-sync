@@ -388,7 +388,14 @@ hlsync pull templates -r
 ```
 
 Push uploads local-only files and replaces changed remote files. Pull replaces
-changed existing local files but never restores a missing local path. Locally
+changed existing local files but never restores a missing local path. A changed
+file is replaced only when the source copy is strictly newer than the
+destination. If the destination is newer or the same age (for example, a file
+edited on the server after your last push), diff shows `?` and push or pull
+stops before changing anything, listing the conflicting paths. Use `--force` to
+overwrite them, or select other paths. Because HLSync copies timestamps on every
+transfer, a later edit on either side makes that side newer; the check assumes
+the local and server clocks roughly agree. Locally
 excluded paths are never uploaded or pulled; remote-excluded paths are not
 traversed or changed. Push never deletes unless `-p` / `--prune` is given;
 then it deletes selected remote-only paths, including remote copies of locally

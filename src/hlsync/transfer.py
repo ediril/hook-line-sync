@@ -79,11 +79,17 @@ def _entry_map(snapshot: TreeSnapshot) -> dict[str, TreeEntry]:
 
 
 def _preflight(plan: ComparisonPlan, local_root: Path, local: TreeSnapshot) -> None:
-    conflicts = [entry.path for entry in plan.entries if entry.action == "conflict"]
+    conflicts = [entry for entry in plan.entries if entry.action == "conflict"]
     if conflicts:
-        raise TransferError(
-            "transfer has unresolved conflict(s): " + ", ".join(conflicts)
+        message = "transfer has unresolved conflict(s): " + ", ".join(
+            entry.path for entry in conflicts
         )
+        if any(entry.state == "destination-newer" for entry in conflicts):
+            message += (
+                "; destination files not older than their source are kept"
+                " unless --force is given"
+            )
+        raise TransferError(message)
     local_entries = _entry_map(local)
     for entry in plan.entries:
         if entry.action not in {"upload", "replace-remote", "replace-local"}:

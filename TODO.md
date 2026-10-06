@@ -2,6 +2,9 @@
 
 - [x] Make remote deletion opt-in: push and diff retain remote-only paths unless
   `-p` / `--prune` is given, replacing `-k` / `--keep-remote`.
+- [x] Replace a changed file only when the source is strictly newer; treat a
+  newer or same-age destination as a `?` conflict that stops push or pull
+  unless `--force` is given.
 - [x] Give diff status a dedicated exclusion slot (action, exclusion, presence)
   so a pruned excluded path shows both `-` and `x`.
 - [x] Make diff and push recursive by default; support `-s` / `--shallow` for

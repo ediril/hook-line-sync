@@ -679,6 +679,7 @@ def test_gitignore_pruning_and_override_over_ftps(
     for name in ("ignored.txt", "deploy.txt"):
         (local_root / name).write_text("local")
         (remote_root / name).write_text("old")
+        os.utime(remote_root / name, (1_600_000_000, 1_600_000_000))
     rules = RuleSet(
         (SyncRule(1, "exclude", ".gitignore"), SyncRule(2, "include", "deploy.txt")),
         gitignores=GitIgnores(local_root),
@@ -777,3 +778,44 @@ def test_push_skips_an_unwritable_subtree_and_continues_independent_files(
         ("skipped", "blocked/child.txt"),
         ("skipped", "orphan.txt"),
     ]
+
+
+def test_cli_push_refuses_to_overwrite_a_newer_remote_file_without_force(
+    tls_ftp_server, tmp_path, monkeypatch
+):
+    port, certificate, remote_root = tls_ftp_server
+    local_root = tmp_path / "local"
+    local_root.mkdir()
+    for name, local_time, remote_time in (
+        ("page.html", 1_600_000_000, 1_700_000_000),
+        ("app.js", 1_700_000_000, 1_600_000_000),
+    ):
+        (local_root / name).write_text("local")
+        os.utime(local_root / name, (local_time, local_time))
+        (remote_root / name).write_text("remote!")
+        os.utime(remote_root / name, (remote_time, remote_time))
+    monkeypatch.chdir(local_root)
+    monkeypatch.setenv("PROD_FTPS_USERNAME", "prod-user")
+    monkeypatch.setenv("PROD_FTPS_PASSWORD", "prod-password")
+    store = ConfigurationStore(tmp_path / "configs.json")
+    store.save(ApplicationConfiguration(profiles={
+        "prod": ProfileConfiguration(
+            host="localhost", port=port, remote_root="/", local_root=str(local_root),
+        ),
+    }))
+    context = ssl.create_default_context(cafile=os.fspath(certificate))
+    monkeypatch.setattr(
+        "hlsync.cli.ExplicitFTPSTransport",
+        lambda profile: ExplicitFTPSTransport(profile, ssl_context=context),
+    )
+
+    errors = io.StringIO()
+    assert run(["push"], store=store, stdout=io.StringIO(), stderr=errors) == 1
+    assert "page.html" in errors.getvalue() and "--force" in errors.getvalue()
+    # The conflict stops the whole push before any file is changed.
+    assert (remote_root / "page.html").read_text() == "remote!"
+    assert (remote_root / "app.js").read_text() == "remote!"
+    assert run(["push", "--force"], store=store, stdout=io.StringIO(),
+               stderr=io.StringIO()) == 0
+    assert (remote_root / "page.html").read_text() == "local"
+    assert (remote_root / "app.js").read_text() == "local"

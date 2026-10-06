@@ -187,6 +187,8 @@ def _active_options(arguments: argparse.Namespace) -> str | None:
         options.append("included paths only (-i)")
     if getattr(arguments, "prune", False):
         options.append("prune remote-only paths (-p)")
+    if getattr(arguments, "force", False):
+        options.append("overwrite newer destinations (--force)")
     if getattr(arguments, "dry", False):
         options.append("dry run (--dry)")
     if getattr(arguments, "paged", False):
@@ -625,12 +627,14 @@ def build_parser() -> argparse.ArgumentParser:
             "Push local changes. With no PATH, push the current subtree "
             "recursively. Directory PATHs are also recursive; use -s for "
             "immediate contents only. Remote-only paths are kept unless "
-            "-p is given. Use --dry to "
+            "-p is given, and a remote file is replaced only when the local "
+            "copy is newer unless --force is given. Use --dry to "
             "preview the exact push without changing either side."
         ),
         "pull": (
             "Pull requires a PATH. A directory PATH is shallow unless -r; "
-            "missing local paths stay missing."
+            "missing local paths stay missing. A local file is replaced only "
+            "when the remote copy is newer unless --force is given."
         ),
     }
     for command in ("push", "pull"):
@@ -640,11 +644,11 @@ def build_parser() -> argparse.ArgumentParser:
             description=transfer_description[command],
             usage=(
                 (
-                    "hlsync [PROFILE] pull PATH [PATH ...] [-r]"
+                    "hlsync [PROFILE] pull PATH [PATH ...] [-r] [--force]"
                     if command == "pull"
                     else "hlsync [PROFILE] push [PATH ...] [-r | -s]"
                 )
-                + (" [-p] [--dry]" if command == "push" else "")
+                + (" [-p] [--force] [--dry]" if command == "push" else "")
             ),
         )
         add_pattern_operands(
@@ -675,6 +679,11 @@ def build_parser() -> argparse.ArgumentParser:
                 "-r", "--recursive", action="store_true",
                 help="recurse into selected directories",
             )
+        transfer_parser.add_argument(
+            "--force",
+            action="store_true",
+            help="overwrite destination files that are not older than the source",
+        )
 
     help_parser = subparsers.add_parser("help", help="show command help")
     help_parser.add_argument("topic", nargs="?")
@@ -1523,7 +1532,11 @@ def _format_legend(output: TextIO) -> str:
         ("l", "local only", _DIFF_MARKER_COLORS["l"]),
         ("r", "remote only", _DIFF_MARKER_COLORS["r"]),
         (" ", "blank side column: present on both sides", None),
-        ("?", "conflict", _DIFF_MARKER_COLORS["?"]),
+        (
+            "?",
+            "conflict; destination not older, or type mismatch",
+            _DIFF_MARKER_COLORS["?"],
+        ),
         ("=", "unchanged file", None),
         ("x", "locally excluded", _DIFF_MARKER_COLORS["x"]),
         ("#", "remotely excluded; leave untouched", _DIFF_MARKER_COLORS["#"]),
@@ -2138,6 +2151,7 @@ def _build_plan(
         remote,
         direction=direction,
         prune_remote=prune_remote,
+        force=getattr(arguments, "force", False),
         selector=comparison_selection if arguments.pattern_operands else None,
     )
     untraversed_directories = frozenset(

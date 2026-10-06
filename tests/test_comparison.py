@@ -21,7 +21,14 @@ def test_comparison_profiles_push_pull_prune_and_timestamp_precision() -> None:
                 "changed.txt",
                 "file",
                 size=12,
-                modified_ns=second,
+                modified_ns=second + 1_000_000_000,
+                timestamp_precision_ns=1,
+            ),
+            TreeEntry(
+                "same-second.txt",
+                "file",
+                size=3,
+                modified_ns=second + 900_000_000,
                 timestamp_precision_ns=1,
             ),
             TreeEntry(
@@ -67,6 +74,13 @@ def test_comparison_profiles_push_pull_prune_and_timestamp_precision() -> None:
                 modified_ns=second,
                 timestamp_precision_ns=1_000_000_000,
             ),
+            TreeEntry(
+                "same-second.txt",
+                "file",
+                size=4,
+                modified_ns=second,
+                timestamp_precision_ns=1_000_000_000,
+            ),
             TreeEntry("conflict", "directory"),
             TreeEntry(
                 "remote.txt",
@@ -107,7 +121,19 @@ def test_comparison_profiles_push_pull_prune_and_timestamp_precision() -> None:
         "unchanged",
     )
     assert push["changed.txt"].action == "replace-remote"
-    assert pull["changed.txt"].action == "replace-local"
+    # Only a strictly newer source replaces; ties at the coarser precision
+    # cannot show which side is newer, so they conflict unless forced.
+    assert (pull["changed.txt"].state, pull["changed.txt"].action) == (
+        "destination-newer",
+        "conflict",
+    )
+    assert push["same-second.txt"].action == "conflict"
+    forced = {
+        entry.path: entry
+        for entry in build_comparison(local, remote, force=True).entries
+    }
+    assert forced["same-second.txt"].action == "replace-remote"
+    assert forced["conflict"].action == "conflict"
     assert push["local.txt"].action == "upload"
     assert pull["local.txt"].action == "skip"
     assert push["remote.txt"].action == "skip"
@@ -134,6 +160,7 @@ def test_comparison_profiles_push_pull_prune_and_timestamp_precision() -> None:
         "excluded.txt",
         "local.txt",
         "remote.txt",
+        "same-second.txt",
     ]
     with pytest.raises(SelectionError, match="matched no"):
         build_comparison(
