@@ -1,5 +1,7 @@
 # Work Queue
 
+- [x] Make default diff show only what push or pull would do, with a hidden-count
+  footer; `-x` adds exclusions and `-a` shows everything. Remove diff's `-i`.
 - [x] Replace `rules -e` / `rules -i` with top-level `exclude` and `include`
   commands, and `rules --remove ID` with `rules rm ID`.
 - [x] Make remote deletion opt-in: push and diff retain remote-only paths unless

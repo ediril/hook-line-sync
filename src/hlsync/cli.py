@@ -189,6 +189,8 @@ def _active_options(arguments: argparse.Namespace) -> str | None:
         options.append("all entries (-a)")
     if getattr(arguments, "included_only", False):
         options.append("included paths only (-i)")
+    if getattr(arguments, "show_excluded", False):
+        options.append("excluded paths (-x)")
     if getattr(arguments, "prune", False):
         options.append("prune remote-only paths (-p)")
     if getattr(arguments, "force", False):
@@ -610,13 +612,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="show changes from the remote perspective without remote deletion",
     )
     _add_recursive_depth_arguments(diff_parser)
-    _add_included_only_argument(diff_parser)
+    diff_parser.add_argument(
+        "-x",
+        "--excluded",
+        dest="show_excluded",
+        action="store_true",
+        help="also show excluded paths",
+    )
     diff_parser.add_argument(
         "-a",
         "--all",
         dest="show_all",
         action="store_true",
-        help="also show unchanged and untraversed paths",
+        help="show every compared path, including unchanged and kept ones",
     )
     diff_parser.add_argument(
         "--paged",
@@ -2095,8 +2103,8 @@ def _resume_command(arguments: argparse.Namespace, directory: PurePosixPath) -> 
         command.append("--recursive")
     if arguments.shallow:
         command.append("--shallow")
-    if arguments.included_only:
-        command.append("-i")
+    if arguments.show_excluded:
+        command.append("--excluded")
     if arguments.show_all:
         command.append("--all")
     command.extend(("--paged", "--resume", directory.as_posix()))
@@ -2223,6 +2231,7 @@ def _diff(
     seeking = resume is not None
     selected_count = 0
     displayed_count = 0
+    hidden: dict[str, int] = {}
     emitted_directories: set[str] = set()
 
     def format_entries(
@@ -2403,30 +2412,13 @@ def _diff(
             shown = tuple(
                 entry
                 for entry in plan.entries
-                if (
-                    (
-                        arguments.show_all
-                        and (
-                            not arguments.included_only
-                            or entry.action != "excluded"
-                        )
-                    )
-                    or (
-                        not arguments.show_all
-                        and (
-                            entry.action
-                            not in {"unchanged", "excluded", "untraversed"}
-                            or (
-                                entry.action == "excluded"
-                                and not arguments.included_only
-                            )
-                            or (
-                                entry.action == "untraversed"
-                            )
-                        )
-                    )
-                )
+                if _diff_entry_visible(entry, direction, arguments)
             )
+            for entry in plan.entries:
+                if entry not in shown and entry.path != directory.as_posix():
+                    category = _hidden_diff_category(entry)
+                    if category is not None:
+                        hidden[category] = hidden.get(category, 0) + 1
 
             if arguments.paged:
                 pending.extend(reversed(pending_descendants))
@@ -2436,10 +2428,11 @@ def _diff(
                 displayed_count += len(lines)
                 if not lines:
                     print(
-                        f"  no differences in {display_directory}",
+                        f"  nothing to {direction} in {display_directory}",
                         file=output,
                         flush=True,
                     )
+                _print_hidden_summary(hidden, output)
                 if pending:
                     print(
                         f"Resume: {_resume_command(arguments, pending[-1].path)}",
@@ -2501,7 +2494,55 @@ def _diff(
     if arguments.pattern_operands and selected_count == 0:
         raise SelectionError(f"file selector '{selector.pattern}' matched no paths")
     if displayed_count == 0:
-        print("  no differences", file=output, flush=True)
+        print(f"  nothing to {direction}", file=output, flush=True)
+    _print_hidden_summary(hidden, output)
+
+
+_HIDDEN_DIFF_HINTS = {
+    "excluded": "-x",
+    "remote-only": "-a",
+    "local-only": "-a",
+}
+
+
+def _diff_entry_visible(
+    entry: ComparisonEntry,
+    direction: str,
+    arguments: argparse.Namespace,
+) -> bool:
+    """Show what the transfer would do; -x adds exclusions, -a everything."""
+    if arguments.show_all:
+        return True
+    if entry.action == "excluded":
+        return arguments.show_excluded
+    if entry.action == "untraversed":
+        # An unentered folder matters only if it could still hold changes.
+        if direction == "push":
+            return entry.local_kind is not None
+        return entry.local_kind is not None and entry.remote_kind is not None
+    return entry.action not in {"unchanged", "skip"}
+
+
+def _hidden_diff_category(entry: ComparisonEntry) -> str | None:
+    if entry.action == "excluded":
+        return "excluded"
+    if entry.action in {"skip", "untraversed"}:
+        if entry.local_kind is None:
+            return "remote-only"
+        if entry.remote_kind is None:
+            return "local-only"
+    return None
+
+
+def _print_hidden_summary(hidden: dict[str, int], output: TextIO) -> None:
+    if not hidden:
+        return
+    parts = ", ".join(
+        f"{hidden[category]} {category} ({_HIDDEN_DIFF_HINTS[category]})"
+        for category in _HIDDEN_DIFF_HINTS
+        if category in hidden
+    )
+    print(f"Not shown: {parts}", file=output, flush=True)
 
 
 def _format_transfer(

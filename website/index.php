@@ -222,7 +222,7 @@ function h(string $value): string
                     <span class="step-number">03</span>
                     <div class="step-icon" aria-hidden="true">∆</div>
                     <h3>Read the diff</h3>
-                    <p>Compare local and remote files before changing either side. Routine output stays focused on paths that differ; <code>--all</code> reveals the complete comparison.</p>
+                    <p>Compare local and remote files before changing either side. Routine output shows only what the push would change; <code>-x</code> adds exclusions and <code>--all</code> reveals the complete comparison.</p>
                     <code>hlsync diff</code>
                 </li>
                 <li>

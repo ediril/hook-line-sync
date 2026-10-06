@@ -1049,11 +1049,16 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "linked" not in push_comparison[1]
     assert "node_modules" not in push_comparison[1]
     assert "same.txt" not in push_comparison[1]
-    assert " x     debug.log\n" in push_comparison[1]
-    pruned_exclusions = invoke(["diff", "-p", "-i"], store)
+    assert "debug.log" not in push_comparison[1]
+    assert push_comparison[1].endswith("Not shown: 1 excluded (-x)\n")
+    shown_exclusions = invoke(["diff", "-x"], store)
+    assert " x     debug.log\n" in shown_exclusions[1]
+    assert "Not shown" not in shown_exclusions[1]
+    # Hidden exclusions never hide a deletion that --prune would perform.
+    pruned_exclusions = invoke(["diff", "-p"], store)
     assert "-x     debug.log\n" in pruned_exclusions[1]
     assert invoke(["prod", "diff", "same.txt"], store)[1] == (
-        "  no differences\n"
+        "  nothing to push\n"
     )
 
     recursive_comparison = invoke(["diff", "-r"], store)
@@ -1075,18 +1080,21 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert "\033[31mdeployed.html\033[0m\n" in pruned_comparison[1]
     assert "archive/ ▸" not in pruned_comparison[1]
     assert "\033[31m-\033[0m" in pruned_comparison[1]
-    assert " \033[90mx\033[0m \033[38;5;51ml\033[0m" in pruned_comparison[1]
-    assert "node_modules/" in pruned_comparison[1]
+    assert "node_modules/" not in pruned_comparison[1]
     assert "\033[38;5;75msrc/\033[0m" in pruned_comparison[1]
     assert "same.txt" not in pruned_comparison[1]
     kept_comparison = invoke(["diff"], store, terminal_output=True)
     assert "Options:" not in kept_comparison[2]
+    assert "deployed.html" not in kept_comparison[1]
+    assert "remote-only (-a)\n" in kept_comparison[1]
     retained_line = (
         "   \033[38;5;30mr\033[0m "
         "\033[38;5;30mdeployed.html\033[0m\n"
     )
-    assert retained_line in kept_comparison[1]
-    explicit_shallow = invoke(["diff", ".", "--shallow"], store, terminal_output=True)
+    assert retained_line in invoke(["diff", "-a"], store, terminal_output=True)[1]
+    explicit_shallow = invoke(
+        ["diff", ".", "--shallow", "-a"], store, terminal_output=True
+    )
     assert "archive/ ▸" in explicit_shallow[1]
     assert "\033[38;5;30mr\033[0m" in explicit_shallow[1]
     monkeypatch.chdir(source)
@@ -1140,10 +1148,6 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     assert colored_comparison[1].index("child.py") < (
         colored_comparison[1].index("README.md")
     )
-    all_included = invoke(["diff", "**", "--all", "-i", "-p"], store)
-    assert "=    same.txt" in all_included[1]
-    assert "-x     debug.log\n" in all_included[1]
-    assert "node_modules" not in all_included[1]
     with monkeypatch.context() as no_color:
         no_color.setenv("NO_COLOR", "1")
         uncolored_comparison = invoke(
@@ -1170,7 +1174,7 @@ def test_current_profile_inference_drives_connect_and_tree_listings(
     monkeypatch.chdir(workspace)
 
     pull_comparison = invoke(
-        ["diff", "--pull", "-r"], store, terminal_output=True
+        ["diff", "--pull", "-r", "-a"], store, terminal_output=True
     )
     assert pull_comparison[0] == 0
     assert "\033[38;5;30mr\033[0m" in pull_comparison[1]
@@ -1395,7 +1399,7 @@ def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
 
     monkeypatch.setattr("hlsync.cli.ExplicitFTPSTransport", RemoteOnlyTransport)
 
-    status, output, error = invoke(["diff", "-r"], store)
+    status, output, error = invoke(["diff", "-r", "-x"], store)
     assert status == 0, error
     assert listed == ["."]
     assert " x r cache/ ▸\n" in output
@@ -1404,7 +1408,7 @@ def test_recursive_diff_prunes_locally_excluded_remote_only_directory(
     # An explicit descendant inclusion must still allow traversal.
     assert invoke(["include", "--pattern", "cache/keep.txt"], store)[0] == 0
     listed.clear()
-    status, output, error = invoke(["diff", "-r", "-p"], store)
+    status, output, error = invoke(["diff", "-r", "-p", "-x"], store)
     assert status == 0, error
     assert listed == [".", "cache"]
     assert " x r cache/\n" in output
@@ -1497,7 +1501,7 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
 
     monkeypatch.setattr("hlsync.cli.ExplicitFTPSTransport", ProtectedTransport)
 
-    comparison = invoke(["diff", "-r"], store)
+    comparison = invoke(["diff", "-r", "-x"], store)
     assert comparison[0] == 0
     assert comparison[1] == " #   future-dir/ ▸\n"
     assert listed == ["."]
@@ -1505,7 +1509,9 @@ def test_remote_rules_are_declarative_sync_boundaries(tmp_path, monkeypatch) -> 
     remote_listing = invoke(["lsr"], store)
     assert remote_listing[0] == 0
     assert "# future-dir/\n" in remote_listing[1]
-    colored_boundary = invoke(["diff", "-r"], store, terminal_output=True)[1]
+    colored_boundary = invoke(
+        ["diff", "-r", "-x"], store, terminal_output=True
+    )[1]
     assert " \033[90m#\033[0m   " in colored_boundary
     assert "\033[38;5;24mfuture-dir/ ▸\033[0m" in colored_boundary
     colored_remote_listing = invoke(["lsr"], store, terminal_output=True)[1]

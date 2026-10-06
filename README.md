@@ -325,10 +325,16 @@ hlsync diff -p
 ```
 
 `--pull` changes the perspective for changed existing files and retains
-remote-only paths. Diff normally shows actionable differences, retained
-one-sided paths, conflicts, and local or remote exclusion boundaries. Use
-`-i`/`--inc`/`--included-only` to hide exclusions. Use `-a`/`--all` to restore
-unchanged and untraversed entries for the complete exploratory view.
+remote-only paths.
+
+By default, diff shows only what the matching push or pull would do: uploads,
+updates, deletions, and conflicts, under their folder headings. A final
+`Not shown:` line counts what was hidden. Widen the view with:
+
+```console
+hlsync diff -x      # also show excluded paths (--excluded)
+hlsync diff -a      # show everything, including unchanged and kept paths (--all)
+```
 Recursive diff keeps file-browser order in both views: directories and their
 indented contents appear before files at the parent level.
 Rows without status markers retain blank status columns so names stay aligned.
@@ -346,14 +352,16 @@ deletion as `-x`. The presence column still reports the actual copies:
 blank when both exist, `r` when only the remote copy exists. An excluded
 directory is a traversal boundary and is retained with `x`. An explicit local
 inclusion for a descendant permits traversal;
-remote exclusions remain hard boundaries. `-i` never hides an actionable deletion.
+remote exclusions remain hard boundaries. Hiding exclusions never hides a
+deletion: with `-p`, an excluded path that would be deleted always shows as `-x`.
 
 Diff enters eligible child folders by default. `diff -s` or
 `diff templates --shallow` reads only immediate contents. Unentered child
-folders retain the `▸` marker and are retained, matching `push -s`; an
-unentered remote-only folder appears as `   r folder/ ▸`. Without `-p`, diff
-does not enter remote-only folders, since push would neither change nor
-delete their contents.
+folders retain the `▸` marker and are retained, matching `push -s`. Unentered
+folders appear by default only when they could still hold changes; an
+unentered remote-only folder appears as `   r folder/ ▸` with `-a`. Without
+`-p`, diff does not enter remote-only folders, since push would neither change
+nor delete their contents.
 
 Show the current status and directory notation without connecting:
 

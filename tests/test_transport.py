@@ -636,13 +636,15 @@ def test_cli_shallow_scope_and_recursive_defaults_over_ftps(
 
     output, _ = invoke(["diff"])
     assert "child.txt" in output and "keep.txt" not in output
-    assert "   r orphan/ ▸" in output
+    assert "orphan" not in output
+    assert output.endswith("Not shown: 1 remote-only (-a)\n")
     assert visited == [".", "nested"]
     output, _ = invoke(["diff", "-p"])
     assert "child.txt" in output and "keep.txt" in output
     assert visited == [".", "nested", "orphan", "orphan/deep"]
     output, _ = invoke(["diff", "-s"])
-    assert "nested/ ▸" in output and "orphan/ ▸" in output
+    # Unentered local folders may hold changes; remote-only ones cannot.
+    assert "nested/ ▸" in output and "orphan" not in output
     assert "child.txt" not in output and "keep.txt" not in output
     assert visited == ["."]
     _, progress = invoke(["push", "--shallow", "--dry"])
